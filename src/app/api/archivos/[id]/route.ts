@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentClientAccount, getCurrentUser } from "@/lib/auth";
-import { readUpload } from "@/lib/storage";
+import { downloadTarget } from "@/lib/storage";
 
 /**
  * Descarga de archivos subidos.
@@ -34,12 +34,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
 
   if (!file?.storageKey) return new Response("No encontrado", { status: 404 });
-  const data = await readUpload(file.storageKey);
-  const ascii = file.name.replace(/[^\x20-\x7e]/g, "_").replace(/"/g, "");
-  return new Response(new Uint8Array(data), {
+  const target = await downloadTarget(file.storageKey, { filename: file.name, mimeType: file.mimeType, download });
+  // R2: redirección a un link firmado que vence en minutos (el archivo sigue siendo privado).
+  if (target.redirect) {
+    return new Response(null, { status: 302, headers: { Location: target.redirect, "Cache-Control": "private, no-store" } });
+  }
+  return new Response(new Uint8Array(target.data!), {
     headers: {
       "Content-Type": file.mimeType || "application/octet-stream",
-      "Content-Disposition": `${download ? "attachment" : "inline"}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(file.name)}`,
+      "Content-Disposition": target.disposition,
       "Cache-Control": "private, max-age=0",
       "X-Content-Type-Options": "nosniff",
     },

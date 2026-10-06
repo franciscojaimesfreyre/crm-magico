@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { duplicateUpload, removeUpload, saveUpload } from "@/lib/storage";
+import { confirmUpload, createUploadTarget, duplicateUpload, removeUpload, saveUpload, storageMode } from "@/lib/storage";
 import { logActivity, notifyClient } from "@/lib/events";
 import type { ActionState } from "@/components/form-controls";
 
@@ -18,25 +18,54 @@ function cleanUrl(value: FormDataEntryValue | null) {
   }
 }
 
+/** Link firmado para que el navegador suba el archivo directo a Cloudflare R2. */
+export async function requestUploadUrl(name: string, contentType: string, size: number) {
+  const user = await requireUser();
+  if (!user.organizationId) return { error: "Sin permiso" };
+  if (storageMode() !== "r2") return { error: "La subida directa no está configurada" };
+  return createUploadTarget(user.organizationId, name, contentType, size);
+}
+
+type Stored = { key: string; size: number; mimeType: string };
+
+/**
+ * Archivo que llega con el formulario: o ya subido a R2 por el navegador (uploadKey),
+ * o el archivo en sí (modo local). Devuelve null si no vino ninguno.
+ */
+async function incomingFile(formData: FormData, organizationId: string): Promise<{ stored: Stored; name: string } | { error: string } | null> {
+  if (formData.get("uploadPending") === "1") return { error: "Esperá a que termine de subir el archivo" };
+  const uploadKey = String(formData.get("uploadKey") ?? "");
+  if (uploadKey) {
+    const stored = await confirmUpload(organizationId, uploadKey);
+    if (!stored) return { error: "No encontramos el archivo subido. Probá subirlo de nuevo." };
+    return { stored, name: String(formData.get("uploadName") ?? "").trim() || "Archivo" };
+  }
+  const file = formData.get("file");
+  if (file instanceof File && file.size > 0) {
+    try {
+      return { stored: await saveUpload(file, organizationId), name: file.name };
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : "No se pudo subir el archivo" };
+    }
+  }
+  return null;
+}
+
 // ─── Documentos de una reserva ───────────────────────────────────────────────
 
 export async function addBookingDocument(bookingId: string, _: ActionState, formData: FormData): Promise<ActionState> {
   const user = await requireUser();
   const booking = await db.booking.findFirst({ where: { id: bookingId, organizationId: user.organizationId } });
   if (!booking) return { error: "Viaje no encontrado" };
-  const file = formData.get("file");
   const url = cleanUrl(formData.get("url"));
   const visibleToClient = formData.get("visibleToClient") === "on";
   let name = String(formData.get("name") ?? "").trim();
 
-  let stored: { key: string; size: number; mimeType: string } | null = null;
-  if (file instanceof File && file.size > 0) {
-    try {
-      stored = await saveUpload(file, user.organizationId);
-    } catch (e) {
-      return { error: e instanceof Error ? e.message : "No se pudo subir el archivo" };
-    }
-    name ||= file.name;
+  const incoming = await incomingFile(formData, user.organizationId);
+  if (incoming && "error" in incoming) return { error: incoming.error };
+  const stored = incoming?.stored ?? null;
+  if (incoming) {
+    name ||= incoming.name;
   } else if (url) {
     name ||= url;
   } else {
@@ -124,18 +153,14 @@ export async function deleteDocument(id: string) {
 
 export async function addLibraryDocument(_: ActionState, formData: FormData): Promise<ActionState> {
   const user = await requireUser();
-  const file = formData.get("file");
   const url = cleanUrl(formData.get("url"));
   const folder = String(formData.get("folder") ?? "").trim() || null;
   let name = String(formData.get("name") ?? "").trim();
-  let stored: { key: string; size: number; mimeType: string } | null = null;
-  if (file instanceof File && file.size > 0) {
-    try {
-      stored = await saveUpload(file, user.organizationId);
-    } catch (e) {
-      return { error: e instanceof Error ? e.message : "No se pudo subir el archivo" };
-    }
-    name ||= file.name;
+  const incoming = await incomingFile(formData, user.organizationId);
+  if (incoming && "error" in incoming) return { error: incoming.error };
+  const stored = incoming?.stored ?? null;
+  if (incoming) {
+    name ||= incoming.name;
   } else if (url) {
     name ||= url;
   } else {

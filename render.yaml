@@ -1,0 +1,56 @@
+# Blueprint de Render: app web + Postgres, ambos en el plan gratis.
+# Crear en Render: New → Blueprint → elegir este repo. Pide los valores marcados con sync: false.
+#
+# Ojo con el plan gratis:
+# - La app se duerme tras 15 minutos sin visitas y tarda ~1 minuto en despertar.
+# - La base Postgres gratis vence a los 30 días (queda inaccesible) y se borra 14 días después
+#   si no se pasa a un plan pago. No tiene backups.
+# - El disco es temporal: los archivos van a Cloudflare R2 (variables R2_*).
+
+databases:
+  - name: crm-magico-db
+    plan: free
+    region: virginia
+    postgresMajorVersion: "17"
+    databaseName: crm_magico
+    user: crm
+
+services:
+  - name: crm-magico
+    type: web
+    runtime: node
+    plan: free
+    region: virginia
+    buildCommand: npm ci && npm run build
+    # Aplica las migraciones pendientes antes de arrancar (el plan gratis no tiene paso de pre-deploy).
+    startCommand: npx prisma migrate deploy && npm start
+    healthCheckPath: /login
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: crm-magico-db
+          property: connectionString
+      # Secretos generados por Render (base64 de 256 bits; ENCRYPTION_KEY necesita justo ese formato).
+      # No cambiar ENCRYPTION_KEY una vez que haya accesos de clientes guardados: quedarían ilegibles.
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: ENCRYPTION_KEY
+        generateValue: true
+      - key: CRON_SECRET
+        generateValue: true
+      # Archivos en Cloudflare R2.
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET
+        sync: false
+      # IA (opcional: sin clave, la app funciona y la IA muestra un aviso).
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      # La URL pública se toma sola de RENDER_EXTERNAL_URL; APP_URL solo hace falta con dominio propio.

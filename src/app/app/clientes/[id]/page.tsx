@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { KeyRound, Mail, MapPin, Phone, Trash2 } from "lucide-react";
+import { CheckCircle2, KeyRound, Mail, MapPin, Phone, Plus, Trash2 } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { ActionForm, ConfirmButton, SubmitButton } from "@/components/form-controls";
@@ -28,6 +28,7 @@ import {
 } from "../actions";
 import { CopyText, RevealPassword, TemplatePicker } from "./client-widgets";
 import { TravelerForm } from "./traveler-form";
+import { appUrl } from "@/lib/app-url";
 
 const TABS = [
   { key: "viajes", label: "Viajes" },
@@ -42,10 +43,10 @@ export default async function ClientPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; creado?: string; para?: string }>;
 }) {
   const { id } = await params;
-  const { tab = "viajes" } = await searchParams;
+  const { tab = "viajes", creado, para } = await searchParams;
   const user = await requireUser();
   const client = await db.client.findFirst({
     where: { id, organizationId: user.organizationId },
@@ -68,7 +69,7 @@ export default async function ClientPage({
   const templates = tab === "email"
     ? await db.emailTemplate.findMany({ where: { organizationId: user.organizationId }, orderBy: { name: "asc" } })
     : [];
-  const appUrl = process.env.APP_URL ?? "http://localhost:3000";
+  const baseUrl = appUrl();
 
   return (
     <>
@@ -93,6 +94,25 @@ export default async function ClientPage({
           </>
         }
       />
+
+      {creado && (
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 className="size-6 shrink-0 text-emerald-600" />
+            <div>
+              <p className="font-medium text-emerald-900">Cliente creado</p>
+              <p className="text-sm text-emerald-800">
+                {para === "viaje"
+                  ? `Ahora creá el viaje de ${client.firstName}: ya va a quedar elegido como cliente.`
+                  : `¿Ya tenés un viaje para ${client.firstName}? Crealo ahora y cargale sus reservas.`}
+              </p>
+            </div>
+          </div>
+          <LinkButton href={`/app/viajes/nueva?clientId=${id}`}>
+            <Plus className="size-4" /> Crear viaje para {client.firstName}
+          </LinkButton>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="min-w-0">
@@ -314,7 +334,7 @@ export default async function ClientPage({
                 <p className="mt-1 text-xs text-slate-500">Código de invitación:</p>
                 <p className="mt-1 font-mono text-2xl font-semibold tracking-widest text-brand-700">{client.inviteCode}</p>
                 <div className="mt-2 flex flex-wrap gap-3">
-                  <CopyText text={`${appUrl}/portal/registro?codigo=${client.inviteCode}`} label="Copiar link" />
+                  <CopyText text={`${baseUrl}/portal/registro?codigo=${client.inviteCode}`} label="Copiar link" />
                   <form action={regenerateInviteCode.bind(null, id)}>
                     <button className="text-xs text-slate-500 hover:underline">Generar otro</button>
                   </form>

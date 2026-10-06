@@ -10,6 +10,7 @@ import { sendEmail } from "@/lib/email";
 import { AIError, draftQuoteMessage } from "@/lib/ai";
 import type { ActionState } from "@/components/form-controls";
 import type { ItemType } from "@/generated/prisma/enums";
+import { appUrl } from "@/lib/app-url";
 
 async function ownQuote(quoteId: string) {
   const user = await requireUser();
@@ -156,7 +157,7 @@ export async function sendQuote(quoteId: string, _state?: ActionState, _formData
     await changeBookingStatus({ bookingId: quote.bookingId, status: "QUOTED", userId: user.id });
   }
   const client = quote.booking.client;
-  const appUrl = process.env.APP_URL ?? "http://localhost:3000";
+  const baseUrl = appUrl();
   const link = `/portal/cotizaciones/${quoteId}`;
   await notifyClient({
     organizationId: user.organizationId,
@@ -183,7 +184,7 @@ export async function sendQuote(quoteId: string, _state?: ActionState, _formData
 
 ${quote.message ?? "Te preparé una cotización para tu próximo viaje."}
 
-Podés ver el detalle y aceptarla desde tu portal: ${appUrl}${link}
+Podés ver el detalle y aceptarla desde tu portal: ${baseUrl}${link}
 ${client.inviteCode ? `\nSi todavía no tenés cuenta, registrate con el código ${client.inviteCode}.` : ""}
 
 ${user.name}`,

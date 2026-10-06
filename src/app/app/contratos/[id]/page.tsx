@@ -10,6 +10,7 @@ import { PrintButton } from "@/app/app/comisiones/widgets";
 import { CONTRACT_STATUS_COLOR, CONTRACT_STATUS_LABEL } from "@/lib/labels";
 import { formatDateTime } from "@/lib/format";
 import { deleteContract, sendContract, updateContractBody } from "../actions";
+import { appUrl } from "@/lib/app-url";
 
 export const metadata = { title: "Contrato" };
 
@@ -18,7 +19,7 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
   const user = await requireUser();
   const c = await db.contract.findFirst({ where: { id, organizationId: user.organizationId }, include: { client: true, booking: true } });
   if (!c) notFound();
-  const link = `${process.env.APP_URL ?? "http://localhost:3000"}/firmar/${c.token}`;
+  const link = `${appUrl()}/firmar/${c.token}`;
   const signed = c.status === "SIGNED";
   return (
     <>

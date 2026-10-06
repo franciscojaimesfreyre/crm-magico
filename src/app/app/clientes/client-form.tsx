@@ -9,12 +9,17 @@ type Props = {
   client?: Client;
   referrers: { id: string; firstName: string; lastName: string }[];
   submitLabel: string;
+  /** Campos extra que viajan con el formulario (por ejemplo, de dónde vino el usuario). */
+  hiddenFields?: Record<string, string>;
 };
 
-export function ClientForm({ action, client, referrers, submitLabel }: Props) {
+export function ClientForm({ action, client, referrers, submitLabel, hiddenFields }: Props) {
   const otherInterests = client?.interests.filter((i) => !INTEREST_OPTIONS.includes(i)) ?? [];
   return (
     <ActionForm action={action} className="space-y-6">
+      {Object.entries(hiddenFields ?? {}).map(([name, value]) => (
+        <input key={name} type="hidden" name={name} value={value} />
+      ))}
       <Card>
         <CardHeader title="Datos de contacto" />
         <div className="grid gap-4 p-5 sm:grid-cols-2">

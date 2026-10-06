@@ -10,6 +10,7 @@ import { buildTemplateVars } from "@/lib/template-context";
 import { sendEmail } from "@/lib/email";
 import { logActivity, notifyClient } from "@/lib/events";
 import type { ActionState } from "@/components/form-controls";
+import { appUrl } from "@/lib/app-url";
 
 export async function saveContractTemplate(id: string | null, _: ActionState, formData: FormData): Promise<ActionState> {
   const user = await requireUser();
@@ -78,7 +79,7 @@ export async function sendContract(id: string, _?: ActionState, _f?: FormData): 
   const contract = await db.contract.findFirst({ where: { id, organizationId: user.organizationId }, include: { client: true } });
   if (!contract) return { error: "Contrato no encontrado" };
   if (contract.status === "SIGNED") return { error: "Ya está firmado" };
-  const link = `${process.env.APP_URL ?? "http://localhost:3000"}/firmar/${contract.token}`;
+  const link = `${appUrl()}/firmar/${contract.token}`;
   let note = "";
   if (contract.client.email) {
     const r = await sendEmail({

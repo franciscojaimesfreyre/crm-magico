@@ -50,8 +50,9 @@ Usuarios de ejemplo (después de `npm run db:seed`):
 | `SESSION_SECRET` | Firma de las sesiones (texto aleatorio largo) |
 | `ENCRYPTION_KEY` | Clave AES-256 para cifrar los accesos a MyDisney, Universal, etc. (`openssl rand -base64 32`). **No cambiarla** una vez que hay datos cifrados |
 | `ANTHROPIC_API_KEY` | Habilita las funciones de IA. Sin ella, el sistema funciona igual y la IA muestra un aviso |
-| `APP_URL` | URL pública (se usa en links de emails, portal e iCal) |
-| `UPLOAD_DIR` | Carpeta de archivos subidos (por defecto `./storage/uploads`) |
+| `APP_URL` | URL pública (links de emails, portal e iCal). En Render no hace falta: se usa `RENDER_EXTERNAL_URL` |
+| `UPLOAD_DIR` | Carpeta de archivos subidos cuando no se usa R2 (por defecto `./storage/uploads`) |
+| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | Archivos en Cloudflare R2. Si están, el navegador sube directo a R2 y las descargas usan links firmados que vencen en minutos |
 | `SMTP_*` | Envío real de emails. Sin SMTP, los emails quedan registrados en *Plantillas de email → Últimos emails* |
 | `CRON_SECRET` | Protege `/api/cron/automatizaciones` |
 
@@ -103,6 +104,32 @@ Usuarios de ejemplo (después de `npm run db:seed`):
 - Automatizaciones por evento o por fecha (crear tarea, enviar email, mensaje al portal, notificar), con historial de ejecuciones.
 - Plantillas de email con variables.
 - Reportes con gráficos.
+
+## Publicar en Render + Cloudflare R2
+
+El repo incluye `render.yaml` (Blueprint): app web y Postgres 17 en el plan gratis, región Virginia. Las migraciones se aplican solas al arrancar.
+
+**1. Cloudflare R2 (archivos)**
+1. En el panel de Cloudflare: *R2 Object Storage* → *Create bucket* (por ejemplo `crm-magico`).
+2. En el bucket: *Settings* → *CORS Policy* → pegar (reemplazando la URL por la de Render):
+   ```json
+   [
+     {
+       "AllowedOrigins": ["https://crm-magico.onrender.com", "http://localhost:3000"],
+       "AllowedMethods": ["PUT", "GET"],
+       "AllowedHeaders": ["content-type"],
+       "MaxAgeSeconds": 3600
+     }
+   ]
+   ```
+3. *R2* → *Manage API tokens* → *Create API token* con permiso *Object Read & Write* solo sobre ese bucket. Guardar el *Access Key ID* y el *Secret Access Key* (se muestran una sola vez) y el *Account ID*.
+
+**2. Render**
+1. *New* → *Blueprint* → elegir el repo. Render lee `render.yaml`.
+2. Completar las variables que pide: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` y, si la tenés, `ANTHROPIC_API_KEY`. Los secretos (`SESSION_SECRET`, `ENCRYPTION_KEY`, `CRON_SECRET`) los genera Render.
+3. Al terminar el despliegue, entrar a `/registro` y crear la primera cuenta (administra las novedades globales).
+
+**Limitaciones del plan gratis:** la app se duerme tras 15 minutos sin visitas (tarda ~1 minuto en despertar) y la base Postgres gratis vence a los 30 días y se borra 14 días después si no se pasa a un plan pago (desde USD 6/mes). Antes del vencimiento conviene exportarla con `pg_dump` o pasarla a pago.
 
 ## Automatizaciones por fecha
 

@@ -16,6 +16,7 @@ import { renderTemplate } from "@/lib/templating";
 import { buildTemplateVars } from "@/lib/template-context";
 import type { ActionState } from "@/components/form-controls";
 import type { BudgetLevel, TripPace } from "@/generated/prisma/enums";
+import { appUrl } from "@/lib/app-url";
 
 async function ownClient(id: string) {
   const user = await requireUser();
@@ -87,7 +88,8 @@ export async function createClient(_: ActionState, formData: FormData): Promise<
     description: "Cliente creado",
   });
   await runEventWorkflows({ organizationId: user.organizationId, trigger: "CLIENT_CREATED", clientId: client.id });
-  redirect(`/app/clientes/${client.id}`);
+  // La ficha muestra el aviso "Cliente creado" con el botón para crear su viaje.
+  redirect(`/app/clientes/${client.id}?creado=1${formData.get("para") === "viaje" ? "&para=viaje" : ""}`);
 }
 
 export async function updateClient(id: string, _: ActionState, formData: FormData): Promise<ActionState> {
@@ -225,7 +227,7 @@ export async function regenerateInviteCode(clientId: string) {
 export async function sendPortalInvite(clientId: string, _state?: ActionState, _formData?: FormData): Promise<ActionState> {
   const { user, client } = await ownClient(clientId);
   if (!client.email) return { error: "El cliente no tiene email cargado" };
-  const appUrl = process.env.APP_URL ?? "http://localhost:3000";
+  const baseUrl = appUrl();
   const result = await sendEmail({
     organizationId: user.organizationId,
     to: client.email,
@@ -234,7 +236,7 @@ export async function sendPortalInvite(clientId: string, _state?: ActionState, _
 
 En tu portal vas a poder ver tus viajes, el itinerario día por día, los documentos y escribirme directamente.
 
-1. Entrá a ${appUrl}/portal/registro
+1. Entrá a ${baseUrl}/portal/registro
 2. Usá este código de invitación: ${client.inviteCode}
 3. Elegí tu contraseña.
 

@@ -24,7 +24,8 @@ export default async function NewBookingPage({ searchParams }: { searchParams: P
       {clients.length === 0 ? (
         <EmptyState
           title="Primero cargá un cliente"
-          action={<LinkButton href="/app/clientes/nuevo">Nuevo cliente</LinkButton>}
+          description="El viaje se arma para un cliente. Crealo y al guardarlo seguís con el viaje."
+          action={<LinkButton href="/app/clientes/nuevo?para=viaje">Crear cliente</LinkButton>}
         />
       ) : (
         <BookingForm

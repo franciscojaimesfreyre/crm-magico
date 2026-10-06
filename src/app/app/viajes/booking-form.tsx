@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { UserPlus } from "lucide-react";
 import { ActionForm, SubmitButton, type ActionState } from "@/components/form-controls";
 import { Card, CardHeader, Checkbox, Field, Input, Select, Textarea } from "@/components/ui";
 import { BOOKING_STATUSES, DESTINATIONS } from "@/lib/labels";
@@ -32,6 +34,9 @@ export function BookingForm({
           {clients && (
             <Field label="Cliente *" className="lg:col-span-2">
               <Select name="clientId" options={clients} defaultValue={defaultClientId} placeholder="Elegí un cliente" required />
+              <Link href="/app/clientes/nuevo?para=viaje" className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-brand-700 hover:underline">
+                <UserPlus className="size-3.5" /> ¿No está en la lista? Crear cliente nuevo
+              </Link>
             </Field>
           )}
           <Field label="Título" hint="Si lo dejás vacío se arma solo" className={clients ? "" : "lg:col-span-2"}>

@@ -10,6 +10,7 @@ import { formatDateTime } from "@/lib/format";
 import type { FormField } from "@/lib/forms";
 import { FormEditor } from "../form-editor";
 import { convertSubmission, deleteForm } from "../actions";
+import { appUrl } from "@/lib/app-url";
 
 export default async function FormPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
   const { id } = await params;
@@ -21,7 +22,7 @@ export default async function FormPage({ params, searchParams }: { params: Promi
   });
   if (!form) notFound();
   const fields = form.fields as FormField[];
-  const url = `${process.env.APP_URL ?? "http://localhost:3000"}/f/${form.slug}`;
+  const url = `${appUrl()}/f/${form.slug}`;
   return (
     <>
       <PageHeader

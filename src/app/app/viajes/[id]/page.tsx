@@ -20,6 +20,9 @@ import { loadBooking } from "./data";
 import { Summary } from "./summary";
 import { Items } from "./items";
 import { Quotes } from "./quotes";
+import { appUrl } from "@/lib/app-url";
+import { FileUpload } from "@/components/file-upload";
+import { storageMode } from "@/lib/storage";
 
 const TABS = [
   { key: "resumen", label: "Resumen" },
@@ -45,7 +48,7 @@ export default async function BookingPage({
   const b = await loadBooking(id, user.organizationId);
   if (!b) notFound();
   const defaultRate = toNumber(user.organization.agency?.defaultCommissionRate ?? user.organization.defaultCommissionRate);
-  const appUrl = process.env.APP_URL ?? "http://localhost:3000";
+  const baseUrl = appUrl();
 
   return (
     <>
@@ -121,7 +124,7 @@ export default async function BookingPage({
 
       {tab === "reservas" && <Items booking={b} defaultRate={defaultRate} />}
       {tab === "cotizaciones" && <Quotes booking={b} defaultRate={defaultRate} />}
-      {tab === "itinerario" && <ItineraryTab bookingId={b.id} shareToken={b.shareToken} appUrl={appUrl} />}
+      {tab === "itinerario" && <ItineraryTab bookingId={b.id} shareToken={b.shareToken} baseUrl={baseUrl} />}
       {tab === "documentos" && <DocumentsTab bookingId={b.id} organizationId={user.organizationId} />}
       {tab === "mensajes" && (
         <Card className="overflow-hidden">
@@ -144,13 +147,13 @@ export default async function BookingPage({
   );
 }
 
-async function ItineraryTab({ bookingId, shareToken, appUrl }: { bookingId: string; shareToken: string; appUrl: string }) {
+async function ItineraryTab({ bookingId, shareToken, baseUrl }: { bookingId: string; shareToken: string; baseUrl: string }) {
   const days = await db.itineraryDay.findMany({
     where: { bookingId },
     orderBy: { dayNumber: "asc" },
     include: { items: { orderBy: { position: "asc" } } },
   });
-  const shareUrl = `${appUrl}/i/${shareToken}`;
+  const shareUrl = `${baseUrl}/i/${shareToken}`;
   return (
     <div className="space-y-4">
       <Card className="flex flex-wrap items-center justify-between gap-3 p-4">
@@ -231,7 +234,7 @@ async function DocumentsTab({ bookingId, organizationId }: { bookingId: string; 
           <CardHeader title="Subir archivo o link" description="PDF, imágenes, Word, Excel… hasta 100 MB." />
           <ActionForm action={addBookingDocument.bind(null, bookingId)} resetOnSuccess className="space-y-3 p-4">
             <Field label="Archivo">
-              <input type="file" name="file" className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-brand-700" />
+              <FileUpload direct={storageMode() === "r2"} />
             </Field>
             <Field label="…o link" hint="Canva, Google Docs, Drive…">
               <Input name="url" type="url" placeholder="https://" />

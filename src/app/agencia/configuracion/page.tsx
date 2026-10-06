@@ -4,6 +4,7 @@ import { Card, CardHeader, Field, Input, PageHeader } from "@/components/ui";
 import { formatDate } from "@/lib/format";
 import { agencyAgents } from "@/lib/agency-panel";
 import { regenerateInviteCode, removeAgent, updateAgency, updateAgencyAccount } from "./actions";
+import { appUrl } from "@/lib/app-url";
 
 export const metadata = { title: "Configuración de la agencia" };
 
@@ -11,8 +12,8 @@ export default async function AgencySettingsPage() {
   const user = await requireAgencyUser();
   const agency = user.agency;
   const agents = await agencyAgents(agency.id);
-  const appUrl = process.env.APP_URL ?? "http://localhost:3000";
-  const inviteLink = `${appUrl}/registro?agencia=${agency.inviteCode}`;
+  const baseUrl = appUrl();
+  const inviteLink = `${baseUrl}/registro?agencia=${agency.inviteCode}`;
 
   return (
     <div className="max-w-4xl space-y-6">

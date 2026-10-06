@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { BOOKING_STATUS_LABEL, DESTINATION_LABEL } from "@/lib/labels";
 import { formatDate, formatRange, fullName, money } from "@/lib/format";
 import type { TemplateVars } from "@/lib/templating";
+import { appUrl } from "@/lib/app-url";
 
 /**
  * Arma las variables de plantilla para un cliente y, opcionalmente, un viaje y una de sus reservas
@@ -18,13 +19,13 @@ export async function buildTemplateVars(opts: {
     where: { id: opts.clientId },
     include: { organization: true, owner: true },
   });
-  const appUrl = process.env.APP_URL ?? "http://localhost:3000";
+  const baseUrl = appUrl();
   const vars: TemplateVars = {
     clientName: client.firstName,
     clientFullName: fullName(client),
     agentName: opts.agentName ?? client.owner?.name ?? client.organization.name,
     agencyName: client.organization.name,
-    portalLink: `${appUrl}/portal`,
+    portalLink: `${baseUrl}/portal`,
     today: formatDate(new Date()),
   };
   if (opts.bookingId) {
@@ -55,7 +56,7 @@ export async function buildTemplateVars(opts: {
         reservation: current ? `${current.description}${current.supplier ? ` (${current.supplier})` : ""}` : "",
         finalPaymentDue: formatDate((current ?? unpaid[0])?.balanceDue),
         travelers: b.travelers.map((t) => fullName(t.traveler)).join(", "),
-        portalLink: `${appUrl}/portal/viajes/${b.id}`,
+        portalLink: `${baseUrl}/portal/viajes/${b.id}`,
       } satisfies TemplateVars);
     }
   }

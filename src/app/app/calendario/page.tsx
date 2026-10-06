@@ -6,6 +6,7 @@ import { Card, PageHeader, buttonClass } from "@/components/ui";
 import { CopyText } from "@/app/app/clientes/[id]/client-widgets";
 import { calendarEvents, type CalendarEvent } from "@/lib/calendar";
 import { addDays, todayUTC } from "@/lib/format";
+import { appUrl } from "@/lib/app-url";
 
 export const metadata = { title: "Calendario" };
 
@@ -37,7 +38,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   for (let d = start; d <= end; d = addDays(d, 1)) days.push(d);
   const monthKey = (date: Date) => date.toISOString().slice(0, 7);
   const title = new Intl.DateTimeFormat("es-AR", { month: "long", year: "numeric", timeZone: "UTC" }).format(first);
-  const icalUrl = `${process.env.APP_URL ?? "http://localhost:3000"}/api/ical/${user.organization.icalToken}`;
+  const icalUrl = `${appUrl()}/api/ical/${user.organization.icalToken}`;
 
   return (
     <>

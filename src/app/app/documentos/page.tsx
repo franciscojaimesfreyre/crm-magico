@@ -5,6 +5,8 @@ import { ActionForm, ConfirmButton, SubmitButton } from "@/components/form-contr
 import { Card, CardHeader, EmptyState, Field, Input, PageHeader } from "@/components/ui";
 import { fileSize, formatDate } from "@/lib/format";
 import { addLibraryDocument, deleteLibraryDocument } from "./actions";
+import { FileUpload } from "@/components/file-upload";
+import { storageMode } from "@/lib/storage";
 
 export const metadata = { title: "Documentos" };
 
@@ -57,7 +59,7 @@ export default async function LibraryPage() {
           <CardHeader title="Agregar a la biblioteca" />
           <ActionForm action={addLibraryDocument} resetOnSuccess className="space-y-3 p-4">
             <Field label="Archivo">
-              <input type="file" name="file" className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-brand-700" />
+              <FileUpload direct={storageMode() === "r2"} />
             </Field>
             <Field label="…o link" hint="Canva, Google Docs, Drive…">
               <Input name="url" type="url" placeholder="https://" />

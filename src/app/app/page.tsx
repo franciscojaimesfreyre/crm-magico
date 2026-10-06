@@ -9,6 +9,7 @@ import { BOOKING_STATUS_COLOR, BOOKING_STATUS_LABEL, DESTINATION_LABEL } from "@
 import { addDays, daysBetween, formatDate, formatRange, money, todayUTC, toNumber } from "@/lib/format";
 import { computeKeyDates } from "@/lib/key-dates";
 import { runDateWorkflowsIfDue } from "@/lib/automations";
+import { appUrl } from "@/lib/app-url";
 
 export const metadata = { title: "Inicio" };
 
@@ -84,7 +85,7 @@ export default async function Dashboard() {
 
   const hour = Number(new Intl.DateTimeFormat("es-AR", { hour: "numeric", hour12: false, timeZone: "America/Argentina/Buenos_Aires" }).format(new Date()));
   const greeting = hour < 12 ? "Buen día" : hour < 20 ? "Buenas tardes" : "Buenas noches";
-  const leadUrl = `${process.env.APP_URL ?? "http://localhost:3000"}/cotizar/${user.organization.marketingCode}`;
+  const leadUrl = `${appUrl()}/cotizar/${user.organization.marketingCode}`;
 
   return (
     <>

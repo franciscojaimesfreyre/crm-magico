@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { calendarEvents } from "@/lib/calendar";
 import { addDays, todayUTC } from "@/lib/format";
+import { appUrl } from "@/lib/app-url";
 
 function escape(text: string) {
   return text.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
@@ -15,7 +16,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
   if (!org) return new Response("No encontrado", { status: 404 });
   const today = todayUTC();
   const events = await calendarEvents(org.id, addDays(today, -60), addDays(today, 365));
-  const appUrl = process.env.APP_URL ?? "http://localhost:3000";
+  const baseUrl = appUrl();
   const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
   const lines = [
     "BEGIN:VCALENDAR",
@@ -30,7 +31,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
       `DTSTART;VALUE=DATE:${ymd(e.date)}`,
       `DTEND;VALUE=DATE:${ymd(addDays(e.date, 1))}`,
       `SUMMARY:${escape(e.title)}`,
-      `URL:${appUrl}${e.href}`,
+      `URL:${baseUrl}${e.href}`,
       "END:VEVENT",
     ]),
     "END:VCALENDAR",

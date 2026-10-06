@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
 import type { BookingStatus, Destination, TaskPriority, WorkflowTrigger } from "@/generated/prisma/enums";
-import type { Workflow } from "@/generated/prisma/client";
+import { Prisma, type Workflow } from "@/generated/prisma/client";
 import { addDays, todayUTC } from "@/lib/format";
 import { renderTemplate } from "@/lib/templating";
 import { buildTemplateVars } from "@/lib/template-context";
@@ -113,28 +113,36 @@ async function executeActions(w: Workflow, target: Target) {
   });
 }
 
-/** Corre un workflow una sola vez por dedupeKey. Devuelve true si se ejecutó. */
+/**
+ * Corre un workflow una sola vez por dedupeKey. Devuelve true si se ejecutó.
+ * Primero reserva la ejecución (la restricción única de la base hace de candado) y después corre
+ * las acciones: si dos pedidos llegan a la vez, solo uno ejecuta.
+ */
 async function runOnce(w: Workflow, dedupeKey: string, target: Target) {
-  const existing = await db.workflowRun.findUnique({
-    where: { workflowId_dedupeKey: { workflowId: w.id, dedupeKey } },
-  });
-  if (existing) return false;
+  let runId: string;
+  try {
+    const run = await db.workflowRun.create({
+      data: {
+        workflowId: w.id,
+        dedupeKey,
+        bookingId: target.bookingId ?? undefined,
+        clientId: target.clientId,
+        success: false,
+        error: "En ejecución",
+      },
+    });
+    runId = run.id;
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") return false; // ya corrió o está corriendo
+    throw e;
+  }
   let error: string | undefined;
   try {
     await executeActions(w, target);
   } catch (e) {
     error = e instanceof Error ? e.message : String(e);
   }
-  await db.workflowRun.create({
-    data: {
-      workflowId: w.id,
-      dedupeKey,
-      bookingId: target.bookingId ?? undefined,
-      clientId: target.clientId,
-      success: !error,
-      error,
-    },
-  });
+  await db.workflowRun.update({ where: { id: runId }, data: { success: !error, error: error ?? null } });
   return true;
 }
 
@@ -268,10 +276,12 @@ export async function runDateWorkflows(organizationId: string) {
 
 /** Corre las automatizaciones por fecha si pasó más de una hora desde la última vez. */
 export async function runDateWorkflowsIfDue(organizationId: string) {
-  const org = await db.organization.findUnique({
-    where: { id: organizationId },
-    select: { automationsRunAt: true },
+  // Reserva atómica del turno: si dos pedidos llegan juntos, solo uno corre las automatizaciones.
+  const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  const claimed = await db.organization.updateMany({
+    where: { id: organizationId, OR: [{ automationsRunAt: null }, { automationsRunAt: { lt: hourAgo } }] },
+    data: { automationsRunAt: new Date() },
   });
-  if (org?.automationsRunAt && Date.now() - org.automationsRunAt.getTime() < 60 * 60 * 1000) return 0;
+  if (claimed.count === 0) return 0;
   return runDateWorkflows(organizationId);
 }

@@ -15,7 +15,12 @@ export const metadata = { title: "Inicio" };
 export default async function Dashboard() {
   const user = await requireUser();
   const orgId = user.organizationId;
-  await runDateWorkflowsIfDue(orgId);
+  // Las automatizaciones nunca deben impedir que cargue el inicio.
+  try {
+    await runDateWorkflowsIfDue(orgId);
+  } catch (e) {
+    console.error("Error ejecutando automatizaciones", e);
+  }
 
   const today = todayUTC();
   const in7 = addDays(today, 7);

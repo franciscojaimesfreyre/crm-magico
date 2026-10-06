@@ -1,0 +1,890 @@
+// CRM Mágico — modelo de datos.
+// Inquilino (tenant) = Organization: el negocio de un agente. Sus datos son solo suyos.
+// Agency: la agencia que le paga las comisiones al agente (una por agente, opcional).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Agentes y agencias ──────────────────────────────────────────────────────
+
+/// El negocio de un agente. Trabaja con una sola agencia, que es la que le paga las comisiones.
+model Organization {
+  id                    String   @id @default(cuid())
+  name                  String
+  marketingCode         String   @unique // usado en /cotizar/[code]
+  tagline               String?
+  bio                   String?
+  logoUrl               String?
+  primaryColor          String   @default("#7c3aed")
+  contactEmail          String?
+  contactPhone          String?
+  defaultCurrency       String   @default("USD")
+  defaultCommissionRate Decimal  @default(10) @db.Decimal(5, 2)
+  bookingSeq            Int      @default(0)
+  icalToken             String   @unique @default(cuid())
+  automationsRunAt      DateTime?
+  agencyId              String?
+  agency                Agency?  @relation("AgencyAgents", fields: [agencyId], references: [id], onDelete: SetNull)
+  agencyJoinedAt        DateTime? // cuando se unió a una agencia de la plataforma
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  users              User[]
+  clients            Client[]
+  bookings           Booking[]
+  groups             Group[]
+  tasks              Task[]
+  documents          Document[]
+  libraryDocuments   LibraryDocument[]
+  activityTemplates  ActivityTemplate[]
+  knowledgeItems     KnowledgeItem[]
+  notifications      Notification[]
+  activities         Activity[]
+  emailTemplates     EmailTemplate[]
+  emailLogs          EmailLog[]
+  workflows          Workflow[]
+  contractTemplates  ContractTemplate[]
+  contracts          Contract[]
+  commissionStatements CommissionStatement[]
+  forms              Form[]
+}
+
+enum UserRole {
+  AGENT // usa el CRM (tiene organizationId)
+  AGENCY // ve el panel de su agencia, solo lectura (tiene agencyId)
+}
+
+model User {
+  id              String        @id @default(cuid())
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  agencyId        String?
+  agency          Agency?       @relation("AgencyStaff", fields: [agencyId], references: [id], onDelete: Cascade)
+  name            String
+  email           String        @unique
+  passwordHash    String
+  role            UserRole      @default(AGENT)
+  isPlatformAdmin Boolean       @default(false) // puede cargar novedades globales
+  phone           String?
+  avatarUrl       String?
+  active          Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  clients       Client[]
+  bookings      Booking[]
+  tasks         Task[]
+  notifications Notification[]
+  messages      Message[]
+  activities    Activity[]
+  documents     Document[]
+  statements    CommissionStatement[]
+}
+
+/// Agencia que le paga las comisiones al agente. Puede ser:
+/// - de la plataforma: tiene usuarios propios y código de invitación; ve los números de sus agentes, sin editar nada;
+/// - privada: la cargó un agente independiente solo para armar sus planillas (sin usuarios ni código).
+model Agency {
+  id                    String    @id @default(cuid())
+  name                  String
+  contactName           String?
+  contactEmail          String?
+  defaultCommissionRate Decimal?  @db.Decimal(5, 2)
+  notes                 String?
+  inviteCode            String?   @unique // solo agencias de la plataforma
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  agents     Organization[]        @relation("AgencyAgents")
+  users      User[]                @relation("AgencyStaff")
+  statements CommissionStatement[]
+}
+
+// ─── Clientes y viajeros ─────────────────────────────────────────────────────
+
+enum ClientSource {
+  MANUAL
+  QUOTE_FORM
+  PORTAL
+  IMPORT
+  REFERRAL
+}
+
+enum TripPace {
+  RELAXED
+  MODERATE
+  INTENSE
+}
+
+enum BudgetLevel {
+  VALUE
+  MODERATE
+  DELUXE
+  LUXURY
+}
+
+model Client {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  ownerId        String?
+  owner          User?        @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+
+  firstName String
+  lastName  String
+  email     String?
+  phone     String?
+  city      String?
+  country   String?
+  language  String       @default("es")
+  source    ClientSource @default(MANUAL)
+  tags      String[]
+  notes     String? // notas internas, el cliente nunca las ve
+
+  // Preferencias de viaje (las usa la IA)
+  pace               TripPace?
+  budgetLevel        BudgetLevel?
+  interests          String[] // ej: "thrill rides", "personajes", "shows", "compras"
+  favoriteParks      String[]
+  dietaryNotes       String?
+  accessibilityNotes String?
+  previousVisits     String?
+  preferenceNotes    String?
+
+  referredById String?
+  referredBy   Client?  @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals    Client[] @relation("Referrals")
+
+  inviteCode String   @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  account        ClientAccount?
+  travelers      Traveler[]
+  bookings       Booking[]
+  supplierLogins SupplierLogin[]
+  messages       Message[]
+  tasks          Task[]
+  documents      Document[]
+  activities     Activity[]
+  contracts      Contract[]
+  organizedGroups Group[]
+
+  @@index([organizationId])
+}
+
+/// Usuario del portal del cliente (se registra con el código de invitación).
+model ClientAccount {
+  id           String    @id @default(cuid())
+  clientId     String    @unique
+  client       Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  email        String    @unique
+  passwordHash String
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+
+  notifications Notification[]
+}
+
+model Traveler {
+  id                 String    @id @default(cuid())
+  clientId           String
+  client             Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  firstName          String
+  lastName           String?
+  birthDate          DateTime? @db.Date
+  heightCm           Int? // para restricciones de altura de atracciones
+  relationship       String? // titular, pareja, hijo/a, abuelo/a...
+  dietaryNotes       String?
+  accessibilityNotes String?
+  passportExpiry     DateTime? @db.Date
+  notes              String?
+  createdAt          DateTime  @default(now())
+
+  bookings BookingTraveler[]
+}
+
+/// Credenciales del cliente en portales de proveedores (MyDisney, Universal...). Cifradas.
+model SupplierLogin {
+  id                String   @id @default(cuid())
+  clientId          String
+  client            Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  supplier          String
+  username          String
+  passwordEncrypted String
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+// ─── Reservas / viajes ───────────────────────────────────────────────────────
+
+enum Destination {
+  DISNEY_WORLD
+  DISNEYLAND
+  DISNEYLAND_PARIS
+  UNIVERSAL_ORLANDO
+  UNIVERSAL_HOLLYWOOD
+  DISNEY_CRUISE
+  OTHER_CRUISE
+  COMBINED
+  OTHER
+}
+
+enum BookingStatus {
+  INQUIRY
+  QUOTED
+  BOOKED
+  PAID_IN_FULL
+  TRAVELED
+  COMPLETED
+  CANCELLED
+}
+
+enum CommissionStatus {
+  PENDING // todavía no se puede cobrar (viaje no realizado o no liquidado)
+  REQUESTED // incluida en una planilla enviada a la agencia
+  PAID
+}
+
+model Booking {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  code           String // R-0001
+  clientId       String
+  client         Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  agentId        String?
+  agent          User?        @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  groupId        String?
+  group          Group?       @relation(fields: [groupId], references: [id], onDelete: SetNull)
+
+  title       String
+  destination Destination
+  status      BookingStatus @default(INQUIRY)
+  startDate   DateTime?     @db.Date
+  endDate     DateTime?     @db.Date
+  adults      Int           @default(2)
+  children    Int           @default(0)
+
+  // Detalle típico de parques
+  resort        String?
+  roomType      String?
+  ticketType    String?
+  parkDays      Int?
+  lightningLane Boolean @default(false)
+  memoryMaker   Boolean @default(false)
+  diningPlan    String?
+
+  // Totales del viaje: suma de sus reservas (se recalculan solos, no se editan a mano).
+  // Pagos, fecha de venta y comisión viven en cada reserva (BookingItem).
+  currency         String  @default("USD")
+  totalPrice       Decimal @default(0) @db.Decimal(12, 2)
+  commissionAmount Decimal @default(0) @db.Decimal(12, 2)
+
+  notes          String? // internas
+  clientNotes    String? // visibles para el cliente
+  shareToken     String   @unique @default(cuid())
+  cancelReason   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  items      BookingItem[]
+  travelers  BookingTraveler[]
+  quotes     Quote[]
+  days       ItineraryDay[]
+  messages   Message[]
+  documents  Document[]
+  tasks      Task[]
+  activities Activity[]
+  contracts  Contract[]
+  diningReservations DiningReservation[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, status])
+}
+
+enum ItemType {
+  HOTEL
+  PACKAGE
+  TICKETS
+  CRUISE
+  FLIGHT
+  CAR
+  TRANSFER
+  INSURANCE
+  DINING
+  EXPERIENCE
+  OTHER
+}
+
+enum ReservationStatus {
+  PENDING // a reservar (cotizada o aceptada, todavía sin confirmar con el proveedor)
+  CONFIRMED
+  CANCELLED
+}
+
+/// Reserva: cada cosa que se reserva con un proveedor dentro de un viaje (paquete Disney, tickets
+/// Universal, auto, hotel...). Tiene su confirmación, sus pagos y su comisión, que se cobra por separado.
+model BookingItem {
+  id                 String            @id @default(cuid())
+  bookingId          String
+  booking            Booking           @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  type               ItemType
+  status             ReservationStatus @default(PENDING)
+  description        String
+  supplier           String?
+  confirmationNumber String?
+  startDate          DateTime?         @db.Date
+  endDate            DateTime?         @db.Date
+  notes              String? // detalles: lugar de retiro del auto, tipo de habitación, vuelo...
+  position           Int               @default(0)
+  createdAt          DateTime          @default(now())
+
+  // Importe y pagos que hace el cliente directamente a este proveedor (solo seguimiento)
+  price         Decimal   @default(0) @db.Decimal(12, 2)
+  depositAmount Decimal?  @db.Decimal(12, 2)
+  depositPaidAt DateTime? @db.Date
+  balanceDue    DateTime? @db.Date // vencimiento del saldo
+  balancePaidAt DateTime? @db.Date
+
+  // Venta y comisión de esta reserva
+  saleDate             DateTime?        @db.Date // cuándo se confirmó con el proveedor
+  commissionRate       Decimal?         @db.Decimal(5, 2)
+  commissionAmount     Decimal          @default(0) @db.Decimal(12, 2)
+  commissionStatus     CommissionStatus @default(PENDING)
+  commissionPaidAt     DateTime?        @db.Date
+  commissionPaidAmount Decimal?         @db.Decimal(12, 2)
+  commissionNotes      String?
+
+  statementItems CommissionStatementItem[]
+
+  @@index([bookingId])
+}
+
+model BookingTraveler {
+  bookingId  String
+  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  travelerId String
+  traveler   Traveler @relation(fields: [travelerId], references: [id], onDelete: Cascade)
+
+  @@id([bookingId, travelerId])
+}
+
+model DiningReservation {
+  id                 String   @id @default(cuid())
+  bookingId          String
+  booking            Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  restaurant         String
+  dateTime           DateTime
+  partySize          Int?
+  confirmationNumber String?
+  notes              String?
+  createdAt          DateTime @default(now())
+}
+
+// ─── Cotizaciones ────────────────────────────────────────────────────────────
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+model Quote {
+  id               String      @id @default(cuid())
+  bookingId        String
+  booking          Booking     @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  title            String
+  message          String? // mensaje personalizado para el cliente
+  status           QuoteStatus @default(DRAFT)
+  validUntil       DateTime?   @db.Date
+  sentAt           DateTime?
+  respondedAt      DateTime?
+  acceptedOptionId String?
+  clientComment    String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  options QuoteOption[]
+}
+
+/// Una cotización puede tener varias alternativas (ej. resort Moderate vs Deluxe).
+model QuoteOption {
+  id          String      @id @default(cuid())
+  quoteId     String
+  quote       Quote       @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  position    Int         @default(0)
+  items       QuoteItem[]
+}
+
+model QuoteItem {
+  id             String      @id @default(cuid())
+  optionId       String
+  option         QuoteOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  type           ItemType
+  description    String
+  supplier       String?
+  startDate      DateTime?   @db.Date
+  endDate        DateTime?   @db.Date
+  price          Decimal     @default(0) @db.Decimal(12, 2)
+  commissionRate Decimal?    @db.Decimal(5, 2)
+  position       Int         @default(0)
+}
+
+// ─── Itinerarios ─────────────────────────────────────────────────────────────
+
+enum ActivityType {
+  PARK
+  RIDE
+  SHOW
+  DINING
+  CHARACTER
+  BREAK
+  TRAVEL
+  SHOPPING
+  POOL
+  CUSTOM
+}
+
+model ItineraryDay {
+  id        String    @id @default(cuid())
+  bookingId String?
+  booking   Booking?  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  groupId   String?
+  group     Group?    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  date      DateTime? @db.Date
+  dayNumber Int
+  title     String? // parque o lugar principal del día
+  notes     String?
+
+  items ItineraryItem[]
+
+  @@index([bookingId])
+  @@index([groupId])
+}
+
+model ItineraryItem {
+  id                 String       @id @default(cuid())
+  dayId              String
+  day                ItineraryDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  type               ActivityType
+  title              String
+  startTime          String? // "09:30"
+  endTime            String?
+  location           String?
+  notes              String?
+  confirmationNumber String?
+  position           Int          @default(0)
+}
+
+model ActivityTemplate {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  type           ActivityType
+  title          String
+  location       String?
+  durationMin    Int?
+  notes          String?
+  createdAt      DateTime     @default(now())
+}
+
+// ─── Base de novedades (alimenta a la IA) ────────────────────────────────────
+
+enum KnowledgeCategory {
+  NEWS
+  OPENING
+  CLOSURE
+  REFURBISHMENT
+  EVENT
+  PROMOTION
+  ATTRACTION
+  DINING
+  TIP
+  RULE_CHANGE
+  PRICING
+}
+
+model KnowledgeItem {
+  id             String            @id @default(cuid())
+  organizationId String? // null = novedad global cargada por la plataforma
+  organization   Organization?     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  title          String
+  content        String
+  category       KnowledgeCategory @default(NEWS)
+  destinations   Destination[]
+  park           String?
+  tags           String[]
+  validFrom      DateTime?         @db.Date
+  validTo        DateTime?         @db.Date
+  sourceUrl      String?
+  published      Boolean           @default(true)
+  pinned         Boolean           @default(false)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([organizationId])
+}
+
+// ─── Grupos ──────────────────────────────────────────────────────────────────
+
+enum GroupStatus {
+  PLANNING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model Group {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  destination    Destination?
+  startDate      DateTime?    @db.Date
+  endDate        DateTime?    @db.Date
+  status         GroupStatus  @default(PLANNING)
+  organizerId    String?
+  organizer      Client?      @relation(fields: [organizerId], references: [id], onDelete: SetNull)
+  notes          String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  bookings Booking[]
+  days     ItineraryDay[]
+}
+
+// ─── Mensajería ──────────────────────────────────────────────────────────────
+
+enum SenderType {
+  AGENT
+  CLIENT
+  SYSTEM
+}
+
+model Message {
+  id             String     @id @default(cuid())
+  clientId       String
+  client         Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  bookingId      String?
+  booking        Booking?   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  senderType     SenderType
+  senderUserId   String?
+  senderUser     User?      @relation(fields: [senderUserId], references: [id], onDelete: SetNull)
+  body           String
+  readByAgentAt  DateTime?
+  readByClientAt DateTime?
+  createdAt      DateTime   @default(now())
+
+  @@index([clientId, bookingId, createdAt])
+}
+
+// ─── Documentos ──────────────────────────────────────────────────────────────
+
+model Document {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  bookingId       String?
+  booking         Booking?     @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  clientId        String?
+  client          Client?      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name            String
+  storageKey      String? // archivo subido
+  url             String? // o link externo (Canva, Google Docs...)
+  mimeType        String?
+  size            Int?
+  visibleToClient Boolean      @default(true)
+  uploadedById    String?
+  uploadedBy      User?        @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  createdAt       DateTime     @default(now())
+}
+
+model LibraryDocument {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  folder         String?
+  name           String
+  storageKey     String?
+  url            String?
+  mimeType       String?
+  size           Int?
+  createdAt      DateTime     @default(now())
+}
+
+// ─── Tareas, notificaciones y actividad ──────────────────────────────────────
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model Task {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assigneeId     String?
+  assignee       User?        @relation(fields: [assigneeId], references: [id], onDelete: SetNull)
+  bookingId      String?
+  booking        Booking?     @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  clientId       String?
+  client         Client?      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  title          String
+  description    String?
+  dueDate        DateTime?    @db.Date
+  priority       TaskPriority @default(MEDIUM)
+  completedAt    DateTime?
+  automated      Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, completedAt])
+}
+
+model Notification {
+  id              String         @id @default(cuid())
+  organizationId  String
+  organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId          String? // destinatario agente (null = todo el equipo)
+  user            User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientAccountId String? // destinatario cliente
+  clientAccount   ClientAccount? @relation(fields: [clientAccountId], references: [id], onDelete: Cascade)
+  title           String
+  body            String?
+  link            String?
+  readAt          DateTime?
+  createdAt       DateTime       @default(now())
+}
+
+model Activity {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clientId       String?
+  client         Client?      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  bookingId      String?
+  booking        Booking?     @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  userId         String?
+  user           User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  type           String
+  description    String
+  createdAt      DateTime     @default(now())
+
+  @@index([clientId])
+  @@index([bookingId])
+}
+
+// ─── Emails y automatizaciones ───────────────────────────────────────────────
+
+enum TemplateCategory {
+  WELCOME
+  REMINDER
+  CONFIRMATION
+  FOLLOW_UP
+  CUSTOM
+}
+
+model EmailTemplate {
+  id             String           @id @default(cuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  category       TemplateCategory @default(CUSTOM)
+  subject        String
+  body           String
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+}
+
+enum EmailStatus {
+  QUEUED
+  SENT
+  FAILED
+  LOGGED // sin SMTP configurado: solo queda registrado
+}
+
+model EmailLog {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  to             String
+  subject        String
+  body           String
+  status         EmailStatus
+  error          String?
+  clientId       String?
+  bookingId      String?
+  createdAt      DateTime     @default(now())
+}
+
+enum WorkflowTrigger {
+  BOOKING_CREATED
+  CLIENT_CREATED
+  STATUS_CHANGED
+  DAYS_BEFORE_TRAVEL
+  DAYS_AFTER_TRAVEL
+  DAYS_BEFORE_FINAL_PAYMENT
+  DAYS_BEFORE_BIRTHDAY
+  PASSPORT_EXPIRING
+}
+
+model Workflow {
+  id             String          @id @default(cuid())
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  active         Boolean         @default(true)
+  trigger        WorkflowTrigger
+  /// { status?: BookingStatus, days?: number }
+  triggerConfig  Json            @default("{}")
+  /// destinos a los que aplica; vacío = todos
+  destinations   Destination[]
+  /// [{ type: "CREATE_TASK", title, priority, dueInDays } | { type: "SEND_EMAIL", templateId } | { type: "SEND_MESSAGE", body } | { type: "NOTIFY", title }]
+  actions        Json            @default("[]")
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  runs WorkflowRun[]
+}
+
+model WorkflowRun {
+  id         String   @id @default(cuid())
+  workflowId String
+  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  /// clave de idempotencia: un workflow no corre dos veces para el mismo objeto/fecha
+  dedupeKey  String
+  bookingId  String?
+  clientId   String?
+  success    Boolean
+  error      String?
+  createdAt  DateTime @default(now())
+
+  @@unique([workflowId, dedupeKey])
+}
+
+// ─── Contratos ───────────────────────────────────────────────────────────────
+
+model ContractTemplate {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  body           String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  contracts Contract[]
+}
+
+enum ContractStatus {
+  DRAFT
+  SENT
+  VIEWED
+  SIGNED
+}
+
+model Contract {
+  id             String            @id @default(cuid())
+  organizationId String
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  templateId     String?
+  template       ContractTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  clientId       String
+  client         Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  bookingId      String?
+  booking        Booking?          @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  title          String
+  body           String
+  status         ContractStatus    @default(DRAFT)
+  token          String            @unique @default(cuid())
+  sentAt         DateTime?
+  viewedAt       DateTime?
+  signedAt       DateTime?
+  signerName     String?
+  signatureImage String? // data URL del trazo
+  signerIp       String?
+  expiresAt      DateTime?         @db.Date
+  createdAt      DateTime          @default(now())
+}
+
+// ─── Planillas de comisiones ─────────────────────────────────────────────────
+
+enum StatementStatus {
+  DRAFT
+  SENT
+  PARTIALLY_PAID
+  PAID
+}
+
+model CommissionStatement {
+  id             String          @id @default(cuid())
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  agencyId       String?
+  agency         Agency?         @relation(fields: [agencyId], references: [id], onDelete: SetNull)
+  agentId        String?
+  agent          User?           @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  periodFrom     DateTime        @db.Date
+  periodTo       DateTime        @db.Date
+  dateBasis      String          @default("SALE") // SALE | TRAVEL_END
+  status         StatementStatus @default(DRAFT)
+  notes          String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  items CommissionStatementItem[]
+}
+
+/// Una reserva incluida en una planilla de comisiones.
+model CommissionStatementItem {
+  id             String              @id @default(cuid())
+  statementId    String
+  statement      CommissionStatement @relation(fields: [statementId], references: [id], onDelete: Cascade)
+  bookingItemId  String
+  bookingItem    BookingItem         @relation(fields: [bookingItemId], references: [id], onDelete: Cascade)
+  expectedAmount Decimal             @db.Decimal(12, 2)
+
+  @@unique([statementId, bookingItemId])
+}
+
+// ─── Formularios ─────────────────────────────────────────────────────────────
+
+model Form {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  title          String
+  description    String?
+  /// [{ id, label, type: text|email|phone|select|date|textarea|checkbox|number, required, options? }]
+  fields         Json         @default("[]")
+  active         Boolean      @default(true)
+  slug           String       @unique
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  submissions FormSubmission[]
+}
+
+model FormSubmission {
+  id        String   @id @default(cuid())
+  formId    String
+  form      Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
+  data      Json
+  clientId  String?
+  createdAt DateTime @default(now())
+}

@@ -1,8 +1,8 @@
 import Link from "next/link";
 import clsx from "clsx";
-import { CalendarClock, Trash2, Utensils } from "lucide-react";
-import { ActionForm, ConfirmButton, SubmitButton } from "@/components/form-controls";
-import { Badge, Card, CardHeader, Field, Input } from "@/components/ui";
+import { CalendarClock } from "lucide-react";
+import { ActionForm, SubmitButton } from "@/components/form-controls";
+import { Badge, Card, CardHeader, Textarea } from "@/components/ui";
 import {
   COMMISSION_STATUS_COLOR,
   COMMISSION_STATUS_LABEL,
@@ -11,14 +11,11 @@ import {
   RESERVATION_STATUS_COLOR,
   RESERVATION_STATUS_LABEL,
 } from "@/lib/labels";
-import { ageOn, daysBetween, formatDate, formatRange, money, todayUTC, toDateInput } from "@/lib/format";
+import { ageOn, daysBetween, formatDate, formatRange, money, todayUTC } from "@/lib/format";
 import { computeKeyDates } from "@/lib/key-dates";
-import {
-  addDiningReservation,
-  deleteDiningReservation,
-  setBookingTravelers,
-} from "../actions";
+import { saveTripNotes, setBookingTravelers } from "../actions";
 import type { LoadedBooking } from "./data";
+import { TripFlights } from "./flights";
 
 export function Summary({ booking: b }: { booking: LoadedBooking }) {
   const today = todayUTC();
@@ -35,26 +32,34 @@ export function Summary({ booking: b }: { booking: LoadedBooking }) {
           <Item label="Pasajeros" value={`${b.adults} adultos, ${b.children} menores`} />
           <Item label="Grupo" value={b.group ? <Link className="text-brand-700 hover:underline" href={`/app/grupos/${b.group.id}`}>{b.group.name}</Link> : "—"} />
         </dl>
-        {(b.notes || b.clientNotes) && (
-          <div className="grid gap-4 border-t border-slate-100 p-5 text-sm sm:grid-cols-2">
-            {b.notes && (
-              <div>
-                <p className="label">Notas internas</p>
-                <p className="whitespace-pre-line text-slate-700">{b.notes}</p>
-              </div>
-            )}
-            {b.clientNotes && (
-              <div>
-                <p className="label">Notas para el cliente</p>
-                <p className="whitespace-pre-line text-slate-700">{b.clientNotes}</p>
-              </div>
-            )}
+        <ActionForm action={saveTripNotes.bind(null, b.id)} className="space-y-2 border-t border-slate-100 p-5">
+          <div>
+            <p className="text-sm font-medium text-slate-800">Notas</p>
+            <p className="text-xs text-slate-500">Libres: pedidos del cliente, restaurantes reservados, ideas. La IA las usa para proponer el itinerario. El cliente no las ve.</p>
+          </div>
+          <Textarea
+            key={b.notes ?? ""}
+            name="notes"
+            rows={8}
+            defaultValue={b.notes ?? ""}
+            placeholder={"Ej.: Cena en Be Our Guest el día 3 a las 19:30 (conf. 1234). Mía quiere conocer a las princesas. Prefieren descansar al mediodía."}
+          />
+          <div className="flex justify-end">
+            <SubmitButton size="sm" variant="secondary">
+              Guardar notas
+            </SubmitButton>
+          </div>
+        </ActionForm>
+        {b.clientNotes && (
+          <div className="border-t border-slate-100 p-5 text-sm">
+            <p className="label">Notas para el cliente</p>
+            <p className="whitespace-pre-line text-slate-700">{b.clientNotes}</p>
           </div>
         )}
       </Card>
 
       <Card>
-        <CardHeader title="Fechas clave" description="Calculadas a partir de cada reserva (check-in del paquete, vuelos, auto, saldos). Aparecen en el calendario y en el portal." />
+        <CardHeader title="Fechas clave" description="Calculadas a partir de cada reserva (check-in del paquete, auto, saldos) y de los vuelos. Aparecen en el calendario y en el portal." />
         {keyDates.length === 0 ? (
           <p className="p-5 text-sm text-slate-500">Se calculan a partir de las reservas: cargá sus fechas (check-in, retiro del auto, vuelo…) y la fecha límite de pago.</p>
         ) : (
@@ -124,6 +129,8 @@ export function Summary({ booking: b }: { booking: LoadedBooking }) {
         )}
       </Card>
 
+      <TripFlights booking={b} />
+
       <Card className="xl:col-span-2">
         <CardHeader
           title="Reservas, pagos y comisiones"
@@ -189,58 +196,6 @@ export function Summary({ booking: b }: { booking: LoadedBooking }) {
         )}
       </Card>
 
-      <Card className="xl:col-span-2">
-        <CardHeader title="Reservas de restaurantes" description="Se muestran en el itinerario y la IA las respeta al planificar." />
-        {b.diningReservations.length > 0 && (
-          <ul className="divide-y divide-slate-100">
-            {b.diningReservations.map((d) => (
-              <li key={d.id} className="flex items-center justify-between gap-3 px-5 py-3 text-sm">
-                <div className="flex items-center gap-3">
-                  <Utensils className="size-4 text-amber-500" />
-                  <div>
-                    <p className="font-medium text-slate-800">{d.restaurant}</p>
-                    <p className="text-xs text-slate-500">
-                      {formatDate(d.dateTime)} · {d.dateTime.toISOString().slice(11, 16)} h{d.partySize ? ` · ${d.partySize} personas` : ""}
-                      {d.confirmationNumber && ` · Conf. ${d.confirmationNumber}`}
-                      {d.notes && ` · ${d.notes}`}
-                    </p>
-                  </div>
-                </div>
-                <form action={deleteDiningReservation.bind(null, d.id)}>
-                  <ConfirmButton variant="ghost" message="¿Eliminar esta reserva de restaurante?">
-                    <Trash2 className="size-3.5" />
-                  </ConfirmButton>
-                </form>
-              </li>
-            ))}
-          </ul>
-        )}
-        <ActionForm action={addDiningReservation.bind(null, b.id)} resetOnSuccess className="grid gap-3 border-t border-slate-100 p-5 sm:grid-cols-6">
-          <Field label="Restaurante" className="sm:col-span-2">
-            <Input name="restaurant" required />
-          </Field>
-          <Field label="Fecha">
-            <Input type="date" name="date" defaultValue={toDateInput(b.startDate)} required />
-          </Field>
-          <Field label="Hora">
-            <Input type="time" name="time" defaultValue="12:00" />
-          </Field>
-          <Field label="Personas">
-            <Input type="number" name="partySize" min={1} defaultValue={b.adults + b.children} />
-          </Field>
-          <Field label="Confirmación">
-            <Input name="confirmationNumber" />
-          </Field>
-          <Field label="Notas" className="sm:col-span-5">
-            <Input name="notes" placeholder="Pedidos especiales, cumpleaños, alergias…" />
-          </Field>
-          <div className="flex items-end">
-            <SubmitButton size="sm" className="w-full">
-              Agregar
-            </SubmitButton>
-          </div>
-        </ActionForm>
-      </Card>
     </div>
   );
 }

@@ -2,9 +2,10 @@ import { Field, Input } from "@/components/ui";
 import { toDateInput } from "@/lib/format";
 import { CommissionInput } from "@/components/commission-input";
 import { ItemTypeSelect } from "@/components/item-type-select";
+import type { ItemType } from "@/generated/prisma/enums";
 
 type ItemLike = {
-  type: string;
+  type: ItemType;
   description: string;
   supplier: string | null;
   confirmationNumber?: string | null;

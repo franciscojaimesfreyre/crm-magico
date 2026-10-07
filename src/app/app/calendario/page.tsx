@@ -14,7 +14,6 @@ const KIND_STYLE: Record<CalendarEvent["kind"], string> = {
   trip: "bg-brand-100 text-brand-800",
   keydate: "bg-amber-100 text-amber-800",
   task: "bg-slate-100 text-slate-700",
-  dining: "bg-orange-50 text-orange-800",
 };
 const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 

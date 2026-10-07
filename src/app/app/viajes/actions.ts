@@ -157,35 +157,6 @@ function itemFields(formData: FormData) {
   };
 }
 
-/** Tramos de ida y vuelta de una reserva de vuelo (campos out* y back* del formulario). */
-function flightLegsFromForm(formData: FormData) {
-  return (["out", "back"] as const)
-    .map((prefix) => ({
-      direction: prefix === "out" ? ("OUTBOUND" as const) : ("RETURN" as const),
-      date: parseDateInput(formData.get(`${prefix}Date`)),
-      time: str(formData, `${prefix}Time`),
-      airline: str(formData, `${prefix}Airline`),
-      flightNumber: str(formData, `${prefix}Number`)?.toUpperCase() ?? null,
-    }))
-    .filter((l) => l.date || l.time || l.airline || l.flightNumber);
-}
-
-/** Guarda los tramos (solo en vuelos) y completa las fechas de la reserva con la ida y la vuelta. */
-async function saveFlightLegs(itemId: string, type: ItemType, legs: ReturnType<typeof flightLegsFromForm>) {
-  await db.flightLeg.deleteMany({ where: { bookingItemId: itemId } });
-  if (type !== "FLIGHT" || legs.length === 0) return;
-  await db.flightLeg.createMany({ data: legs.map((l) => ({ bookingItemId: itemId, ...l })) });
-}
-
-function withFlightDates<T extends { type: ItemType; startDate: Date | null; endDate: Date | null }>(data: T, legs: ReturnType<typeof flightLegsFromForm>) {
-  if (data.type !== "FLIGHT") return data;
-  return {
-    ...data,
-    startDate: data.startDate ?? legs.find((l) => l.direction === "OUTBOUND")?.date ?? null,
-    endDate: data.endDate ?? legs.find((l) => l.direction === "RETURN")?.date ?? null,
-  };
-}
-
 async function ownItem(itemId: string) {
   const user = await requireUser();
   const item = await db.bookingItem.findFirst({
@@ -206,10 +177,8 @@ export async function addBookingItem(bookingId: string, _: ActionState, formData
   const data = itemFields(formData);
   if (!data.description) return { error: "Describí la reserva" };
   data.balanceDue ??= suggestedBalanceDue(data.type, data.startDate ?? booking.startDate);
-  const legs = flightLegsFromForm(formData);
   const position = await db.bookingItem.count({ where: { bookingId } });
-  const created = await db.bookingItem.create({ data: { bookingId, ...withFlightDates(data, legs), position } });
-  await saveFlightLegs(created.id, data.type, legs);
+  await db.bookingItem.create({ data: { bookingId, ...data, position } });
   await logActivity({ organizationId: user.organizationId, clientId: booking.clientId, bookingId, userId: user.id, type: "item", description: `Reserva agregada: ${data.description}` });
   await afterItemChange(bookingId, user.id);
   return { ok: "Reserva agregada" };
@@ -220,9 +189,7 @@ export async function updateBookingItem(itemId: string, _: ActionState, formData
   const data = itemFields(formData);
   if (!data.description) return { error: "Describí la reserva" };
   data.balanceDue ??= suggestedBalanceDue(data.type, data.startDate ?? item.booking.startDate);
-  const legs = flightLegsFromForm(formData);
-  await db.bookingItem.update({ where: { id: itemId }, data: withFlightDates(data, legs) });
-  await saveFlightLegs(itemId, data.type, legs);
+  await db.bookingItem.update({ where: { id: itemId }, data });
   if (item.status !== data.status) {
     await logActivity({
       organizationId: user.organizationId,
@@ -302,6 +269,28 @@ export async function deleteBookingItem(itemId: string) {
   await afterItemChange(item.bookingId, user.id);
 }
 
+// ─── Vuelos del viaje (dato de referencia: los agentes no los venden) ────────
+
+export async function saveTripFlights(bookingId: string, _: ActionState, formData: FormData): Promise<ActionState> {
+  await ownBooking(bookingId);
+  for (const [prefix, direction] of [["out", "OUTBOUND"], ["back", "RETURN"]] as const) {
+    const leg = {
+      date: parseDateInput(formData.get(`${prefix}Date`)),
+      time: str(formData, `${prefix}Time`),
+      airline: str(formData, `${prefix}Airline`),
+      flightNumber: str(formData, `${prefix}Number`)?.toUpperCase() ?? null,
+    };
+    const where = { bookingId_direction: { bookingId, direction } };
+    if (!leg.date && !leg.time && !leg.airline && !leg.flightNumber) {
+      await db.flightLeg.deleteMany({ where: { bookingId, direction } });
+    } else {
+      await db.flightLeg.upsert({ where, create: { bookingId, direction, ...leg }, update: leg });
+    }
+  }
+  revalidatePath(`/app/viajes/${bookingId}`);
+  return { ok: "Vuelos guardados" };
+}
+
 // ─── Viajeros de la reserva ──────────────────────────────────────────────────
 
 export async function setBookingTravelers(bookingId: string, formData: FormData) {
@@ -320,33 +309,12 @@ export async function setBookingTravelers(bookingId: string, formData: FormData)
   revalidatePath(`/app/viajes/${bookingId}`);
 }
 
-// ─── Restaurantes ────────────────────────────────────────────────────────────
+// ─── Notas ───────────────────────────────────────────────────────────────────
 
-export async function addDiningReservation(bookingId: string, _: ActionState, formData: FormData): Promise<ActionState> {
+/** Notas libres del viaje (internas): se editan desde el resumen y la IA las usa para el itinerario. */
+export async function saveTripNotes(bookingId: string, _: ActionState, formData: FormData): Promise<ActionState> {
   await ownBooking(bookingId);
-  const restaurant = str(formData, "restaurant");
-  const date = str(formData, "date");
-  const time = str(formData, "time") ?? "12:00";
-  if (!restaurant || !date) return { error: "Completá restaurante y fecha" };
-  await db.diningReservation.create({
-    data: {
-      bookingId,
-      restaurant,
-      // Se guarda la hora local del parque como si fuera UTC: se muestra tal cual.
-      dateTime: new Date(`${date}T${time}:00.000Z`),
-      partySize: num(formData, "partySize"),
-      confirmationNumber: str(formData, "confirmationNumber"),
-      notes: str(formData, "notes"),
-    },
-  });
+  await db.booking.update({ where: { id: bookingId }, data: { notes: str(formData, "notes") } });
   revalidatePath(`/app/viajes/${bookingId}`);
-  return { ok: "Reserva de restaurante agregada" };
-}
-
-export async function deleteDiningReservation(id: string) {
-  const user = await requireUser();
-  const dr = await db.diningReservation.findFirst({ where: { id, booking: { organizationId: user.organizationId } } });
-  if (!dr) return;
-  await db.diningReservation.delete({ where: { id } });
-  revalidatePath(`/app/viajes/${dr.bookingId}`);
+  return { ok: "Notas guardadas" };
 }

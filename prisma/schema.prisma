@@ -281,23 +281,23 @@ model Booking {
   totalPrice       Decimal @default(0) @db.Decimal(12, 2)
   commissionAmount Decimal @default(0) @db.Decimal(12, 2)
 
-  notes        String? // internas
+  notes        String? // internas: notas libres del agente, la IA las usa para el itinerario
   clientNotes  String? // visibles para el cliente
   shareToken   String   @unique @default(cuid())
   cancelReason String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  items              BookingItem[]
-  travelers          BookingTraveler[]
-  quotes             Quote[]
-  days               ItineraryDay[]
-  messages           Message[]
-  documents          Document[]
-  tasks              Task[]
-  activities         Activity[]
-  contracts          Contract[]
-  diningReservations DiningReservation[]
+  items      BookingItem[]
+  flightLegs FlightLeg[] // vuelos de ida y vuelta (dato de referencia)
+  travelers  BookingTraveler[]
+  quotes     Quote[]
+  days       ItineraryDay[]
+  messages   Message[]
+  documents  Document[]
+  tasks      Task[]
+  activities Activity[]
+  contracts  Contract[]
 
   @@unique([organizationId, code])
   @@index([organizationId, status])
@@ -360,7 +360,6 @@ model BookingItem {
   paidAmount    Decimal              @default(0) @db.Decimal(12, 2) // suma de los pagos
   balancePaidAt DateTime?            @db.Date // fecha del pago con el que quedó saldada
   payments      ReservationPayment[]
-  flightLegs    FlightLeg[] // tramos de ida y vuelta, en reservas de vuelo
 
   // Venta y comisión de esta reserva
   saleDate             DateTime?        @db.Date // cuándo se confirmó con el proveedor
@@ -382,18 +381,18 @@ enum FlightDirection {
   RETURN
 }
 
-/// Un tramo de una reserva de vuelo (ida o vuelta).
+/// Vuelo de ida o de vuelta del viaje. Los agentes no venden los vuelos: es un dato de referencia.
 model FlightLeg {
-  id            String          @id @default(cuid())
-  bookingItemId String
-  bookingItem   BookingItem     @relation(fields: [bookingItemId], references: [id], onDelete: Cascade)
-  direction     FlightDirection
-  date          DateTime?       @db.Date
-  time          String? // hora local de salida, "HH:MM"
-  airline       String?
-  flightNumber  String?
+  id           String          @id @default(cuid())
+  bookingId    String
+  booking      Booking         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  direction    FlightDirection
+  date         DateTime?       @db.Date
+  time         String? // hora local de salida, "HH:MM"
+  airline      String?
+  flightNumber String?
 
-  @@unique([bookingItemId, direction])
+  @@unique([bookingId, direction])
 }
 
 /// Un pago del cliente al proveedor de una reserva (depósito, cuotas, saldo).
@@ -416,18 +415,6 @@ model BookingTraveler {
   traveler   Traveler @relation(fields: [travelerId], references: [id], onDelete: Cascade)
 
   @@id([bookingId, travelerId])
-}
-
-model DiningReservation {
-  id                 String   @id @default(cuid())
-  bookingId          String
-  booking            Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  restaurant         String
-  dateTime           DateTime
-  partySize          Int?
-  confirmationNumber String?
-  notes              String?
-  createdAt          DateTime @default(now())
 }
 
 // ─── Cotizaciones ────────────────────────────────────────────────────────────
@@ -577,6 +564,48 @@ model KnowledgeItem {
   updatedAt      DateTime          @updatedAt
 
   @@index([organizationId])
+}
+
+// ─── Catálogo de parques ─────────────────────────────────────────────────────
+// Atracciones, shows, restaurantes y shoppings que existen de verdad, con sus alturas mínimas y
+// cierres. Lo mantiene el equipo de la plataforma (isPlatformAdmin) y la IA lo usa para no
+// inventar lugares y para saber a qué puede subir cada chico.
+
+enum CatalogKind {
+  ATTRACTION
+  SHOW
+  RESTAURANT
+  SHOPPING
+}
+
+enum DiningStyle {
+  TABLE_SERVICE
+  QUICK_SERVICE
+  CHARACTER_DINING
+  SIGNATURE
+  LOUNGE
+  SNACK
+}
+
+model CatalogEntry {
+  id          String       @id @default(cuid())
+  kind        CatalogKind
+  destination Destination
+  area        String // parque o zona: Magic Kingdom, EPCOT, Disney Springs, CityWalk, un hotel, Orlando…
+  name        String
+  minHeightIn Int? // altura mínima en pulgadas, como la publican Disney y Universal
+  diningStyle DiningStyle?
+  priceLevel  Int? // 1 a 4 ($ a $$$$): precio relativo de restaurantes y shoppings
+  mustDo      Boolean      @default(false) // imperdible: se suma siempre al itinerario de ese parque
+  notes       String?
+  closedFrom  DateTime?    @db.Date // cerrada (remodelación) desde
+  closedTo    DateTime?    @db.Date // hasta (vacío = sin fecha de reapertura confirmada)
+  verifiedAt  DateTime? // última vez que un administrador la revisó contra la fuente oficial
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([destination, area, name])
+  @@index([destination, kind])
 }
 
 // ─── Grupos ──────────────────────────────────────────────────────────────────

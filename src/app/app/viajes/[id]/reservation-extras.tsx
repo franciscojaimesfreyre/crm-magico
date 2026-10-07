@@ -6,62 +6,35 @@ import { buttonClass } from "@/components/ui";
 
 export type FlightLegValues = { date: string; time: string; airline: string; flightNumber: string };
 
-/** Lee el tipo elegido en el formulario que contiene al elemento y avisa cuando cambia. */
-function useFormType(ref: React.RefObject<HTMLElement | null>) {
-  const [type, setType] = useState<string | null>(null);
-  useEffect(() => {
-    const form = ref.current?.closest("form");
-    const select = form?.querySelector<HTMLSelectElement>('select[name="type"]');
-    if (!select) return;
-    const update = () => setType(select.value);
-    const onReset = () => setTimeout(update);
-    update();
-    select.addEventListener("change", update);
-    form?.addEventListener("reset", onReset);
-    return () => {
-      select.removeEventListener("change", update);
-      form?.removeEventListener("reset", onReset);
-    };
-  }, [ref]);
-  return type;
+/** Campos de un tramo de vuelo (ida o vuelta): fecha, hora, aerolínea y número. */
+export function FlightLegInputs({ prefix, title, values }: { prefix: "out" | "back"; title: string; values?: FlightLegValues }) {
+  return <LegRow prefix={prefix} title={title} values={values} />;
 }
 
-/** Tramos de ida y vuelta: solo se muestran en reservas de vuelo. */
-export function FlightFields({ outbound, back }: { outbound?: FlightLegValues; back?: FlightLegValues }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const type = useFormType(ref);
-  const visible = type === "FLIGHT";
+function LegRow({ prefix, title, values }: { prefix: string; title: string; values?: FlightLegValues }) {
   return (
-    <div ref={ref} className={visible ? "space-y-3 rounded-lg border border-sky-100 bg-sky-50/50 p-3 sm:col-span-4" : "hidden"}>
-      <LegRow prefix="out" title="Vuelo de ida" values={outbound} disabled={!visible} />
-      <LegRow prefix="back" title="Vuelo de vuelta" values={back} disabled={!visible} />
-      <p className="text-xs text-slate-500">Si no completás “Desde” y “Hasta”, se toman de las fechas de ida y vuelta.</p>
-    </div>
-  );
-}
-
-function LegRow({ prefix, title, values, disabled }: { prefix: string; title: string; values?: FlightLegValues; disabled: boolean }) {
-  return (
-    <div className="grid gap-3 sm:grid-cols-[9rem_1fr_7rem_1fr_9rem] sm:items-end">
-      <p className="flex items-center gap-1.5 text-sm font-medium text-slate-700 sm:pb-2">
-        <Plane className={prefix === "back" ? "size-4 rotate-180 text-sky-600" : "size-4 text-sky-600"} /> {title}
+    <div>
+      <p className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-slate-700">
+        <Plane className={prefix === "back" ? "size-4 -scale-x-100 text-sky-600" : "size-4 text-sky-600"} /> {title}
       </p>
-      <label className="block">
-        <span className="label">Fecha</span>
-        <input type="date" name={`${prefix}Date`} defaultValue={values?.date} disabled={disabled} className="field" />
-      </label>
-      <label className="block">
-        <span className="label">Hora</span>
-        <input type="time" name={`${prefix}Time`} defaultValue={values?.time} disabled={disabled} className="field" />
-      </label>
-      <label className="block">
-        <span className="label">Aerolínea</span>
-        <input name={`${prefix}Airline`} defaultValue={values?.airline} disabled={disabled} placeholder="Ej: American Airlines" className="field" />
-      </label>
-      <label className="block">
-        <span className="label">N° de vuelo</span>
-        <input name={`${prefix}Number`} defaultValue={values?.flightNumber} disabled={disabled} placeholder="Ej: AA 1234" className="field" />
-      </label>
+      <div className="grid grid-cols-2 gap-3">
+        <label className="block">
+          <span className="label">Fecha</span>
+          <input type="date" name={`${prefix}Date`} defaultValue={values?.date} className="field" />
+        </label>
+        <label className="block">
+          <span className="label">Hora</span>
+          <input type="time" name={`${prefix}Time`} defaultValue={values?.time} className="field" />
+        </label>
+        <label className="block">
+          <span className="label">Aerolínea</span>
+          <input name={`${prefix}Airline`} defaultValue={values?.airline} placeholder="Ej: American Airlines" className="field" />
+        </label>
+        <label className="block">
+          <span className="label">N° de vuelo</span>
+          <input name={`${prefix}Number`} defaultValue={values?.flightNumber} placeholder="Ej: AA 930" className="field" />
+        </label>
+      </div>
     </div>
   );
 }
@@ -69,7 +42,7 @@ function LegRow({ prefix, title, values, disabled }: { prefix: string; title: st
 const fmt = (iso: string) => iso.split("-").reverse().join("/");
 
 /**
- * Antes de guardar, revisa que las fechas de la reserva (y de los vuelos) estén dentro de las del viaje.
+ * Antes de guardar, revisa que las fechas de la reserva estén dentro de las del viaje.
  * Si no, muestra un aviso: puede ser un error de carga, pero también se puede guardar igual.
  */
 export function TripDatesGuard({ tripStart, tripEnd }: { tripStart: string | null; tripEnd: string | null }) {
@@ -86,15 +59,10 @@ export function TripDatesGuard({ tripStart, tripEnd }: { tripStart: string | nul
         bypass.current = false;
         return;
       }
-      const value = (name: string) => {
-        const input = form.querySelector<HTMLInputElement>(`[name="${name}"]`);
-        return input && !input.disabled ? input.value : "";
-      };
+      const value = (name: string) => form.querySelector<HTMLInputElement>(`[name="${name}"]`)?.value ?? "";
       const checks: [string, string][] = [
         ["La reserva empieza", value("startDate")],
         ["La reserva termina", value("endDate")],
-        ["El vuelo de ida sale", value("outDate")],
-        ["El vuelo de vuelta sale", value("backDate")],
       ];
       const found: string[] = [];
       for (const [label, date] of checks) {

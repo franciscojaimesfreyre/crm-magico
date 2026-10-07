@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import clsx from "clsx";
-import { CalendarClock, Download, ExternalLink, FileText, Utensils } from "lucide-react";
+import { CalendarClock, Download, ExternalLink, FileText, Plane } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireClientAccount } from "@/lib/auth";
 import { Chat } from "@/components/chat";
@@ -45,8 +45,8 @@ export default async function PortalTrip({
     where: { id, clientId: account.clientId },
     include: {
       travelers: { include: { traveler: true } },
-      items: { orderBy: { position: "asc" }, include: { flightLegs: true } },
-      diningReservations: { orderBy: { dateTime: "asc" } },
+      items: { orderBy: { position: "asc" } },
+      flightLegs: true,
       quotes: { where: { status: { in: ["SENT", "ACCEPTED"] } }, orderBy: { createdAt: "desc" } },
       group: true,
     },
@@ -110,6 +110,21 @@ export default async function PortalTrip({
             </ul>
           </Section>
 
+          {b.flightLegs.length > 0 && (
+            <Section title="Tus vuelos">
+              <ul className="space-y-2 text-sm">
+                {describeFlightLegs(b.flightLegs, formatDate).map((l) => (
+                  <li key={l.direction} className="flex flex-wrap items-center gap-x-2">
+                    <Plane className={clsx("size-4 text-sky-600", l.direction === "RETURN" && "-scale-x-100")} />
+                    <span className="font-medium text-slate-800">{l.label}</span>
+                    <span className="text-slate-700">{l.when}</span>
+                    {l.flight && <span className="text-slate-500">· {l.flight}</span>}
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          )}
+
           {b.items.some((i) => i.status !== "CANCELLED") && (
             <Section title="Tus reservas">
               <p className="mb-2 text-xs text-slate-400">Cada reserva se paga directamente a su proveedor con tu tarjeta.</p>
@@ -136,16 +151,6 @@ export default async function PortalTrip({
                         </div>
                         {Number(i.price) > 0 && <span className="whitespace-nowrap text-slate-700">{money(i.price, b.currency)}</span>}
                       </div>
-                      {i.flightLegs.length > 0 && (
-                        <ul className="mt-1 space-y-0.5 text-xs text-slate-600">
-                          {describeFlightLegs(i.flightLegs, formatDate).map((l) => (
-                            <li key={l.direction}>
-                              <span className="font-medium text-sky-700">{l.label}:</span> {l.when}
-                              {l.flight && ` · ${l.flight}`}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
                       {Number(i.price) > 0 && i.status !== "CANCELLED" && (() => {
                         const pay = paymentProgress(i);
                         return (
@@ -178,24 +183,6 @@ export default async function PortalTrip({
             </Section>
           )}
 
-          {b.diningReservations.length > 0 && (
-            <Section title="Reservas de restaurantes">
-              <ul className="space-y-2 text-sm">
-                {b.diningReservations.map((d) => (
-                  <li key={d.id} className="flex items-start gap-2">
-                    <Utensils className="mt-0.5 size-4 text-amber-500" />
-                    <div>
-                      <p className="font-medium text-slate-800">{d.restaurant}</p>
-                      <p className="text-xs text-slate-500">
-                        {formatDate(d.dateTime)} · {d.dateTime.toISOString().slice(11, 16)} h
-                        {d.confirmationNumber && ` · Conf. ${d.confirmationNumber}`}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </Section>
-          )}
 
           <Section title="Viajeros">
             <ul className="space-y-1 text-sm text-slate-700">

@@ -45,7 +45,7 @@ export default async function Dashboard() {
     }),
     db.booking.findMany({
       where: { organizationId: orgId, status: { notIn: ["CANCELLED", "COMPLETED"] }, startDate: { gte: addDays(today, -60), lte: in90 } },
-      include: { client: { select: { firstName: true, lastName: true } }, items: { include: { flightLegs: true } } },
+      include: { client: { select: { firstName: true, lastName: true } }, items: true, flightLegs: true },
       orderBy: { startDate: "asc" },
     }),
     // Ventas = reservas confirmadas con un proveedor (un viaje puede tener varias).

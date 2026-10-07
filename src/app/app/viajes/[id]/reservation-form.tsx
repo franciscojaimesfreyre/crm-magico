@@ -3,8 +3,8 @@ import { Field, Input, Select, Textarea } from "@/components/ui";
 import { COMMISSION_STATUS_LABEL, RESERVATION_STATUSES } from "@/lib/labels";
 import { toDateInput } from "@/lib/format";
 import { CommissionInput } from "@/components/commission-input";
-import type { BookingItem, FlightLeg } from "@/generated/prisma/client";
-import { FlightFields, TripDatesGuard, type FlightLegValues } from "./reservation-extras";
+import type { BookingItem } from "@/generated/prisma/client";
+import { TripDatesGuard } from "./reservation-extras";
 import { ItemTypeSelect } from "@/components/item-type-select";
 
 const COMMISSION_STATUSES = Object.entries(COMMISSION_STATUS_LABEL).map(([value, label]) => ({ value, label }));
@@ -19,7 +19,7 @@ export function ReservationForm({
   submitLabel,
 }: {
   action: (state: ActionState, formData: FormData) => Promise<ActionState>;
-  item?: BookingItem & { flightLegs?: FlightLeg[] };
+  item?: BookingItem;
   /** Fechas del viaje, para avisar si la reserva queda afuera. */
   trip: { startDate: Date | null; endDate: Date | null };
   defaultRate: number;
@@ -27,10 +27,6 @@ export function ReservationForm({
   submitLabel: string;
 }) {
   const n = (v: { toString(): string } | null | undefined) => (v === null || v === undefined ? "" : v.toString());
-  const leg = (direction: FlightLeg["direction"]): FlightLegValues | undefined => {
-    const l = item?.flightLegs?.find((x) => x.direction === direction);
-    return l ? { date: toDateInput(l.date), time: l.time ?? "", airline: l.airline ?? "", flightNumber: l.flightNumber ?? "" } : undefined;
-  };
   return (
     <ActionForm action={action} resetOnSuccess={!item} className="space-y-5">
       <TripDatesGuard tripStart={toDateInput(trip.startDate) || null} tripEnd={toDateInput(trip.endDate) || null} />
@@ -57,7 +53,6 @@ export function ReservationForm({
         <Field label="Hasta">
           <Input type="date" name="endDate" defaultValue={toDateInput(item?.endDate)} />
         </Field>
-        <FlightFields outbound={leg("OUTBOUND")} back={leg("RETURN")} />
         <Field label="Detalles" hint="Tipo de habitación, lugar de retiro del auto, equipaje, etc." className="sm:col-span-4">
           <Textarea name="notes" rows={2} defaultValue={item?.notes ?? ""} />
         </Field>

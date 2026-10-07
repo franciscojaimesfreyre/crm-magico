@@ -16,10 +16,11 @@ import {
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import clsx from "clsx";
-import { ArrowDownUp, CalendarPlus, Clock, GripVertical, MapPin, Plus, Save, Trash2, Wand2, X } from "lucide-react";
+import { AlertTriangle, ArrowDownUp, CalendarPlus, Clock, GripVertical, MapPin, Plus, Save, ShieldCheck, Star, Trash2, Wand2, X } from "lucide-react";
 import { ACTIVITY_TYPES, ACTIVITY_TYPE_COLOR, ACTIVITY_TYPE_LABEL } from "@/lib/labels";
 import { buttonClass } from "@/components/ui";
 import type { ActivityType } from "@/generated/prisma/enums";
+import { checkItinerary, withMustDos, type CheckEntry, type CheckTraveler, type ItemWarning } from "@/lib/itinerary-checks";
 import { proposeItinerary, saveItinerary, type ItineraryDayInput, type ItineraryTarget } from "@/app/app/viajes/itinerary-actions";
 
 // ─── Estado del editor ───────────────────────────────────────────────────────
@@ -39,6 +40,8 @@ type DayState = { key: string; date: string | null; title: string | null; notes:
 
 export type EditorTemplate = { id: string; type: ActivityType; title: string; location: string | null; durationMin: number | null; notes: string | null };
 
+const NONE: never[] = [];
+
 let counter = 0;
 const newKey = (p: string) => `${p}-${Date.now().toString(36)}-${(counter++).toString(36)}`;
 
@@ -50,6 +53,28 @@ function addMinutes(time: string, minutes: number) {
   const [h, m] = time.split(":").map(Number);
   const total = Math.min(h * 60 + m + minutes, 23 * 60 + 59);
   return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
+/** Saca la etiqueta interna "IMPERDIBLE" del catálogo de un texto que ve el cliente. */
+function withoutMustDoTag(text: string) {
+  return text
+    .replace(/\s*[([]?\s*imperdible\s*[)\]]?\s*[.,;:–-]?/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Actividad para un imperdible del catálogo que la propuesta no incluyó. */
+function mustDoItem(e: CheckEntry): ItemState {
+  return {
+    key: newKey("i"),
+    type: e.kind === "SHOW" ? "SHOW" : "RIDE",
+    title: e.name,
+    startTime: null,
+    endTime: null,
+    location: e.area,
+    notes: null,
+    confirmationNumber: null,
+  };
 }
 
 function datesBetween(start: string, end: string) {
@@ -77,6 +102,8 @@ export function ItineraryEditor({
   endDate,
   templates,
   aiEnabled,
+  catalog = NONE,
+  travelers = NONE,
 }: {
   target: ItineraryTarget;
   initialDays: ItineraryDayInput[];
@@ -84,6 +111,9 @@ export function ItineraryEditor({
   endDate: string | null;
   templates: EditorTemplate[];
   aiEnabled: boolean;
+  /** Atracciones y shows del catálogo del destino, para la revisión automática. */
+  catalog?: CheckEntry[];
+  travelers?: CheckTraveler[];
 }) {
   const [days, setDays] = useState<DayState[]>(() => toState(initialDays));
   const [dirty, setDirty] = useState(false);
@@ -94,7 +124,7 @@ export function ItineraryEditor({
   const [saving, startSave] = useTransition();
   const [aiOpen, setAiOpen] = useState(initialDays.length === 0 && aiEnabled);
   const [aiInstructions, setAiInstructions] = useState("");
-  const [aiResult, setAiResult] = useState<{ summary: string; warnings: string[]; knowledge: { id: string; title: string }[] } | null>(null);
+  const [aiResult, setAiResult] = useState<{ summary: string; warnings: string[]; knowledge: { id: string; title: string }[]; added: string[] } | null>(null);
   const [generating, startGenerate] = useTransition();
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
@@ -118,6 +148,17 @@ export function ItineraryEditor({
     days.forEach((d, di) => d.items.forEach((it, ii) => map.set(it.key, { day: di, index: ii })));
     return map;
   }, [days]);
+
+  // Revisión automática contra el catálogo: alturas, cierres, atracciones que no existen e imperdibles.
+  const checks = useMemo(() => checkItinerary(days, catalog, travelers), [days, catalog, travelers]);
+
+  function addMustDo(dayIndex: number, entry: CheckEntry) {
+    update((prev) => prev.map((d, di) => (di === dayIndex ? { ...d, items: [...d.items, mustDoItem(entry)] } : d)));
+  }
+
+  function addAllMustDos() {
+    update((prev) => withMustDos(prev, catalog, mustDoItem).days);
+  }
 
   // ── Días
 
@@ -317,7 +358,7 @@ export function ItineraryEditor({
       }
       if (!("result" in res) || !res.result) return;
       const r = res.result;
-      setDays(
+      const proposed = withMustDos(
         toState(
           r.days.map((d) => ({
             date: d.date && /^\d{4}-\d{2}-\d{2}$/.test(d.date) ? d.date : null,
@@ -325,18 +366,22 @@ export function ItineraryEditor({
             notes: d.notes,
             items: d.items.map((i) => ({
               type: i.type,
-              title: i.title,
+              // Por si la IA copia la etiqueta interna del catálogo: título y notas los ve el cliente.
+              title: withoutMustDoTag(i.title) || i.title,
               startTime: i.startTime && /^\d{2}:\d{2}$/.test(i.startTime) ? i.startTime : null,
               endTime: i.endTime && /^\d{2}:\d{2}$/.test(i.endTime) ? i.endTime : null,
               location: i.location,
-              notes: i.notes,
+              notes: withoutMustDoTag(i.notes ?? "") || null,
               confirmationNumber: null,
             })),
           })),
         ),
+        catalog,
+        mustDoItem,
       );
+      setDays(proposed.days);
       setDirty(true);
-      setAiResult({ summary: r.summary, warnings: r.warnings, knowledge: res.knowledgeUsed });
+      setAiResult({ summary: r.summary, warnings: r.warnings, knowledge: res.knowledgeUsed, added: proposed.added.map((e) => e.name) });
       setAiOpen(false);
     });
   }
@@ -418,8 +463,49 @@ export function ItineraryEditor({
               ))}
             </ul>
           )}
+          {aiResult.added.length > 0 && (
+            <p className="mt-2 text-xs text-slate-600">
+              <Star className="mr-1 inline size-3 text-amber-500" />
+              Se sumaron imperdibles que la propuesta no incluía: {aiResult.added.join(" · ")}
+            </p>
+          )}
           {aiResult.knowledge.length > 0 && (
             <p className="mt-2 text-xs text-slate-500">Novedades usadas: {aiResult.knowledge.map((k) => k.title).join(" · ")}</p>
+          )}
+        </div>
+      )}
+
+      {catalog.length > 0 && days.some((d) => d.items.length > 0) && (
+        <div className={clsx("mb-4 rounded-xl border p-4 text-sm", checks.count + checks.missing.length > 0 ? "border-amber-200 bg-amber-50/60" : "border-emerald-200 bg-emerald-50/60")}>
+          <p className="flex items-center gap-2 font-semibold text-slate-900">
+            <ShieldCheck className={clsx("size-4", checks.count + checks.missing.length > 0 ? "text-amber-600" : "text-emerald-600")} />
+            Revisión automática
+            <span className="font-normal text-slate-600">
+              {checks.count + checks.missing.length === 0
+                ? "· Todo en orden: alturas, cierres e imperdibles."
+                : `· ${checks.count} ${checks.count === 1 ? "aviso" : "avisos"} en las actividades${checks.missing.length ? ` · ${checks.missing.length} ${checks.missing.length === 1 ? "imperdible falta" : "imperdibles faltan"}` : ""}`}
+            </span>
+          </p>
+          <p className="mt-1 text-xs text-slate-500">Se calcula con el catálogo de parques y la altura de cada viajero, sea una propuesta de la IA o lo que armes a mano.</p>
+          {checks.missing.length > 0 && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {checks.missing.map((m) => (
+                <button
+                  key={m.entry.id}
+                  type="button"
+                  onClick={() => addMustDo(m.dayIndex, m.entry)}
+                  className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-white px-2.5 py-1 text-xs text-slate-700 hover:border-amber-500"
+                  title={`Agregar al día ${m.dayIndex + 1}`}
+                >
+                  <Plus className="size-3" /> {m.entry.name} <span className="text-slate-400">· día {m.dayIndex + 1}</span>
+                </button>
+              ))}
+              {checks.missing.length > 1 && (
+                <button type="button" onClick={addAllMustDos} className="text-xs font-medium text-brand-700 hover:underline">
+                  Agregar todos
+                </button>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -459,6 +545,7 @@ export function ItineraryEditor({
               key={day.key}
               day={day}
               number={di + 1}
+              warnings={checks.itemWarnings[di] ?? []}
               editing={editing}
               setEditing={setEditing}
               onPatch={(patch) => patchDay(day.key, patch)}
@@ -502,6 +589,7 @@ function PaletteChip({ id, label, type }: { id: string; label: string; type: Act
 function DayColumn({
   day,
   number,
+  warnings,
   editing,
   setEditing,
   onPatch,
@@ -513,6 +601,7 @@ function DayColumn({
 }: {
   day: DayState;
   number: number;
+  warnings: ItemWarning[][];
   editing: string | null;
   setEditing: (k: string | null) => void;
   onPatch: (p: Partial<DayState>) => void;
@@ -549,10 +638,11 @@ function DayColumn({
       </header>
       <div ref={setNodeRef} className="space-y-2 p-3">
         <SortableContext items={day.items.map((i) => i.key)} strategy={verticalListSortingStrategy}>
-          {day.items.map((item) => (
+          {day.items.map((item, ii) => (
             <SortableItem
               key={item.key}
               item={item}
+              warnings={warnings[ii] ?? []}
               open={editing === item.key}
               onToggle={() => setEditing(editing === item.key ? null : item.key)}
               onPatch={(p) => onPatchItem(item.key, p)}
@@ -580,12 +670,14 @@ function DayColumn({
 
 function SortableItem({
   item,
+  warnings,
   open,
   onToggle,
   onPatch,
   onRemove,
 }: {
   item: ItemState;
+  warnings: ItemWarning[];
   open: boolean;
   onToggle: () => void;
   onPatch: (p: Partial<ItemState>) => void;
@@ -620,6 +712,12 @@ function SortableItem({
               </span>
             )}
           </p>
+          {warnings.map((w, i) => (
+            <p key={i} className={clsx("mt-0.5 flex items-start gap-1 text-xs", w.tone === "error" ? "text-rose-700" : "text-amber-700")}>
+              <AlertTriangle className="mt-0.5 size-3 shrink-0" />
+              {w.text}
+            </p>
+          ))}
         </button>
         <button type="button" onClick={onRemove} className="text-slate-300 hover:text-rose-600" title="Quitar">
           <Trash2 className="size-3.5" />

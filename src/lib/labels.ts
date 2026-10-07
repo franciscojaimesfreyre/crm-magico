@@ -3,10 +3,12 @@ import type {
   ActivityType,
   BookingStatus,
   BudgetLevel,
+  CatalogKind,
   ClientSource,
   CommissionStatus,
   ContractStatus,
   Destination,
+  DiningStyle,
   GroupStatus,
   ItemType,
   KnowledgeCategory,
@@ -106,7 +108,7 @@ export const ITEM_TYPE_LABEL: Record<ItemType, string> = {
   PACKAGE: "Paquete",
   TICKETS: "Entradas",
   CRUISE: "Crucero",
-  FLIGHT: "Vuelo",
+  FLIGHT: "Vuelo", // ya no se ofrece: los vuelos son un dato del viaje (FlightLeg)
   CAR: "Auto",
   TRANSFER: "Traslado",
   INSURANCE: "Seguro",
@@ -158,7 +160,7 @@ export const ITEM_TYPE_GROUPS: { label: string; types: ItemType[] }[] = [
   { label: "Universal Orlando", types: ["UNIVERSAL_PACKAGE", "UNIVERSAL_HOTEL", "UNIVERSAL_TICKETS", "UNIVERSAL_EXPRESS"] },
   { label: "Disneyland", types: ["DISNEYLAND_PACKAGE", "DISNEYLAND_TICKETS"] },
   { label: "Cruceros", types: ["DISNEY_CRUISE", "CRUISE"] },
-  { label: "Otros", types: ["PACKAGE", "HOTEL", "TICKETS", "FLIGHT", "CAR", "TRANSFER", "INSURANCE", "DINING", "EXPERIENCE", "OTHER"] },
+  { label: "Otros", types: ["PACKAGE", "HOTEL", "TICKETS", "CAR", "TRANSFER", "INSURANCE", "DINING", "EXPERIENCE", "OTHER"] },
 ];
 
 export const QUOTE_STATUS_LABEL: Record<QuoteStatus, string> = {
@@ -231,6 +233,39 @@ export const BUDGET_LEVEL_LABEL: Record<BudgetLevel, string> = {
   LUXURY: "Lujo",
 };
 export const BUDGET_LEVELS = options(BUDGET_LEVEL_LABEL);
+
+export const CATALOG_KIND_LABEL: Record<CatalogKind, string> = {
+  ATTRACTION: "Atracción",
+  SHOW: "Show",
+  RESTAURANT: "Restaurante",
+  SHOPPING: "Shopping",
+};
+export const CATALOG_KINDS = options(CATALOG_KIND_LABEL);
+export const CATALOG_KIND_COLOR: Record<CatalogKind, string> = {
+  ATTRACTION: "bg-rose-50 text-rose-700",
+  SHOW: "bg-violet-50 text-violet-700",
+  RESTAURANT: "bg-amber-50 text-amber-800",
+  SHOPPING: "bg-sky-50 text-sky-700",
+};
+
+export const DINING_STYLE_LABEL: Record<DiningStyle, string> = {
+  TABLE_SERVICE: "Servicio a la mesa",
+  QUICK_SERVICE: "Comida rápida",
+  CHARACTER_DINING: "Con personajes",
+  SIGNATURE: "Gourmet",
+  LOUNGE: "Bar",
+  SNACK: "Snacks",
+};
+export const DINING_STYLES = options(DINING_STYLE_LABEL);
+
+/** Nivel de precio de restaurantes y shoppings (1 a 4). */
+export const PRICE_LEVELS = [
+  { value: "1", label: "$ · Barato" },
+  { value: "2", label: "$$ · Moderado" },
+  { value: "3", label: "$$$ · Caro" },
+  { value: "4", label: "$$$$ · Muy caro" },
+];
+export const priceSigns = (level: number | null | undefined) => (level ? "$".repeat(level) : "");
 
 export const CLIENT_SOURCE_LABEL: Record<ClientSource, string> = {
   MANUAL: "Carga manual",

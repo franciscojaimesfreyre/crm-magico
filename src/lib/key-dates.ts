@@ -46,12 +46,14 @@ type ReservationInput = {
   balancePaidAt: Date | null;
   price?: Num;
   paidAmount?: Num;
-  flightLegs?: { direction: string; date: Date | null; time: string | null; airline: string | null; flightNumber: string | null }[];
 };
+
+type FlightLegInput = { direction: string; date: Date | null; time: string | null; airline: string | null; flightNumber: string | null };
 
 type Input = {
   destination?: Destination;
   currency?: string;
+  flightLegs?: FlightLegInput[];
   startDate: Date | null;
   endDate: Date | null;
   items?: ReservationInput[];
@@ -108,20 +110,10 @@ function reservationKeyDates(i: ReservationInput, currency: string): KeyDate[] {
         out.push({ date: start, label: `Embarque: ${name}`, kind: "stay-in", hint: i.supplier ?? undefined });
         if (end) out.push({ date: end, label: `Desembarque: ${name}`, kind: "stay-out", hint: i.supplier ?? undefined });
         break;
-      case "FLIGHT": {
-        const legs = (i.flightLegs ?? []).filter((l) => l.date);
-        if (legs.length === 0) {
-          out.push({
-            date: addDays(start, -FLIGHT_ONLINE_CHECKIN_DAYS),
-            label: "Check-in online del vuelo",
-            kind: "checkin-online",
-            hint: `Suele abrir 24 a 48 h antes · ${name}`,
-          });
-          out.push({ date: start, label: `Vuelo: ${name}`, kind: "flight", hint: i.supplier ?? undefined });
-          if (end) out.push({ date: end, label: `Vuelo de regreso: ${name}`, kind: "flight", hint: i.supplier ?? undefined });
-        }
+      case "FLIGHT":
+        out.push({ date: start, label: `Vuelo: ${name}`, kind: "flight", hint: i.supplier ?? undefined });
+        if (end) out.push({ date: end, label: `Vuelo de regreso: ${name}`, kind: "flight", hint: i.supplier ?? undefined });
         break;
-      }
       case "CAR":
         out.push({ date: start, label: `Retiro del auto: ${name}`, kind: "pickup", hint: i.supplier ?? undefined });
         if (end) out.push({ date: end, label: `Devolución del auto: ${name}`, kind: "dropoff", hint: i.supplier ?? undefined });
@@ -137,27 +129,6 @@ function reservationKeyDates(i: ReservationInput, currency: string): KeyDate[] {
       case "TRANSFER":
         out.push({ date: start, label: `Traslado: ${name}`, kind: "pickup", hint: i.supplier ?? undefined });
         break;
-    }
-  }
-
-  // Vuelos con tramos cargados: cada tramo trae su check-in online y su salida.
-  if (ITEM_TYPE_BASE[i.type as ItemType] === "FLIGHT") {
-    for (const l of i.flightLegs ?? []) {
-      if (!l.date) continue;
-      const what = l.direction === "OUTBOUND" ? "ida" : "vuelta";
-      const flight = [l.airline, l.flightNumber].filter(Boolean).join(" ");
-      out.push({
-        date: addDays(l.date, -FLIGHT_ONLINE_CHECKIN_DAYS),
-        label: `Check-in online del vuelo de ${what}`,
-        kind: "checkin-online",
-        hint: `Suele abrir 24 a 48 h antes${flight ? ` · ${flight}` : ""}`,
-      });
-      out.push({
-        date: l.date,
-        label: `Vuelo de ${what}${flight ? `: ${flight}` : ""}${l.time ? ` · ${l.time}` : ""}`,
-        kind: "flight",
-        hint: name,
-      });
     }
   }
 
@@ -179,6 +150,20 @@ export function computeKeyDates(b: Input): KeyDate[] {
   const out: KeyDate[] = [];
   if (b.startDate) out.push({ date: b.startDate, label: "Comienzo del viaje", kind: "checkin" });
   if (b.endDate) out.push({ date: b.endDate, label: "Fin del viaje", kind: "checkout" });
+
+  // Vuelos del viaje: check-in online el día anterior y la salida de cada tramo.
+  for (const l of b.flightLegs ?? []) {
+    if (!l.date) continue;
+    const what = l.direction === "OUTBOUND" ? "ida" : "vuelta";
+    const flight = [l.airline, l.flightNumber].filter(Boolean).join(" ");
+    out.push({
+      date: addDays(l.date, -FLIGHT_ONLINE_CHECKIN_DAYS),
+      label: `Check-in online del vuelo de ${what}`,
+      kind: "checkin-online",
+      hint: `Suele abrir 24 a 48 h antes${flight ? ` · ${flight}` : ""}`,
+    });
+    out.push({ date: l.date, label: `Vuelo de ${what}${flight ? `: ${flight}` : ""}${l.time ? ` · ${l.time}` : ""}`, kind: "flight" });
+  }
 
   for (const item of b.items ?? []) {
     if (item.status === "CANCELLED") continue;

@@ -6,6 +6,7 @@ import clsx from "clsx";
 import {
   BookOpen,
   Briefcase,
+  Castle,
   CalendarDays,
   CheckSquare,
   ClipboardList,
@@ -47,6 +48,7 @@ const SECTIONS = [
     title: "Herramientas",
     items: [
       { href: "/app/novedades", label: "Novedades e IA", icon: Sparkles },
+      { href: "/app/catalogo", label: "Catálogo de parques", icon: Castle },
       { href: "/app/documentos", label: "Documentos", icon: FolderOpen },
       { href: "/app/contratos", label: "Contratos", icon: FileSignature },
       { href: "/app/formularios", label: "Formularios", icon: ClipboardList },

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { parseDateInput } from "@/lib/format";
-import { changeBookingStatus } from "@/lib/bookings";
+import { syncBookingStatus } from "@/lib/bookings";
 import { logActivity, notifyClient } from "@/lib/events";
 import { sendEmail } from "@/lib/email";
 import { AIError, draftQuoteMessage } from "@/lib/ai";
@@ -154,9 +154,7 @@ export async function sendQuote(quoteId: string, _state?: ActionState, _formData
     return { error: "Agregá al menos un servicio a alguna opción antes de enviar" };
   }
   await db.quote.update({ where: { id: quoteId }, data: { status: "SENT", sentAt: new Date() } });
-  if (quote.booking.status === "INQUIRY") {
-    await changeBookingStatus({ bookingId: quote.bookingId, status: "QUOTED", userId: user.id });
-  }
+  await syncBookingStatus(quote.bookingId, user.id);
   const client = quote.booking.client;
   const baseUrl = appUrl();
   const link = `/portal/cotizaciones/${quoteId}`;

@@ -27,9 +27,8 @@ export async function resolveCommissionRate(bookingId: string) {
 }
 
 /**
- * Recalcula la comisión de cada reserva y los totales del viaje (suma de sus reservas no canceladas).
- * Además avanza el viaje en el pipeline: con la primera reserva confirmada pasa a Reservado, y cuando
- * todas las reservas confirmadas quedaron saldadas con sus pagos, a Pagado.
+ * Recalcula la comisión de cada reserva y los totales del viaje (suma de sus reservas no canceladas),
+ * y actualiza la etapa del viaje (ver syncBookingStatus).
  */
 export async function recalcBookingTotals(bookingId: string, userId?: string | null) {
   const items = await db.bookingItem.findMany({ where: { bookingId }, include: { payments: { orderBy: [{ paidAt: "asc" }, { createdAt: "asc" }] } } });
@@ -57,22 +56,51 @@ export async function recalcBookingTotals(bookingId: string, userId?: string | n
     total += price;
     commission += amount;
   }
-  const booking = await db.booking.update({
+  await db.booking.update({
     where: { id: bookingId },
     data: { totalPrice: total, commissionAmount: Math.round(commission * 100) / 100 },
   });
 
-  const confirmed = items.filter((i) => i.status === "CONFIRMED");
-  if (confirmed.length > 0 && ["INQUIRY", "QUOTED"].includes(booking.status)) {
-    await changeBookingStatus({ bookingId, status: "BOOKED", userId });
-  } else if (
-    booking.status === "BOOKED" &&
-    confirmed.length > 0 &&
-    !items.some((i) => i.status === "PENDING") &&
-    confirmed.every((i) => i.balancePaidAt || toNumber(i.price) === 0)
-  ) {
-    await changeBookingStatus({ bookingId, status: "PAID_IN_FULL", userId });
-  }
+  await syncBookingStatus(bookingId, userId);
+}
+
+/** Etapas que el sistema mueve solo; Viajó, Completado y Cancelado son siempre manuales. */
+const AUTO_STATUSES: BookingStatus[] = ["INQUIRY", "QUOTED", "BOOKED", "PAID_IN_FULL"];
+const RANK: Record<string, number> = { INQUIRY: 0, QUOTED: 1, BOOKED: 2, PAID_IN_FULL: 3 };
+
+/**
+ * Pone el viaje en la etapa que corresponde según lo que pasó:
+ * - Pagado: todas las reservas activas están confirmadas y saldadas.
+ * - Reservado: hay al menos una reserva confirmada.
+ * - Cotizado: se envió (o aceptó) una cotización.
+ * - Consulta: nada de lo anterior.
+ * Avanza siempre. Retrocede solo desde Reservado o Pagado, cuando ya no se cumple (se canceló la
+ * reserva confirmada o se borró un pago); Cotizado puesto a mano no vuelve a Consulta.
+ */
+export async function syncBookingStatus(bookingId: string, userId?: string | null) {
+  const booking = await db.booking.findUniqueOrThrow({
+    where: { id: bookingId },
+    select: {
+      status: true,
+      items: { select: { status: true, price: true, balancePaidAt: true } },
+      _count: { select: { quotes: { where: { status: { in: ["SENT", "ACCEPTED"] } } } } },
+    },
+  });
+  if (!AUTO_STATUSES.includes(booking.status)) return;
+  const active = booking.items.filter((i) => i.status !== "CANCELLED");
+  const confirmed = active.filter((i) => i.status === "CONFIRMED");
+  const target: BookingStatus =
+    confirmed.length > 0 && confirmed.length === active.length && confirmed.every((i) => i.balancePaidAt || toNumber(i.price) === 0)
+      ? "PAID_IN_FULL"
+      : confirmed.length > 0
+        ? "BOOKED"
+        : booking._count.quotes > 0
+          ? "QUOTED"
+          : "INQUIRY";
+  if (target === booking.status) return;
+  const forward = RANK[target] > RANK[booking.status];
+  const allowedBack = !forward && (booking.status === "BOOKED" || booking.status === "PAID_IN_FULL");
+  if (forward || allowedBack) await changeBookingStatus({ bookingId, status: target, userId });
 }
 
 /** Confirma una reserva con el proveedor: queda registrada la fecha de venta (para la planilla). */

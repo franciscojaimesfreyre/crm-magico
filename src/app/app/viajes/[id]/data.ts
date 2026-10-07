@@ -9,8 +9,8 @@ export async function loadBooking(id: string, organizationId: string) {
       organization: { select: { agency: true } },
       group: true,
       travelers: { include: { traveler: true } },
-      items: { orderBy: { position: "asc" }, include: { payments: { orderBy: [{ paidAt: "asc" }, { createdAt: "asc" }] }, flightLegs: true } },
-      diningReservations: { orderBy: { dateTime: "asc" } },
+      items: { orderBy: { position: "asc" }, include: { payments: { orderBy: [{ paidAt: "asc" }, { createdAt: "asc" }] } } },
+      flightLegs: true,
       quotes: {
         orderBy: { createdAt: "desc" },
         include: { options: { orderBy: { position: "asc" }, include: { items: { orderBy: { position: "asc" } } } } },

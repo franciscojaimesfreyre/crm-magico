@@ -12,7 +12,7 @@ import {
 } from "@/lib/labels";
 import { formatDate, formatRange, money, percent, toNumber } from "@/lib/format";
 import type { ItemType } from "@/generated/prisma/enums";
-import { describeFlightLegs, paymentProgress } from "@/lib/trips";
+import { paymentProgress } from "@/lib/trips";
 import { addBookingItem, deleteBookingItem, quickItemAction, updateBookingItem } from "../actions";
 import { ReservationForm } from "./reservation-form";
 import { ReservationPayments } from "./payments";
@@ -81,17 +81,6 @@ export function Items({ booking: b, defaultRate }: { booking: LoadedBooking; def
                     .filter(Boolean)
                     .join(" · ")}
                 </p>
-                {item.flightLegs.length > 0 && (
-                  <ul className="mt-1.5 space-y-0.5 text-xs text-slate-700">
-                    {describeFlightLegs(item.flightLegs, formatDate).map((l) => (
-                      <li key={l.direction} className="flex flex-wrap gap-x-2">
-                        <span className="w-12 font-medium text-sky-700">{l.label}</span>
-                        <span>{l.when || "Sin fecha"}</span>
-                        {l.flight && <span className="text-slate-500">· {l.flight}</span>}
-                      </li>
-                    ))}
-                  </ul>
-                )}
                 {item.notes && <p className="mt-1 text-xs whitespace-pre-line text-slate-500">{item.notes}</p>}
                 <ReservationPayments item={item} currency={b.currency} />
               </div>

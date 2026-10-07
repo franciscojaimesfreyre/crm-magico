@@ -92,7 +92,7 @@ async function main() {
   const clientSeeds: ClientSeed[] = [
     {
       firstName: "Amanda", lastName: "Reyes", email: "cliente@crm.test", phone: "+54 9 11 4444-1111", city: "Buenos Aires",
-      tags: ["VIP", "Repite"], pace: "MODERATE", budgetLevel: "DELUXE", interests: ["Personajes", "Princesas", "Fuegos artificiales", "Gastronomía"],
+      tags: ["VIP", "Repite"], pace: "MODERATE", budgetLevel: "DELUXE", interests: ["Personajes", "Princesas", "Fuegos artificiales", "Gastronomía", "Star Wars", "Toy Story"],
       previousVisits: "Disney World 2023 (Magic Kingdom y EPCOT)", ownerId: laura.id, inviteCode: "AMANDA",
       travelers: [
         { firstName: "Amanda", age: 38, relationship: "Titular" },
@@ -200,7 +200,6 @@ async function main() {
     deposit?: number;
     depositPaid?: number;
     installments?: { amount: number; on: number; note?: string }[]; // cuotas libres después del depósito
-    legs?: { direction: "OUTBOUND" | "RETURN"; on: number; time: string; airline: string; flightNumber: string }[];
     balanceDue?: number;
     balancePaid?: number;
     commission?: "PENDING" | "REQUESTED" | "PAID";
@@ -218,6 +217,7 @@ async function main() {
     saleDate?: number;
     commissionStatus?: "PENDING" | "REQUESTED" | "PAID";
     items: ItemSeed[];
+    flights?: { direction: "OUTBOUND" | "RETURN"; on: number; time: string; airline: string; flightNumber: string }[];
   }) {
     const organizationId = opts.client.organizationId;
     const seq = (seqs.get(organizationId) ?? 0) + 1;
@@ -258,7 +258,6 @@ async function main() {
         paidAmount: payments.reduce((t, p) => t + p.amount, 0),
         balancePaidAt: payments.reduce((t, p) => t + p.amount, 0) >= i.price ? (payments.at(-1)?.paidAt ?? null) : null,
         payments: { create: payments },
-        flightLegs: { create: (i.legs ?? []).map((l) => ({ direction: l.direction, date: d(l.on), time: l.time, airline: l.airline, flightNumber: l.flightNumber })) },
         saleDate: status !== "CONFIRMED" ? null : i.sale !== undefined ? d(i.sale) : opts.saleDate !== undefined ? d(opts.saleDate) : null,
         commissionRate: i.rate ?? null,
         commissionAmount,
@@ -285,6 +284,7 @@ async function main() {
         commissionAmount: Math.round(active.reduce((t, i) => t + i.commissionAmount, 0) * 100) / 100,
         travelers: { create: opts.client.travelers.map((t) => ({ travelerId: t.id })) },
         items: { create: items },
+        flightLegs: { create: (opts.flights ?? []).map((f) => ({ direction: f.direction, date: d(f.on), time: f.time, airline: f.airline, flightNumber: f.flightNumber })) },
       },
     });
   }
@@ -294,6 +294,10 @@ async function main() {
   const amandaTrip = await booking({
     client: amanda, agentId: laura.id, title: "Disney + Universal — familia Reyes", destination: "COMBINED",
     status: "BOOKED", start: 55, nights: 7,
+    flights: [
+      { direction: "OUTBOUND", on: 55, time: "22:35", airline: "American Airlines", flightNumber: "AA 930" },
+      { direction: "RETURN", on: 62, time: "16:10", airline: "American Airlines", flightNumber: "AA 931" },
+    ],
     items: [
       {
         type: "DISNEY_WORLD_PACKAGE", description: "Paquete Art of Animation, suite familiar, 5 noches + tickets Disney 4 días", supplier: "Disney Destinations",
@@ -305,14 +309,6 @@ async function main() {
         type: "UNIVERSAL_TICKETS", description: "Tickets Universal 2 días, 2 parques (x4)", supplier: "Universal Orlando",
         price: 1480, confirmation: "UOR-31877", start: 60, nights: 1, sale: -20, balancePaid: -20,
         notes: "Pagados completos al reservar.",
-      },
-      {
-        type: "FLIGHT", description: "Vuelos Buenos Aires – Orlando (x4)", supplier: "American Airlines", price: 4400, rate: 5,
-        confirmation: "XKQ7PL", start: 55, nights: 7, sale: -40, balancePaid: -40,
-        legs: [
-          { direction: "OUTBOUND", on: 55, time: "22:35", airline: "American Airlines", flightNumber: "AA 930" },
-          { direction: "RETURN", on: 62, time: "16:10", airline: "American Airlines", flightNumber: "AA 931" },
-        ],
       },
       {
         type: "CAR", description: "Auto SUV 8 días", supplier: "Alamo", price: 620, rate: 8, confirmation: "ALM-7781",
@@ -412,8 +408,13 @@ async function main() {
       },
     });
   }
-  await db.diningReservation.create({
-    data: { bookingId: amandaTrip.id, restaurant: "Cinderella's Royal Table", dateTime: new Date(`${d(56).toISOString().slice(0, 10)}T11:45:00.000Z`), partySize: 4, confirmationNumber: "ADR-1234" },
+
+  // Notas libres del viaje: la IA las usa al proponer el itinerario.
+  await db.booking.update({
+    where: { id: amandaTrip.id },
+    data: {
+      notes: `Restaurantes reservados:\n- Cinderella's Royal Table · ${d(56).toISOString().slice(0, 10)} 11:45 h · 4 personas · Conf. ADR-1234\n\nMía está obsesionada con las princesas: sumar un desayuno con personajes. Prefieren volver al hotel a descansar al mediodía.`,
+    },
   });
 
   // Mensajes, tareas, grupo.

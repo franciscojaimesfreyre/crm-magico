@@ -74,7 +74,7 @@ export function BookingForm({
       <Card>
         <CardHeader title="Notas" />
         <div className="grid gap-4 p-5 sm:grid-cols-2">
-          <Field label="Notas internas" hint="Solo las ves vos">
+          <Field label="Notas internas" hint="Solo las ves vos. La IA las usa para el itinerario">
             <Textarea name="notes" defaultValue={n(booking?.notes)} rows={4} />
           </Field>
           <Field label="Notas para el cliente" hint="Se muestran en el portal">

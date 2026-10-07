@@ -72,7 +72,7 @@ export default async function BookingPage({
         actions={
           <>
             <form action={setBookingStatusForm.bind(null, b.id)} className="flex items-center gap-2">
-              <Select name="status" defaultValue={b.status} options={BOOKING_STATUSES} className="w-36" />
+              <Select key={b.status} name="status" defaultValue={b.status} options={BOOKING_STATUSES} className="w-36" />
               <SubmitButton variant="secondary" pendingText="…">
                 Cambiar
               </SubmitButton>

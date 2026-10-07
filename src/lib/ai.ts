@@ -1,6 +1,4 @@
 import "server-only";
-import Anthropic from "@anthropic-ai/sdk";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import {
@@ -15,17 +13,10 @@ import { addDays, ageOn, formatDate, fullName, money, toDateInput } from "@/lib/
 import { computeKeyDates } from "@/lib/key-dates";
 import { catalogForTrip } from "@/lib/catalog";
 import { createPseudonymizer, type Pseudonymizer } from "@/lib/ai-privacy";
+import { AIError, callStructured } from "@/lib/ai-providers";
 
-const MODEL = "claude-opus-5-5";
-
-let client: Anthropic | null = null;
-function anthropic() {
-  // Sin argumentos: toma ANTHROPIC_API_KEY o el perfil de `ant auth login`.
-  client ??= new Anthropic();
-  return client;
-}
-
-export class AIError extends Error {}
+// El proveedor (Anthropic, Groq…) se elige con AI_PROVIDER en el .env: ver ai-providers.
+export { AIError, aiConfigured } from "@/lib/ai-providers";
 
 // ─── Contexto del viaje ──────────────────────────────────────────────────────
 
@@ -169,7 +160,8 @@ const ItinerarySchema = z.object({
       notes: z.string().nullable(),
       items: z.array(
         z.object({
-          type: z.enum(ACTIVITY_TYPES),
+          // Si el modelo inventa un tipo, la actividad queda como "Otro" en vez de descartar todo.
+          type: z.enum(ACTIVITY_TYPES).catch("CUSTOM"),
           title: z.string(),
           startTime: z.string().nullable().describe("HH:MM 24 h"),
           endTime: z.string().nullable(),
@@ -324,53 +316,4 @@ export async function askKnowledge(opts: { organizationId: string; question: str
   });
   const used = items.filter((i) => result.sources.includes(i.id)).map((i) => ({ id: i.id, title: i.title }));
   return { answer: result.answer, sources: used };
-}
-
-// ─── Llamada común ───────────────────────────────────────────────────────────
-
-async function callStructured<T extends z.ZodType>(opts: {
-  system: string;
-  user: string;
-  schema: T;
-}): Promise<z.infer<T>> {
-  try {
-    const stream = anthropic().beta.messages.stream({
-      model: MODEL,
-      max_tokens: 64000,
-      // Si el modelo declina por política, la API reintenta con el modelo de respaldo recomendado.
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
-      output_config: { effort: "medium", format: betaZodOutputFormat(opts.schema) },
-      system: [{ type: "text", text: opts.system, cache_control: { type: "ephemeral" } }],
-      messages: [{ role: "user", content: opts.user }],
-    });
-    const message = await stream.finalMessage();
-    if (message.stop_reason === "refusal") {
-      throw new AIError("La IA no pudo procesar este pedido. Probá reformulando las instrucciones.");
-    }
-    if (message.stop_reason === "max_tokens") {
-      throw new AIError("La respuesta de la IA quedó incompleta. Probá con un viaje más corto o menos instrucciones.");
-    }
-    if (!message.parsed_output) throw new AIError("La IA devolvió una respuesta con formato inválido.");
-    return message.parsed_output as z.infer<T>;
-  } catch (error) {
-    if (error instanceof AIError) throw error;
-    if (error instanceof Anthropic.AuthenticationError) {
-      throw new AIError("Falta configurar la API key de Anthropic (ANTHROPIC_API_KEY).");
-    }
-    if (error instanceof Anthropic.RateLimitError) {
-      throw new AIError("La IA está saturada en este momento. Probá de nuevo en unos minutos.");
-    }
-    if (error instanceof Anthropic.APIError) {
-      throw new AIError(`Error de la API de IA (${error.status ?? "sin estado"}): ${error.message}`);
-    }
-    if (error instanceof Error && /api key|apiKey|credentials/i.test(error.message)) {
-      throw new AIError("Falta configurar la API key de Anthropic (ANTHROPIC_API_KEY).");
-    }
-    throw error;
-  }
-}
-
-export function aiConfigured() {
-  return Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN || process.env.ANTHROPIC_PROFILE);
 }

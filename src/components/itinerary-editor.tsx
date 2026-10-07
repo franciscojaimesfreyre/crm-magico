@@ -362,8 +362,8 @@ export function ItineraryEditor({
         toState(
           r.days.map((d) => ({
             date: d.date && /^\d{4}-\d{2}-\d{2}$/.test(d.date) ? d.date : null,
-            title: d.title,
-            notes: d.notes,
+            title: withoutMustDoTag(d.title) || d.title,
+            notes: withoutMustDoTag(d.notes ?? "") || null,
             items: d.items.map((i) => ({
               type: i.type,
               // Por si la IA copia la etiqueta interna del catálogo: título y notas los ve el cliente.
@@ -424,7 +424,7 @@ export function ItineraryEditor({
             <div>
               <p className="font-semibold text-slate-900">Itinerario con IA</p>
               <p className="text-sm text-slate-600">
-                Usa las edades y alturas de los viajeros, sus preferencias, los servicios y restaurantes ya reservados y las novedades vigentes del destino.
+                Usa las edades de los viajeros, los intereses y el presupuesto del grupo, las reservas, los vuelos, las notas del viaje, el catálogo de parques y las novedades vigentes. No recibe nombres ni datos personales; las alturas las revisa el sistema.
               </p>
             </div>
             <button type="button" onClick={() => setAiOpen(false)} className="text-slate-400 hover:text-slate-700">
@@ -440,7 +440,7 @@ export function ItineraryEditor({
           />
           <div className="mt-3 flex items-center gap-3">
             <button type="button" onClick={generate} disabled={generating} className={buttonClass("magic")}>
-              <Wand2 className="size-4" /> {generating ? "Armando el itinerario… (puede tardar un minuto)" : "Generar propuesta"}
+              <Wand2 className="size-4" /> {generating ? "Armando el itinerario… (puede tardar un par de minutos)" : "Generar propuesta"}
             </button>
             <span className="text-xs text-slate-500">La propuesta se carga en el editor para que la revises antes de guardar.</span>
           </div>

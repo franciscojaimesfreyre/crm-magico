@@ -39,15 +39,23 @@ export function createPseudonymizer(travelers: Person[], others: Person[] = []) 
   }
 
   function unmask(text: string): string {
-    let out = text;
+    // Plural: "los Viajeros A, B y D" → "Amanda, Diego y Tomás" (cada letra por su nombre, mismos separadores).
+    let out = text.replace(/(?:(?<![\p{L}])(?:[Ll]os|[Ll]as) )?[Vv]iajeros ([A-Z](?:, [A-Z])*(?: y [A-Z])?)(?![\p{L}\p{N}])/gu, (all, list: string) => {
+      const name = (l: string) => aliases.find((a) => a.alias === `Viajero ${l}`)?.firstName;
+      if (list.match(/[A-Z]/g)!.some((l) => !name(l))) return all;
+      return list.replace(/[A-Z]/g, (l) => name(l)!);
+    });
     // De la última letra a la primera, para no pisar "Viajero A" dentro de un alias más largo.
     for (const a of [...aliases].reverse()) {
+      // El modelo a veces escribe "viajero D" en minúscula.
+      const alias = `[Vv]iajero ${escape(a.alias.slice("Viajero ".length))}`;
+      const end = "(?![\\p{L}\\p{N}])";
       // "del Viajero D" → "de Tomás", "al Viajero D" → "a Tomás", "el Viajero D" → "Tomás".
       out = out
-        .replace(new RegExp(`(?<![\\p{L}])([Dd])el ${escape(a.alias)}(?![\\p{L}\\p{N}])`, "gu"), `$1e ${a.firstName}`)
-        .replace(new RegExp(`(?<![\\p{L}])([Aa])l ${escape(a.alias)}(?![\\p{L}\\p{N}])`, "gu"), `$1 ${a.firstName}`)
-        .replace(new RegExp(`(?<![\\p{L}])(?:[Ee]l|[Ll]a) ${escape(a.alias)}(?![\\p{L}\\p{N}])`, "gu"), a.firstName)
-        .replace(word(a.alias), a.firstName);
+        .replace(new RegExp(`(?<![\\p{L}])([Dd])el ${alias}${end}`, "gu"), `$1e ${a.firstName}`)
+        .replace(new RegExp(`(?<![\\p{L}])([Aa])l ${alias}${end}`, "gu"), `$1 ${a.firstName}`)
+        .replace(new RegExp(`(?<![\\p{L}])(?:[Ee]l|[Ll]a) ${alias}${end}`, "gu"), a.firstName)
+        .replace(new RegExp(`(?<![\\p{L}\\p{N}])${alias}${end}`, "gu"), a.firstName);
     }
     return out;
   }

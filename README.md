@@ -49,7 +49,11 @@ Usuarios de ejemplo (después de `npm run db:seed`):
 | `DATABASE_URL` | Conexión a Postgres |
 | `SESSION_SECRET` | Firma de las sesiones (texto aleatorio largo) |
 | `ENCRYPTION_KEY` | Clave AES-256 para cifrar los accesos a MyDisney, Universal, etc. (`openssl rand -base64 32`). **No cambiarla** una vez que hay datos cifrados |
-| `ANTHROPIC_API_KEY` | Habilita las funciones de IA. Sin ella, el sistema funciona igual y la IA muestra un aviso |
+| `AI_PROVIDER` | Proveedor de IA: `anthropic` (por defecto), `groq` o `deepseek` |
+| `AI_MODEL` | Opcional: otro modelo del proveedor (por defecto `claude-opus-5-5` en Anthropic, `openai/gpt-oss-120b` en Groq y `deepseek-flash` en DeepSeek; para más detalle, `deepseek-v4-pro`) |
+| `ANTHROPIC_API_KEY` | API key de Anthropic, si `AI_PROVIDER` es `anthropic`. Sin la del proveedor elegido, el sistema funciona igual y la IA muestra un aviso |
+| `GROQ_API_KEY` | API key de Groq, si `AI_PROVIDER` es `groq`. El plan gratuito (8.000 tokens por minuto) no alcanza para un itinerario completo |
+| `DEEPSEEK_API_KEY` | API key de DeepSeek, si `AI_PROVIDER` es `deepseek` (plan prepago) |
 | `APP_URL` | URL pública (links de emails, portal e iCal). En Render no hace falta: se usa `RENDER_EXTERNAL_URL` |
 | `UPLOAD_DIR` | Carpeta de archivos subidos cuando no se usa R2 (por defecto `./storage/uploads`) |
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | Archivos en Cloudflare R2. Si están, el navegador sube directo a R2 y las descargas usan links firmados que vencen en minutos |

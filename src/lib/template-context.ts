@@ -4,7 +4,7 @@ import { BOOKING_STATUS_LABEL, DESTINATION_LABEL } from "@/lib/labels";
 import { formatDate, formatRange, fullName, money } from "@/lib/format";
 import type { TemplateVars } from "@/lib/templating";
 import { appUrl } from "@/lib/app-url";
-import { mainStay } from "@/lib/trips";
+import { mainStay, paymentProgress } from "@/lib/trips";
 
 /**
  * Arma las variables de plantilla para un cliente y, opcionalmente, un viaje y una de sus reservas
@@ -53,9 +53,12 @@ export async function buildTemplateVars(opts: {
         reservations: active
           .map((i) => `- ${i.description}${i.supplier ? ` (${i.supplier})` : ""}${i.confirmationNumber ? ` · confirmación ${i.confirmationNumber}` : ""}`)
           .join("\n"),
-        pendingPayments: unpaid.map((i) => `- ${i.description}${i.supplier ? ` (${i.supplier})` : ""}: vence el ${formatDate(i.balanceDue)}`).join("\n"),
+        pendingPayments: unpaid
+          .map((i) => `- ${i.description}${i.supplier ? ` (${i.supplier})` : ""}: resta ${money(paymentProgress(i).remaining, b.currency)}, saldar antes del ${formatDate(i.balanceDue)}`)
+          .join("\n"),
         reservation: current ? `${current.description}${current.supplier ? ` (${current.supplier})` : ""}` : "",
         finalPaymentDue: formatDate((current ?? unpaid[0])?.balanceDue),
+        balanceRemaining: current ?? unpaid[0] ? money(paymentProgress((current ?? unpaid[0])!).remaining, b.currency) : "",
         travelers: b.travelers.map((t) => fullName(t.traveler)).join(", "),
         portalLink: `${baseUrl}/portal/viajes/${b.id}`,
       } satisfies TemplateVars);

@@ -194,6 +194,27 @@ export function Select({
   );
 }
 
+/** Select con grupos de opciones (optgroup). */
+export function GroupedSelect({
+  groups,
+  className,
+  ...props
+}: ComponentProps<"select"> & { groups: { label: string; options: { value: string; label: string }[] }[] }) {
+  return (
+    <select className={clsx("field", className)} {...props}>
+      {groups.map((g) => (
+        <optgroup key={g.label} label={g.label}>
+          {g.options.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </optgroup>
+      ))}
+    </select>
+  );
+}
+
 export function Checkbox({ label, ...props }: ComponentProps<"input"> & { label: string }) {
   return (
     <label className="inline-flex items-center gap-2 text-sm text-slate-700">

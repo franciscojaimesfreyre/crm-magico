@@ -54,15 +54,15 @@ export function Summary({ booking: b }: { booking: LoadedBooking }) {
       </Card>
 
       <Card>
-        <CardHeader title="Fechas clave" description="Calculadas a partir de las fechas del viaje. Aparecen en el calendario y en el portal." />
+        <CardHeader title="Fechas clave" description="Calculadas a partir de cada reserva (check-in del paquete, vuelos, auto, saldos). Aparecen en el calendario y en el portal." />
         {keyDates.length === 0 ? (
-          <p className="p-5 text-sm text-slate-500">Cargá las fechas del viaje para calcularlas.</p>
+          <p className="p-5 text-sm text-slate-500">Se calculan a partir de las reservas: cargá sus fechas (check-in, retiro del auto, vuelo…) y la fecha límite de pago.</p>
         ) : (
           <ul className="divide-y divide-slate-100">
-            {keyDates.map((k) => {
+            {keyDates.map((k, idx) => {
               const diff = daysBetween(today, k.date);
               return (
-                <li key={k.label} className="flex items-center justify-between gap-3 px-5 py-3 text-sm">
+                <li key={idx} className="flex items-center justify-between gap-3 px-5 py-3 text-sm">
                   <div className="flex items-center gap-3">
                     <CalendarClock className={clsx("size-4", diff < 0 ? "text-slate-300" : diff <= 7 ? "text-rose-500" : "text-brand-500")} />
                     <div>
@@ -157,11 +157,16 @@ export function Summary({ booking: b }: { booking: LoadedBooking }) {
                     </td>
                     <td className="px-3 py-2.5 text-xs whitespace-nowrap">
                       {i.balancePaidAt ? (
-                        <span className="text-emerald-700">Pagado</span>
-                      ) : i.balanceDue ? (
-                        <span className={daysBetween(today, i.balanceDue) <= 14 ? "font-medium text-rose-600" : "text-slate-600"}>Saldo vence {formatDate(i.balanceDue)}</span>
+                        <span className="text-emerald-700">Saldada</span>
                       ) : (
-                        <span className="text-slate-400">Sin vencimiento</span>
+                        <>
+                          <span className="text-slate-600">Pagado {money(i.paidAmount, b.currency)}</span>
+                          {i.balanceDue && (
+                            <span className={clsx("block", daysBetween(today, i.balanceDue) <= 14 ? "font-medium text-rose-600" : "text-slate-500")}>
+                              Saldar antes del {formatDate(i.balanceDue)}
+                            </span>
+                          )}
+                        </>
                       )}
                     </td>
                     <td className="px-3 py-2.5 text-right whitespace-nowrap">{money(i.price, b.currency)}</td>

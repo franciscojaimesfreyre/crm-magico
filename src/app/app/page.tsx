@@ -45,7 +45,7 @@ export default async function Dashboard() {
     }),
     db.booking.findMany({
       where: { organizationId: orgId, status: { notIn: ["CANCELLED", "COMPLETED"] }, startDate: { gte: addDays(today, -60), lte: in90 } },
-      include: { client: { select: { firstName: true, lastName: true } }, items: true },
+      include: { client: { select: { firstName: true, lastName: true } }, items: { include: { flightLegs: true } } },
       orderBy: { startDate: "asc" },
     }),
     // Ventas = reservas confirmadas con un proveedor (un viaje puede tener varias).
@@ -78,7 +78,7 @@ export default async function Dashboard() {
   // Fechas clave de los próximos 30 días de todos los viajes.
   const keyDates = upcoming
     .flatMap((b) => computeKeyDates(b).map((k) => ({ ...k, booking: b })))
-    .filter((k) => k.date >= today && k.date <= addDays(today, 30) && k.kind !== "checkout")
+    .filter((k) => k.date >= today && k.date <= addDays(today, 30) && !["checkout", "stay-out", "dropoff"].includes(k.kind))
     .sort((a, b) => a.date.getTime() - b.date.getTime())
     .slice(0, 10);
   const nextTrips = upcoming.filter((b) => b.startDate && b.startDate >= today).slice(0, 6);

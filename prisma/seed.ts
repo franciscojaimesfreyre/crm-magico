@@ -199,6 +199,8 @@ async function main() {
     sale?: number; // fecha de venta (por defecto, la del viaje)
     deposit?: number;
     depositPaid?: number;
+    installments?: { amount: number; on: number; note?: string }[]; // cuotas libres después del depósito
+    legs?: { direction: "OUTBOUND" | "RETURN"; on: number; time: string; airline: string; flightNumber: string }[];
     balanceDue?: number;
     balancePaid?: number;
     commission?: "PENDING" | "REQUESTED" | "PAID";
@@ -231,6 +233,15 @@ async function main() {
       const commissionAmount = Math.round(i.price * (i.rate ?? rate)) / 100;
       const balanceDue = i.balanceDue ?? (idx === 0 ? opts.finalPaymentDue : undefined);
       const commission = status === "CONFIRMED" ? (i.commission ?? opts.commissionStatus ?? "PENDING") : "PENDING";
+      // Pagos del cliente al proveedor: depósito, cuotas libres y saldo.
+      const depositAmount = i.deposit ?? (idx === 0 && sold ? Math.round(i.price * 0.2) : null);
+      const depositPaid = i.depositPaid !== undefined ? i.depositPaid : idx === 0 && sold ? opts.saleDate : undefined;
+      const payments: { amount: number; paidAt: Date; note?: string }[] = [];
+      if (depositAmount && depositPaid !== undefined) payments.push({ amount: depositAmount, paidAt: d(depositPaid), note: "Depósito" });
+      for (const c of i.installments ?? []) payments.push({ amount: c.amount, paidAt: d(c.on), note: c.note ?? "Cuota" });
+      const balancePaid = i.balancePaid ?? (paidInFull && balanceDue !== undefined ? balanceDue - 3 : undefined);
+      const paidSoFar = payments.reduce((t, p) => t + p.amount, 0);
+      if (balancePaid !== undefined && paidSoFar < i.price) payments.push({ amount: i.price - paidSoFar, paidAt: d(balancePaid), note: "Saldo" });
       return {
         type: i.type,
         status,
@@ -242,10 +253,12 @@ async function main() {
         endDate: i.start !== undefined && i.nights ? d(i.start + i.nights) : endDate,
         position: idx,
         price: i.price,
-        depositAmount: i.deposit ?? (idx === 0 && sold ? Math.round(i.price * 0.2) : null),
-        depositPaidAt: i.depositPaid !== undefined ? d(i.depositPaid) : idx === 0 && sold && opts.saleDate !== undefined ? d(opts.saleDate) : null,
+        depositAmount,
         balanceDue: balanceDue !== undefined ? d(balanceDue) : null,
-        balancePaidAt: i.balancePaid !== undefined ? d(i.balancePaid) : paidInFull && balanceDue !== undefined ? d(balanceDue - 3) : null,
+        paidAmount: payments.reduce((t, p) => t + p.amount, 0),
+        balancePaidAt: payments.reduce((t, p) => t + p.amount, 0) >= i.price ? (payments.at(-1)?.paidAt ?? null) : null,
+        payments: { create: payments },
+        flightLegs: { create: (i.legs ?? []).map((l) => ({ direction: l.direction, date: d(l.on), time: l.time, airline: l.airline, flightNumber: l.flightNumber })) },
         saleDate: status !== "CONFIRMED" ? null : i.sale !== undefined ? d(i.sale) : opts.saleDate !== undefined ? d(opts.saleDate) : null,
         commissionRate: i.rate ?? null,
         commissionAmount,
@@ -283,14 +296,23 @@ async function main() {
     status: "BOOKED", start: 55, nights: 7,
     items: [
       {
-        type: "PACKAGE", description: "Paquete Art of Animation, suite familiar, 5 noches + tickets Disney 4 días", supplier: "Disney Destinations",
+        type: "DISNEY_WORLD_PACKAGE", description: "Paquete Art of Animation, suite familiar, 5 noches + tickets Disney 4 días", supplier: "Disney Destinations",
         price: 6200, confirmation: "DDX-48211", start: 55, nights: 5, sale: -40, deposit: 200, depositPaid: -40, balanceDue: 25,
+        installments: [{ amount: 1500, on: -25 }, { amount: 1000, on: -6, note: "Cuota con tarjeta Visa" }],
         notes: "Incluye Lightning Lane Multi Pass para los 4 días de parque.",
       },
       {
-        type: "TICKETS", description: "Tickets Universal 2 días, 2 parques (x4)", supplier: "Universal Orlando",
+        type: "UNIVERSAL_TICKETS", description: "Tickets Universal 2 días, 2 parques (x4)", supplier: "Universal Orlando",
         price: 1480, confirmation: "UOR-31877", start: 60, nights: 1, sale: -20, balancePaid: -20,
         notes: "Pagados completos al reservar.",
+      },
+      {
+        type: "FLIGHT", description: "Vuelos Buenos Aires – Orlando (x4)", supplier: "American Airlines", price: 4400, rate: 5,
+        confirmation: "XKQ7PL", start: 55, nights: 7, sale: -40, balancePaid: -40,
+        legs: [
+          { direction: "OUTBOUND", on: 55, time: "22:35", airline: "American Airlines", flightNumber: "AA 930" },
+          { direction: "RETURN", on: 62, time: "16:10", airline: "American Airlines", flightNumber: "AA 931" },
+        ],
       },
       {
         type: "CAR", description: "Auto SUV 8 días", supplier: "Alamo", price: 620, rate: 8, confirmation: "ALM-7781",
@@ -313,29 +335,29 @@ async function main() {
     status: "PAID_IN_FULL", start: 12, nights: 6,
     finalPaymentDue: -20, saleDate: -90,
     items: [
-      { type: "HOTEL", description: "Cabana Bay, habitación familiar, 6 noches", supplier: "Universal Orlando", price: 2100, confirmation: "UOR-55120" },
-      { type: "TICKETS", description: "Entradas 4 días, 3 parques (x4)", supplier: "Universal Orlando", price: 2480 },
-      { type: "EXPERIENCE", description: "Express Pass", supplier: "Universal Orlando", price: 760 },
+      { type: "UNIVERSAL_HOTEL", description: "Cabana Bay, habitación familiar, 6 noches", supplier: "Universal Orlando", price: 2100, confirmation: "UOR-55120" },
+      { type: "UNIVERSAL_TICKETS", description: "Entradas 4 días, 3 parques (x4)", supplier: "Universal Orlando", price: 2480 },
+      { type: "UNIVERSAL_EXPRESS", description: "Express Pass", supplier: "Universal Orlando", price: 760 },
     ],
   });
   await booking({
     client: priya, agentId: laura.id, title: "Luna de miel en Disney World", destination: "DISNEY_WORLD",
     status: "COMPLETED", start: -60, nights: 6, saleDate: -200, finalPaymentDue: -90,
     commissionStatus: "PAID",
-    items: [{ type: "PACKAGE", description: "Grand Floridian 6 noches + entradas", supplier: "Disney Destinations", price: 9800 }],
+    items: [{ type: "DISNEY_WORLD_PACKAGE", description: "Grand Floridian 6 noches + entradas", supplier: "Disney Destinations", price: 9800 }],
   });
   await booking({
     client: linh, agentId: laura.id, title: "Disney Cruise — Nguyen", destination: "DISNEY_CRUISE",
     status: "TRAVELED", start: -15, nights: 5, saleDate: -150, finalPaymentDue: -100,
-    items: [{ type: "CRUISE", description: "Disney Wish 5 noches, camarote con balcón", supplier: "Disney Cruise Line", price: 6200, confirmation: "DCL-90311" }],
+    items: [{ type: "DISNEY_CRUISE", description: "Disney Wish 5 noches, camarote con balcón", supplier: "Disney Cruise Line", price: 6200, confirmation: "DCL-90311" }],
   });
   await booking({
     client: theo, agentId: martin.id, title: "Disney + Universal — Theo", destination: "COMBINED",
     status: "TRAVELED", start: -35, nights: 8, saleDate: -120, finalPaymentDue: -80, commissionStatus: "REQUESTED",
     items: [
       { type: "HOTEL", description: "Hotel en Disney Springs, 4 noches", supplier: "Booking", price: 1300, rate: 8 },
-      { type: "TICKETS", description: "Entradas Disney 4 días", supplier: "Disney", price: 690 },
-      { type: "TICKETS", description: "Entradas Universal 3 días", supplier: "Universal Orlando", price: 520 },
+      { type: "DISNEY_WORLD_TICKETS", description: "Entradas Disney 4 días", supplier: "Disney", price: 690 },
+      { type: "UNIVERSAL_TICKETS", description: "Entradas Universal 3 días", supplier: "Universal Orlando", price: 520 },
     ],
   });
   await booking({
@@ -345,7 +367,7 @@ async function main() {
   await booking({
     client: ortiz, agentId: paula.id, title: "Crucero Disney — familia Ortiz", destination: "DISNEY_CRUISE",
     status: "TRAVELED", start: -25, nights: 4, saleDate: -130, finalPaymentDue: -90,
-    items: [{ type: "CRUISE", description: "Disney Dream 4 noches, camarote exterior", supplier: "Disney Cruise Line", price: 4100, confirmation: "DCL-77120" }],
+    items: [{ type: "DISNEY_CRUISE", description: "Disney Dream 4 noches, camarote exterior", supplier: "Disney Cruise Line", price: 4100, confirmation: "DCL-77120" }],
   });
   await booking({
     client: ortiz, agentId: paula.id, title: "Disney World 2027 — familia Ortiz", destination: "DISNEY_WORLD",
@@ -366,8 +388,8 @@ async function main() {
       validUntil: d(12),
       options: {
         create: [
-          { name: "Camarote interior", position: 0, items: { create: [{ type: "CRUISE", description: "Disney Wish 4 noches, interior", supplier: "Disney Cruise Line", price: 4300 }] } },
-          { name: "Camarote con balcón", position: 1, items: { create: [{ type: "CRUISE", description: "Disney Wish 4 noches, verandah", supplier: "Disney Cruise Line", price: 5600 }] } },
+          { name: "Camarote interior", position: 0, items: { create: [{ type: "DISNEY_CRUISE", description: "Disney Wish 4 noches, interior", supplier: "Disney Cruise Line", price: 4300 }] } },
+          { name: "Camarote con balcón", position: 1, items: { create: [{ type: "DISNEY_CRUISE", description: "Disney Wish 4 noches, verandah", supplier: "Disney Cruise Line", price: 5600 }] } },
         ],
       },
     },

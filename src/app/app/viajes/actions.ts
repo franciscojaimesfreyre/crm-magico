@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { ageOn, parseDateInput, todayUTC } from "@/lib/format";
+import { ageOn, money, parseDateInput, todayUTC } from "@/lib/format";
+import { commissionFromForm, paymentProgress, suggestedBalanceDue } from "@/lib/trips";
 import { changeBookingStatus, confirmationData, nextBookingCode, recalcBookingTotals } from "@/lib/bookings";
 import { logActivity } from "@/lib/events";
 import { runEventWorkflows } from "@/lib/automations";
@@ -145,12 +146,10 @@ function itemFields(formData: FormData) {
     notes: str(formData, "notes"),
     price: num(formData, "price") ?? 0,
     depositAmount: num(formData, "depositAmount"),
-    depositPaidAt: parseDateInput(formData.get("depositPaidAt")),
     balanceDue: parseDateInput(formData.get("balanceDue")),
-    balancePaidAt: parseDateInput(formData.get("balancePaidAt")),
     // Al confirmarla con el proveedor queda registrada la venta (para la planilla de comisiones).
     saleDate: saleDate ?? (status === "CONFIRMED" ? todayUTC() : null),
-    commissionRate: num(formData, "commissionRate"),
+    ...commissionFromForm(formData),
     commissionStatus,
     commissionPaidAt: commissionStatus === "PAID" ? (parseDateInput(formData.get("commissionPaidAt")) ?? todayUTC()) : null,
     commissionPaidAmount: commissionStatus === "PAID" ? num(formData, "commissionPaidAmount") : null,
@@ -158,11 +157,40 @@ function itemFields(formData: FormData) {
   };
 }
 
+/** Tramos de ida y vuelta de una reserva de vuelo (campos out* y back* del formulario). */
+function flightLegsFromForm(formData: FormData) {
+  return (["out", "back"] as const)
+    .map((prefix) => ({
+      direction: prefix === "out" ? ("OUTBOUND" as const) : ("RETURN" as const),
+      date: parseDateInput(formData.get(`${prefix}Date`)),
+      time: str(formData, `${prefix}Time`),
+      airline: str(formData, `${prefix}Airline`),
+      flightNumber: str(formData, `${prefix}Number`)?.toUpperCase() ?? null,
+    }))
+    .filter((l) => l.date || l.time || l.airline || l.flightNumber);
+}
+
+/** Guarda los tramos (solo en vuelos) y completa las fechas de la reserva con la ida y la vuelta. */
+async function saveFlightLegs(itemId: string, type: ItemType, legs: ReturnType<typeof flightLegsFromForm>) {
+  await db.flightLeg.deleteMany({ where: { bookingItemId: itemId } });
+  if (type !== "FLIGHT" || legs.length === 0) return;
+  await db.flightLeg.createMany({ data: legs.map((l) => ({ bookingItemId: itemId, ...l })) });
+}
+
+function withFlightDates<T extends { type: ItemType; startDate: Date | null; endDate: Date | null }>(data: T, legs: ReturnType<typeof flightLegsFromForm>) {
+  if (data.type !== "FLIGHT") return data;
+  return {
+    ...data,
+    startDate: data.startDate ?? legs.find((l) => l.direction === "OUTBOUND")?.date ?? null,
+    endDate: data.endDate ?? legs.find((l) => l.direction === "RETURN")?.date ?? null,
+  };
+}
+
 async function ownItem(itemId: string) {
   const user = await requireUser();
   const item = await db.bookingItem.findFirst({
     where: { id: itemId, booking: { organizationId: user.organizationId } },
-    include: { booking: { select: { clientId: true } } },
+    include: { booking: { select: { clientId: true, startDate: true, currency: true } } },
   });
   if (!item) throw new Error("Reserva no encontrada");
   return { user, item };
@@ -177,8 +205,11 @@ export async function addBookingItem(bookingId: string, _: ActionState, formData
   const { user, booking } = await ownBooking(bookingId);
   const data = itemFields(formData);
   if (!data.description) return { error: "Describí la reserva" };
+  data.balanceDue ??= suggestedBalanceDue(data.type, data.startDate ?? booking.startDate);
+  const legs = flightLegsFromForm(formData);
   const position = await db.bookingItem.count({ where: { bookingId } });
-  await db.bookingItem.create({ data: { bookingId, ...data, position } });
+  const created = await db.bookingItem.create({ data: { bookingId, ...withFlightDates(data, legs), position } });
+  await saveFlightLegs(created.id, data.type, legs);
   await logActivity({ organizationId: user.organizationId, clientId: booking.clientId, bookingId, userId: user.id, type: "item", description: `Reserva agregada: ${data.description}` });
   await afterItemChange(bookingId, user.id);
   return { ok: "Reserva agregada" };
@@ -188,7 +219,10 @@ export async function updateBookingItem(itemId: string, _: ActionState, formData
   const { user, item } = await ownItem(itemId);
   const data = itemFields(formData);
   if (!data.description) return { error: "Describí la reserva" };
-  await db.bookingItem.update({ where: { id: itemId }, data });
+  data.balanceDue ??= suggestedBalanceDue(data.type, data.startDate ?? item.booking.startDate);
+  const legs = flightLegsFromForm(formData);
+  await db.bookingItem.update({ where: { id: itemId }, data: withFlightDates(data, legs) });
+  await saveFlightLegs(itemId, data.type, legs);
   if (item.status !== data.status) {
     await logActivity({
       organizationId: user.organizationId,
@@ -204,18 +238,61 @@ export async function updateBookingItem(itemId: string, _: ActionState, formData
 }
 
 /** Accesos rápidos desde la lista de reservas del viaje. */
-export async function quickItemAction(itemId: string, action: "confirm" | "balancePaid" | "cancel") {
+export async function quickItemAction(itemId: string, action: "confirm" | "cancel") {
   const { user, item } = await ownItem(itemId);
-  const data =
-    action === "confirm"
-      ? confirmationData(item)
-      : action === "balancePaid"
-        ? { balancePaidAt: todayUTC() }
-        : { status: "CANCELLED" as const };
+  const data = action === "confirm" ? confirmationData(item) : { status: "CANCELLED" as const };
   await db.bookingItem.update({ where: { id: itemId }, data });
-  const label = action === "confirm" ? "confirmada" : action === "balancePaid" ? "con saldo pagado" : "cancelada";
+  const label = action === "confirm" ? "confirmada" : "cancelada";
   await logActivity({ organizationId: user.organizationId, clientId: item.booking.clientId, bookingId: item.bookingId, userId: user.id, type: "item", description: `Reserva ${label}: ${item.description}` });
   await afterItemChange(item.bookingId, user.id);
+}
+
+// ─── Pagos de la reserva (depósito, cuotas libres, saldo) ────────────────────
+
+export async function addReservationPayment(itemId: string, _: ActionState, formData: FormData): Promise<ActionState> {
+  const { user, item } = await ownItem(itemId);
+  const amount = num(formData, "amount");
+  if (!amount || amount <= 0) return { error: "Ingresá el monto pagado" };
+  const paidAt = parseDateInput(formData.get("paidAt")) ?? todayUTC();
+  await db.reservationPayment.create({ data: { bookingItemId: itemId, amount, paidAt, note: str(formData, "note") } });
+  await logActivity({
+    organizationId: user.organizationId,
+    clientId: item.booking.clientId,
+    bookingId: item.bookingId,
+    userId: user.id,
+    type: "payment",
+    description: `Pago de ${money(amount, item.booking.currency)} en ${item.description}`,
+  });
+  await afterItemChange(item.bookingId, user.id);
+  return { ok: "Pago registrado" };
+}
+
+/** Registra un pago por todo lo que falta. */
+export async function payReservationBalance(itemId: string) {
+  const { user, item } = await ownItem(itemId);
+  const { remaining } = paymentProgress(item);
+  if (remaining <= 0) return;
+  await db.reservationPayment.create({ data: { bookingItemId: itemId, amount: remaining, paidAt: todayUTC(), note: "Saldo" } });
+  await logActivity({
+    organizationId: user.organizationId,
+    clientId: item.booking.clientId,
+    bookingId: item.bookingId,
+    userId: user.id,
+    type: "payment",
+    description: `Saldo pagado (${money(remaining, item.booking.currency)}): ${item.description}`,
+  });
+  await afterItemChange(item.bookingId, user.id);
+}
+
+export async function deleteReservationPayment(paymentId: string) {
+  const user = await requireUser();
+  const payment = await db.reservationPayment.findFirst({
+    where: { id: paymentId, bookingItem: { booking: { organizationId: user.organizationId } } },
+    include: { bookingItem: { select: { bookingId: true } } },
+  });
+  if (!payment) throw new Error("Pago no encontrado");
+  await db.reservationPayment.delete({ where: { id: paymentId } });
+  await afterItemChange(payment.bookingItem.bookingId, user.id);
 }
 
 export async function deleteBookingItem(itemId: string) {

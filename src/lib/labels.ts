@@ -92,6 +92,16 @@ export const RESERVATION_STATUS_COLOR: Record<ReservationStatus, string> = {
 };
 
 export const ITEM_TYPE_LABEL: Record<ItemType, string> = {
+  DISNEY_WORLD_PACKAGE: "Paquete Disney World",
+  DISNEY_WORLD_HOTEL: "Hotel Disney World",
+  DISNEY_WORLD_TICKETS: "Tickets Disney World",
+  DISNEYLAND_PACKAGE: "Paquete Disneyland",
+  DISNEYLAND_TICKETS: "Tickets Disneyland",
+  UNIVERSAL_PACKAGE: "Paquete Universal Orlando",
+  UNIVERSAL_HOTEL: "Hotel Universal Orlando",
+  UNIVERSAL_TICKETS: "Tickets Universal Orlando",
+  UNIVERSAL_EXPRESS: "Universal Express Pass",
+  DISNEY_CRUISE: "Crucero Disney Cruise Line",
   HOTEL: "Hotel",
   PACKAGE: "Paquete",
   TICKETS: "Entradas",
@@ -105,6 +115,51 @@ export const ITEM_TYPE_LABEL: Record<ItemType, string> = {
   OTHER: "Otro",
 };
 export const ITEM_TYPES = options(ITEM_TYPE_LABEL);
+
+/** Tipo genérico de cada tipo de reserva: define fechas clave, ícono y vencimientos. */
+export const ITEM_TYPE_BASE: Record<ItemType, ItemType> = {
+  DISNEY_WORLD_PACKAGE: "PACKAGE",
+  DISNEY_WORLD_HOTEL: "HOTEL",
+  DISNEY_WORLD_TICKETS: "TICKETS",
+  DISNEYLAND_PACKAGE: "PACKAGE",
+  DISNEYLAND_TICKETS: "TICKETS",
+  UNIVERSAL_PACKAGE: "PACKAGE",
+  UNIVERSAL_HOTEL: "HOTEL",
+  UNIVERSAL_TICKETS: "TICKETS",
+  UNIVERSAL_EXPRESS: "EXPERIENCE",
+  DISNEY_CRUISE: "CRUISE",
+  HOTEL: "HOTEL",
+  PACKAGE: "PACKAGE",
+  TICKETS: "TICKETS",
+  CRUISE: "CRUISE",
+  FLIGHT: "FLIGHT",
+  CAR: "CAR",
+  TRANSFER: "TRANSFER",
+  INSURANCE: "INSURANCE",
+  DINING: "DINING",
+  EXPERIENCE: "EXPERIENCE",
+  OTHER: "OTHER",
+};
+
+export type ItemBrand = "DISNEY_WORLD" | "DISNEYLAND" | "UNIVERSAL" | "DISNEY_CRUISE";
+
+/** Marca de los tipos específicos (null en los genéricos). */
+export function itemBrand(type: string): ItemBrand | null {
+  if (type.startsWith("DISNEY_WORLD_")) return "DISNEY_WORLD";
+  if (type.startsWith("DISNEYLAND_")) return "DISNEYLAND";
+  if (type.startsWith("UNIVERSAL_")) return "UNIVERSAL";
+  if (type === "DISNEY_CRUISE") return "DISNEY_CRUISE";
+  return null;
+}
+
+/** Tipos agrupados para el selector (optgroups). */
+export const ITEM_TYPE_GROUPS: { label: string; types: ItemType[] }[] = [
+  { label: "Walt Disney World", types: ["DISNEY_WORLD_PACKAGE", "DISNEY_WORLD_HOTEL", "DISNEY_WORLD_TICKETS"] },
+  { label: "Universal Orlando", types: ["UNIVERSAL_PACKAGE", "UNIVERSAL_HOTEL", "UNIVERSAL_TICKETS", "UNIVERSAL_EXPRESS"] },
+  { label: "Disneyland", types: ["DISNEYLAND_PACKAGE", "DISNEYLAND_TICKETS"] },
+  { label: "Cruceros", types: ["DISNEY_CRUISE", "CRUISE"] },
+  { label: "Otros", types: ["PACKAGE", "HOTEL", "TICKETS", "FLIGHT", "CAR", "TRANSFER", "INSURANCE", "DINING", "EXPERIENCE", "OTHER"] },
+];
 
 export const QUOTE_STATUS_LABEL: Record<QuoteStatus, string> = {
   DRAFT: "Borrador",

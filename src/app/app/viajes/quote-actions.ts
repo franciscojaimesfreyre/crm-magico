@@ -11,6 +11,7 @@ import { AIError, draftQuoteMessage } from "@/lib/ai";
 import type { ActionState } from "@/components/form-controls";
 import type { ItemType } from "@/generated/prisma/enums";
 import { appUrl } from "@/lib/app-url";
+import { commissionFromForm } from "@/lib/trips";
 
 async function ownQuote(quoteId: string) {
   const user = await requireUser();
@@ -52,6 +53,7 @@ export async function createQuote(bookingId: string) {
               endDate: i.endDate,
               price: i.price,
               commissionRate: i.commissionRate,
+              commissionFixed: i.commissionFixed,
               position: idx,
             })),
           },
@@ -115,7 +117,6 @@ export async function addQuoteItem(optionId: string, _: ActionState, formData: F
   const description = String(formData.get("description") ?? "").trim();
   if (!description) return { error: "Describí el servicio" };
   const price = Number(String(formData.get("price") ?? "0").replace(",", "."));
-  const rateRaw = String(formData.get("commissionRate") ?? "").trim();
   const position = await db.quoteItem.count({ where: { optionId } });
   await db.quoteItem.create({
     data: {
@@ -126,7 +127,7 @@ export async function addQuoteItem(optionId: string, _: ActionState, formData: F
       startDate: parseDateInput(formData.get("startDate")),
       endDate: parseDateInput(formData.get("endDate")),
       price: Number.isFinite(price) ? price : 0,
-      commissionRate: rateRaw ? Number(rateRaw.replace(",", ".")) : null,
+      ...commissionFromForm(formData),
       position,
     },
   });

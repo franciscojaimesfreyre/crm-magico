@@ -12,6 +12,7 @@ import { computeKeyDates } from "@/lib/key-dates";
 import { loadThread } from "@/lib/messages";
 import { readClientThread, sendClientMessage } from "../../../actions";
 import type { BookingStatus } from "@/generated/prisma/enums";
+import { describeFlightLegs, paymentProgress } from "@/lib/trips";
 
 const CLIENT_STATUS: Record<BookingStatus, string> = {
   INQUIRY: "Estamos armando tu cotización",
@@ -44,7 +45,7 @@ export default async function PortalTrip({
     where: { id, clientId: account.clientId },
     include: {
       travelers: { include: { traveler: true } },
-      items: { orderBy: { position: "asc" } },
+      items: { orderBy: { position: "asc" }, include: { flightLegs: true } },
       diningReservations: { orderBy: { dateTime: "asc" } },
       quotes: { where: { status: { in: ["SENT", "ACCEPTED"] } }, orderBy: { createdAt: "desc" } },
       group: true,
@@ -95,10 +96,10 @@ export default async function PortalTrip({
 
           <Section title="Fechas importantes">
             <ul className="space-y-2">
-              {computeKeyDates(b).map((k) => {
+              {computeKeyDates(b).map((k, idx) => {
                 const diff = daysBetween(today, k.date);
                 return (
-                  <li key={k.label} className="flex items-center justify-between gap-3 text-sm">
+                  <li key={idx} className="flex items-center justify-between gap-3 text-sm">
                     <span className={clsx("flex items-center gap-2", diff < 0 ? "text-slate-400" : "text-slate-800")}>
                       <CalendarClock className="size-4 text-brand-500" /> {k.label}
                     </span>
@@ -135,20 +136,36 @@ export default async function PortalTrip({
                         </div>
                         {Number(i.price) > 0 && <span className="whitespace-nowrap text-slate-700">{money(i.price, b.currency)}</span>}
                       </div>
-                      {(i.depositAmount !== null || i.balanceDue || i.balancePaidAt) && (
-                        <p className="mt-1 flex flex-wrap gap-x-3 text-xs">
-                          {i.depositAmount !== null && (
-                            <span className={i.depositPaidAt ? "text-emerald-600" : "text-amber-600"}>
-                              Depósito {money(i.depositAmount, b.currency)} {i.depositPaidAt ? "· pagado" : "· pendiente"}
-                            </span>
-                          )}
-                          {i.balancePaidAt ? (
-                            <span className="text-emerald-600">Saldo pagado</span>
-                          ) : i.balanceDue ? (
-                            <span className="text-slate-600">Saldo: vence el {formatDate(i.balanceDue)}</span>
-                          ) : null}
-                        </p>
+                      {i.flightLegs.length > 0 && (
+                        <ul className="mt-1 space-y-0.5 text-xs text-slate-600">
+                          {describeFlightLegs(i.flightLegs, formatDate).map((l) => (
+                            <li key={l.direction}>
+                              <span className="font-medium text-sky-700">{l.label}:</span> {l.when}
+                              {l.flight && ` · ${l.flight}`}
+                            </li>
+                          ))}
+                        </ul>
                       )}
+                      {Number(i.price) > 0 && i.status !== "CANCELLED" && (() => {
+                        const pay = paymentProgress(i);
+                        return (
+                          <p className="mt-1 flex flex-wrap gap-x-3 text-xs">
+                            {pay.settled ? (
+                              <span className="text-emerald-600">Pagada en su totalidad</span>
+                            ) : (
+                              <>
+                                <span className="text-slate-600">
+                                  Pagaste {money(pay.paid, b.currency)} · resta {money(pay.remaining, b.currency)}
+                                </span>
+                                {i.depositAmount !== null && !pay.depositCovered && (
+                                  <span className="text-amber-600">Depósito para reservar: {money(i.depositAmount, b.currency)}</span>
+                                )}
+                                {i.balanceDue && <span className="text-slate-600">Saldar antes del {formatDate(i.balanceDue)}</span>}
+                              </>
+                            )}
+                          </p>
+                        );
+                      })()}
                     </li>
                   ))}
               </ul>

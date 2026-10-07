@@ -21,9 +21,10 @@ export async function calendarEvents(organizationId: string, from: Date, to: Dat
         OR: [
           { startDate: { gte: addDays(from, -90), lte: addDays(to, 90) } },
           { items: { some: { balanceDue: { gte: from, lte: to } } } },
+          { items: { some: { startDate: { gte: addDays(from, -90), lte: addDays(to, 90) } } } },
         ],
       },
-      include: { client: { select: { firstName: true, lastName: true } }, items: true },
+      include: { client: { select: { firstName: true, lastName: true } }, items: { include: { flightLegs: true } } },
     }),
     db.task.findMany({ where: { organizationId, completedAt: null, dueDate: { gte: from, lte: to } } }),
     db.diningReservation.findMany({

@@ -36,7 +36,7 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
   const guests = active.reduce((s, b) => s + b.adults + b.children, 0);
   const revenue = active.reduce((s, b) => s + toNumber(b.totalPrice), 0);
   const deposits = active.reduce(
-    (s, b) => s + b.items.filter((i) => i.status !== "CANCELLED" && i.depositPaidAt).reduce((t, i) => t + toNumber(i.depositAmount), 0),
+    (s, b) => s + b.items.filter((i) => i.status !== "CANCELLED").reduce((t, i) => t + toNumber(i.paidAmount), 0),
     0,
   );
 
@@ -60,7 +60,7 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
         <StatCard label="Viajes" value={active.length} />
         <StatCard label="Viajeros" value={guests} />
         <StatCard label="Total vendido" value={money(revenue, currency)} />
-        <StatCard label="Depósitos pagados" value={money(deposits, currency)} tone="good" />
+        <StatCard label="Pagado por los clientes" value={money(deposits, currency)} tone="good" />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">

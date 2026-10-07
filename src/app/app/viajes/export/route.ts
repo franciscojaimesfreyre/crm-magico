@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
       b.children,
       b.currency,
     ];
-    if (b.items.length === 0) return [[...trip, "", "", "", "", "", "", "", "", "", "", "", "", ""]];
+    if (b.items.length === 0) return [[...trip, "", "", "", "", "", "", "", "", "", "", "", "", "", ""]];
     return b.items.map((i) => [
       ...trip,
       ITEM_TYPE_LABEL[i.type],
@@ -41,6 +41,7 @@ export async function GET(request: NextRequest) {
       i.startDate,
       i.endDate,
       amount(i.price),
+      amount(i.paidAmount),
       i.balanceDue,
       i.balancePaidAt,
       i.saleDate,
@@ -52,7 +53,7 @@ export async function GET(request: NextRequest) {
     [
       "Viaje", "Cliente", "Email", "Título", "Destino", "Estado del viaje", "Desde", "Hasta", "Adultos", "Menores", "Moneda",
       "Tipo de reserva", "Reserva", "Proveedor", "Confirmación", "Estado de la reserva", "Reserva desde", "Reserva hasta",
-      "Importe", "Vence el saldo", "Saldo pagado el", "Fecha de venta", "Comisión", "Estado comisión",
+      "Importe", "Pagado", "Saldar antes del", "Saldada el", "Fecha de venta", "Comisión", "Estado comisión",
     ],
     rows,
   );

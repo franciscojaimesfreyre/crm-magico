@@ -24,6 +24,8 @@ Vocabulario de CRM Mágico. Cuando el nombre en el código difiere del nombre en
 
 **Cotización** (`Quote`): propuesta con una o varias **opciones** (`QuoteOption`), cada una con sus reservas cotizadas (`QuoteItem`). Cuando el cliente acepta una opción, sus reservas se suman al viaje como "a reservar".
 
-**Fechas clave**: se calculan a partir del viaje y sus reservas. Incluyen la apertura de reservas de restaurantes y de Lightning Lane, según el check-in en Disney; el vencimiento del saldo de cada reserva; el check-in online del crucero; y la salida y el regreso.
+**Fechas clave**: las aporta cada reserva según su tipo y con sus propias fechas, no las del viaje. Un paquete u hotel de Disney trae la apertura de restaurantes (60 días antes de su check-in) y de Lightning Lane (7 días antes, en Disney World); un crucero, su check-in online; un vuelo, el check-in online y la salida de cada tramo; un auto, el retiro y la devolución; y cada reserva sin saldar, su fecha límite de pago. El viaje solo suma su comienzo y su fin.
+
+**Tipo de reserva**: hay tipos específicos por marca (paquete, hotel o tickets de Disney World, Universal Orlando o Disneyland, Express Pass, crucero de Disney) y genéricos (paquete, hotel, vuelo, auto…). Cada específico tiene un tipo base que define sus fechas clave y su ícono.
 
 **Novedad** (`KnowledgeItem`): información vigente del destino (aperturas, cierres, eventos, tips) que la IA prioriza al planificar. Puede ser global (de la plataforma) o propia del agente.

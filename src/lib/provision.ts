@@ -42,7 +42,7 @@ Próximos pasos:
     subject: "Recordatorio: vence el saldo de {{reservation}} el {{finalPaymentDue}}",
     body: `Hola {{clientName}}:
 
-Les recuerdo que el {{finalPaymentDue}} vence el saldo de {{reservation}}, parte de su viaje {{tripTitle}}. Lo pueden pagar directamente en el portal del proveedor con su tarjeta. Si necesitan ayuda, me avisan.
+Les recuerdo que antes del {{finalPaymentDue}} tiene que quedar saldada la reserva {{reservation}}, parte de su viaje {{tripTitle}}. Resta pagar {{balanceRemaining}}. Lo pueden pagar directamente en el portal del proveedor con su tarjeta. Si necesitan ayuda, me avisan.
 
 {{agentName}}`,
   },

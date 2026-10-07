@@ -5,6 +5,7 @@ import type { BookingStatus } from "@/generated/prisma/enums";
 import { logActivity, notifyClient } from "@/lib/events";
 import { BOOKING_STATUS_LABEL } from "@/lib/labels";
 import { runEventWorkflows } from "@/lib/automations";
+import { commissionFor } from "@/lib/trips";
 
 /** Próximo código correlativo R-0001 dentro de la organización (atómico). */
 export async function nextBookingCode(organizationId: string) {
@@ -28,17 +29,27 @@ export async function resolveCommissionRate(bookingId: string) {
 /**
  * Recalcula la comisión de cada reserva y los totales del viaje (suma de sus reservas no canceladas).
  * Además avanza el viaje en el pipeline: con la primera reserva confirmada pasa a Reservado, y cuando
- * todas las reservas confirmadas tienen el saldo pagado, a Pagado.
+ * todas las reservas confirmadas quedaron saldadas con sus pagos, a Pagado.
  */
 export async function recalcBookingTotals(bookingId: string, userId?: string | null) {
-  const items = await db.bookingItem.findMany({ where: { bookingId } });
+  const items = await db.bookingItem.findMany({ where: { bookingId }, include: { payments: { orderBy: [{ paidAt: "asc" }, { createdAt: "asc" }] } } });
   const fallbackRate = await resolveCommissionRate(bookingId);
   let total = 0;
   let commission = 0;
   for (const item of items) {
     const price = toNumber(item.price);
-    const rate = item.commissionRate === null ? fallbackRate : toNumber(item.commissionRate);
-    const amount = Math.round(price * rate) / 100;
+    // Lo pagado y la fecha en que quedó saldada salen de los pagos registrados.
+    let paid = 0;
+    let settledAt: Date | null = null;
+    for (const p of item.payments) {
+      paid = Math.round((paid + toNumber(p.amount)) * 100) / 100;
+      if (!settledAt && price > 0 && paid >= price) settledAt = p.paidAt;
+    }
+    if (toNumber(item.paidAmount) !== paid || item.balancePaidAt?.getTime() !== settledAt?.getTime()) {
+      await db.bookingItem.update({ where: { id: item.id }, data: { paidAmount: paid, balancePaidAt: settledAt } });
+      item.balancePaidAt = settledAt;
+    }
+    const amount = commissionFor(item, fallbackRate);
     if (toNumber(item.commissionAmount) !== amount) {
       await db.bookingItem.update({ where: { id: item.id }, data: { commissionAmount: amount } });
     }
@@ -58,7 +69,7 @@ export async function recalcBookingTotals(bookingId: string, userId?: string | n
     booking.status === "BOOKED" &&
     confirmed.length > 0 &&
     !items.some((i) => i.status === "PENDING") &&
-    confirmed.every((i) => i.balancePaidAt)
+    confirmed.every((i) => i.balancePaidAt || toNumber(i.price) === 0)
   ) {
     await changeBookingStatus({ bookingId, status: "PAID_IN_FULL", userId });
   }

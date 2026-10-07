@@ -1,8 +1,11 @@
 import { ActionForm, SubmitButton, type ActionState } from "@/components/form-controls";
 import { Field, Input, Select, Textarea } from "@/components/ui";
-import { COMMISSION_STATUS_LABEL, ITEM_TYPES, RESERVATION_STATUSES } from "@/lib/labels";
+import { COMMISSION_STATUS_LABEL, RESERVATION_STATUSES } from "@/lib/labels";
 import { toDateInput } from "@/lib/format";
-import type { BookingItem } from "@/generated/prisma/client";
+import { CommissionInput } from "@/components/commission-input";
+import type { BookingItem, FlightLeg } from "@/generated/prisma/client";
+import { FlightFields, TripDatesGuard, type FlightLegValues } from "./reservation-extras";
+import { ItemTypeSelect } from "@/components/item-type-select";
 
 const COMMISSION_STATUSES = Object.entries(COMMISSION_STATUS_LABEL).map(([value, label]) => ({ value, label }));
 
@@ -11,20 +14,30 @@ export function ReservationForm({
   action,
   item,
   defaultRate,
+  currency,
+  trip,
   submitLabel,
 }: {
   action: (state: ActionState, formData: FormData) => Promise<ActionState>;
-  item?: BookingItem;
+  item?: BookingItem & { flightLegs?: FlightLeg[] };
+  /** Fechas del viaje, para avisar si la reserva queda afuera. */
+  trip: { startDate: Date | null; endDate: Date | null };
   defaultRate: number;
+  currency: string;
   submitLabel: string;
 }) {
   const n = (v: { toString(): string } | null | undefined) => (v === null || v === undefined ? "" : v.toString());
+  const leg = (direction: FlightLeg["direction"]): FlightLegValues | undefined => {
+    const l = item?.flightLegs?.find((x) => x.direction === direction);
+    return l ? { date: toDateInput(l.date), time: l.time ?? "", airline: l.airline ?? "", flightNumber: l.flightNumber ?? "" } : undefined;
+  };
   return (
     <ActionForm action={action} resetOnSuccess={!item} className="space-y-5">
+      <TripDatesGuard tripStart={toDateInput(trip.startDate) || null} tripEnd={toDateInput(trip.endDate) || null} />
       <fieldset className="grid gap-3 sm:grid-cols-4">
         <legend className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">Reserva</legend>
         <Field label="Tipo">
-          <Select name="type" options={ITEM_TYPES} defaultValue={item?.type ?? "PACKAGE"} />
+          <ItemTypeSelect defaultValue={item?.type ?? "DISNEY_WORLD_PACKAGE"} />
         </Field>
         <Field label="Descripción *" className="sm:col-span-2">
           <Input name="description" defaultValue={item?.description} placeholder="Ej: Paquete Pop Century 7 noches + tickets 5 días" required />
@@ -44,35 +57,29 @@ export function ReservationForm({
         <Field label="Hasta">
           <Input type="date" name="endDate" defaultValue={toDateInput(item?.endDate)} />
         </Field>
-        <Field label="Detalles" hint="Tipo de habitación, lugar de retiro del auto, vuelo, etc." className="sm:col-span-4">
+        <FlightFields outbound={leg("OUTBOUND")} back={leg("RETURN")} />
+        <Field label="Detalles" hint="Tipo de habitación, lugar de retiro del auto, equipaje, etc." className="sm:col-span-4">
           <Textarea name="notes" rows={2} defaultValue={item?.notes ?? ""} />
         </Field>
       </fieldset>
 
-      <fieldset className="grid gap-3 sm:grid-cols-5">
+      <fieldset className="grid gap-3 sm:grid-cols-4">
         <legend className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">Pagos del cliente a este proveedor</legend>
         <Field label="Importe">
           <Input type="number" step="0.01" min={0} name="price" defaultValue={n(item?.price)} required />
         </Field>
-        <Field label="Depósito">
+        <Field label="Depósito para reservar" hint="Ej: 200 en un paquete Disney">
           <Input type="number" step="0.01" min={0} name="depositAmount" defaultValue={n(item?.depositAmount)} />
         </Field>
-        <Field label="Depósito pagado el">
-          <Input type="date" name="depositPaidAt" defaultValue={toDateInput(item?.depositPaidAt)} />
-        </Field>
-        <Field label="Vence el saldo">
+        <Field label="Saldar antes del" hint="En paquetes, vacío = 30 días antes de la llegada" className="sm:col-span-2">
           <Input type="date" name="balanceDue" defaultValue={toDateInput(item?.balanceDue)} />
         </Field>
-        <Field label="Saldo pagado el">
-          <Input type="date" name="balancePaidAt" defaultValue={toDateInput(item?.balancePaidAt)} />
-        </Field>
+        <p className="self-end pb-2 text-xs text-slate-500 sm:col-span-5">Los pagos (depósito, cuotas y saldo) se registran en la reserva, una vez guardada.</p>
       </fieldset>
 
       <fieldset className="grid gap-3 sm:grid-cols-5">
         <legend className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">Comisión</legend>
-        <Field label="Comisión %" hint={`Vacío = ${defaultRate}%`}>
-          <Input type="number" step="0.01" min={0} max={100} name="commissionRate" defaultValue={n(item?.commissionRate)} />
-        </Field>
+        <CommissionInput rate={item?.commissionRate?.toString()} fixed={item?.commissionFixed?.toString()} defaultRate={defaultRate} currency={currency} />
         <Field label="Fecha de venta" hint="Se completa al confirmar">
           <Input type="date" name="saleDate" defaultValue={toDateInput(item?.saleDate)} />
         </Field>

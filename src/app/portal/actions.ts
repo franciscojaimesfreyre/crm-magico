@@ -110,6 +110,7 @@ export async function acceptQuote(quoteId: string, _: ActionState, formData: For
         endDate: i.endDate,
         price: i.price,
         commissionRate: i.commissionRate,
+        commissionFixed: i.commissionFixed,
         status: "PENDING" as const,
         position: offset + idx,
       })),

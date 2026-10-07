@@ -17,6 +17,7 @@ import {
 import { ItemFields } from "./item-fields";
 import { QuoteMessageEditor } from "./quote-message";
 import type { LoadedBooking } from "./data";
+import { commissionFor } from "@/lib/trips";
 
 export function Quotes({ booking: b, defaultRate }: { booking: LoadedBooking; defaultRate: number }) {
   const newQuote = (
@@ -95,10 +96,7 @@ export function Quotes({ booking: b, defaultRate }: { booking: LoadedBooking; de
             <div className="grid gap-4 p-5 lg:grid-cols-2">
               {q.options.map((o) => {
                 const total = o.items.reduce((s, i) => s + toNumber(i.price), 0);
-                const commission = o.items.reduce(
-                  (s, i) => s + (toNumber(i.price) * toNumber(i.commissionRate ?? defaultRate)) / 100,
-                  0,
-                );
+                const commission = o.items.reduce((s, i) => s + commissionFor(i, defaultRate), 0);
                 const accepted = q.acceptedOptionId === o.id;
                 return (
                   <div key={o.id} className={clsx("rounded-xl border p-4", accepted ? "border-emerald-300 bg-emerald-50" : "border-slate-200")}>
@@ -142,7 +140,7 @@ export function Quotes({ booking: b, defaultRate }: { booking: LoadedBooking; de
                       <details className="mt-3">
                         <summary className="cursor-pointer text-xs font-medium text-brand-700">+ Agregar servicio a esta opción</summary>
                         <ActionForm action={addQuoteItem.bind(null, o.id)} resetOnSuccess className="mt-3 grid gap-3 sm:grid-cols-2">
-                          <ItemFields defaultRate={defaultRate} withConfirmation={false} />
+                          <ItemFields defaultRate={defaultRate} currency={b.currency} withConfirmation={false} />
                           <div className="flex items-end">
                             <SubmitButton size="sm">Agregar</SubmitButton>
                           </div>

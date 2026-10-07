@@ -33,7 +33,7 @@ async function loadTrip(bookingId: string, organizationId: string) {
     include: {
       client: true,
       travelers: { include: { traveler: true } },
-      items: { orderBy: { position: "asc" } },
+      items: { orderBy: { position: "asc" }, include: { flightLegs: true } },
       diningReservations: { orderBy: { dateTime: "asc" } },
     },
   });
@@ -82,7 +82,13 @@ function describeTrip(trip: Trip) {
     `Grupo: ${trip.adults} adultos, ${trip.children} menores`,
     trip.items.length > 0 &&
       `Servicios contratados:\n${trip.items
-        .map((i) => `- ${ITEM_TYPE_LABEL[i.type]}: ${i.description}${i.startDate ? ` (${toDateInput(i.startDate)}${i.endDate ? ` a ${toDateInput(i.endDate)}` : ""})` : ""}`)
+        .map(
+          (i) =>
+            `- ${ITEM_TYPE_LABEL[i.type]}: ${i.description}${i.startDate ? ` (${toDateInput(i.startDate)}${i.endDate ? ` a ${toDateInput(i.endDate)}` : ""})` : ""}` +
+            i.flightLegs
+              .map((l) => `\n  · ${l.direction === "OUTBOUND" ? "Ida" : "Vuelta"}: ${[l.date && toDateInput(l.date), l.time, l.airline, l.flightNumber].filter(Boolean).join(" ")}`)
+              .join(""),
+        )
         .join("\n")}`,
     trip.diningReservations.length > 0 &&
       `Reservas de restaurantes ya confirmadas (respetarlas en el itinerario):\n${trip.diningReservations

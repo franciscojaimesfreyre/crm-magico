@@ -4,6 +4,7 @@ import { BOOKING_STATUS_LABEL, DESTINATION_LABEL } from "@/lib/labels";
 import { formatDate, formatRange, fullName, money } from "@/lib/format";
 import type { TemplateVars } from "@/lib/templating";
 import { appUrl } from "@/lib/app-url";
+import { mainStay } from "@/lib/trips";
 
 /**
  * Arma las variables de plantilla para un cliente y, opcionalmente, un viaje y una de sus reservas
@@ -45,7 +46,7 @@ export async function buildTemplateVars(opts: {
         tripDates: formatRange(b.startDate, b.endDate),
         startDate: formatDate(b.startDate),
         endDate: formatDate(b.endDate),
-        resortName: b.resort ?? "",
+        resortName: mainStay(b.items) ?? "",
         bookingCode: b.code,
         bookingStatus: BOOKING_STATUS_LABEL[b.status],
         totalPrice: money(b.totalPrice, b.currency),

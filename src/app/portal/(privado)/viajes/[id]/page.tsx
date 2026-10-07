@@ -161,13 +161,6 @@ export default async function PortalTrip({
             </Section>
           )}
 
-          {(b.resort || b.ticketType) && (
-            <Section title="Hotel y entradas">
-              <p className="text-sm text-slate-700">{[b.resort, b.roomType].filter(Boolean).join(" · ")}</p>
-              <p className="text-sm text-slate-700">{[b.ticketType, b.parkDays && `${b.parkDays} días de parque`, b.lightningLane && "Lightning Lane", b.memoryMaker && "Memory Maker"].filter(Boolean).join(" · ")}</p>
-            </Section>
-          )}
-
           {b.diningReservations.length > 0 && (
             <Section title="Reservas de restaurantes">
               <ul className="space-y-2 text-sm">

@@ -212,10 +212,6 @@ async function main() {
     status: BookingStatus;
     start?: number;
     nights?: number;
-    resort?: string;
-    ticketType?: string;
-    parkDays?: number;
-    lightningLane?: boolean;
     finalPaymentDue?: number; // vencimiento del saldo de la primera reserva
     saleDate?: number;
     commissionStatus?: "PENDING" | "REQUESTED" | "PAID";
@@ -272,10 +268,6 @@ async function main() {
         endDate,
         adults: opts.client.travelers.length - children,
         children,
-        resort: opts.resort,
-        ticketType: opts.ticketType,
-        parkDays: opts.parkDays,
-        lightningLane: opts.lightningLane ?? false,
         totalPrice: active.reduce((t, i) => t + i.price, 0),
         commissionAmount: Math.round(active.reduce((t, i) => t + i.commissionAmount, 0) * 100) / 100,
         travelers: { create: opts.client.travelers.map((t) => ({ travelerId: t.id })) },
@@ -288,12 +280,12 @@ async function main() {
   // proveedor, su forma de pago y su comisión.
   const amandaTrip = await booking({
     client: amanda, agentId: laura.id, title: "Disney + Universal — familia Reyes", destination: "COMBINED",
-    status: "BOOKED", start: 55, nights: 7, resort: "Disney's Art of Animation Resort", ticketType: "Disney 4 días + Universal 2 días", parkDays: 6,
-    lightningLane: true,
+    status: "BOOKED", start: 55, nights: 7,
     items: [
       {
         type: "PACKAGE", description: "Paquete Art of Animation, suite familiar, 5 noches + tickets Disney 4 días", supplier: "Disney Destinations",
         price: 6200, confirmation: "DDX-48211", start: 55, nights: 5, sale: -40, deposit: 200, depositPaid: -40, balanceDue: 25,
+        notes: "Incluye Lightning Lane Multi Pass para los 4 días de parque.",
       },
       {
         type: "TICKETS", description: "Tickets Universal 2 días, 2 parques (x4)", supplier: "Universal Orlando",
@@ -318,7 +310,7 @@ async function main() {
   });
   const whitmoreTrip = await booking({
     client: whitmore, agentId: martin.id, title: "Universal Orlando — Whitmore", destination: "UNIVERSAL_ORLANDO",
-    status: "PAID_IN_FULL", start: 12, nights: 6, resort: "Universal's Cabana Bay Beach Resort", ticketType: "3 parques, 4 días", parkDays: 4,
+    status: "PAID_IN_FULL", start: 12, nights: 6,
     finalPaymentDue: -20, saleDate: -90,
     items: [
       { type: "HOTEL", description: "Cabana Bay, habitación familiar, 6 noches", supplier: "Universal Orlando", price: 2100, confirmation: "UOR-55120" },
@@ -328,7 +320,7 @@ async function main() {
   });
   await booking({
     client: priya, agentId: laura.id, title: "Luna de miel en Disney World", destination: "DISNEY_WORLD",
-    status: "COMPLETED", start: -60, nights: 6, resort: "Disney's Grand Floridian Resort & Spa", saleDate: -200, finalPaymentDue: -90,
+    status: "COMPLETED", start: -60, nights: 6, saleDate: -200, finalPaymentDue: -90,
     commissionStatus: "PAID",
     items: [{ type: "PACKAGE", description: "Grand Floridian 6 noches + entradas", supplier: "Disney Destinations", price: 9800 }],
   });

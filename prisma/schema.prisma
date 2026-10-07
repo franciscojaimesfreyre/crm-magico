@@ -273,14 +273,7 @@ model Booking {
   adults      Int           @default(2)
   children    Int           @default(0)
 
-  // Detalle típico de parques
-  resort        String?
-  roomType      String?
-  ticketType    String?
-  parkDays      Int?
-  lightningLane Boolean @default(false)
-  memoryMaker   Boolean @default(false)
-  diningPlan    String?
+  // Hotel, entradas, Lightning Lane, plan de comidas, etc. se cargan en cada reserva (BookingItem).
 
   // Totales del viaje: suma de sus reservas (se recalculan solos, no se editan a mano).
   // Pagos, fecha de venta y comisión viven en cada reserva (BookingItem).

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { UserPlus } from "lucide-react";
 import { ActionForm, SubmitButton, type ActionState } from "@/components/form-controls";
-import { Card, CardHeader, Checkbox, Field, Input, Select, Textarea } from "@/components/ui";
+import { Card, CardHeader, Field, Input, Select, Textarea } from "@/components/ui";
 import { BOOKING_STATUSES, DESTINATIONS } from "@/lib/labels";
 import { toDateInput } from "@/lib/format";
 import type { Booking } from "@/generated/prisma/client";
@@ -70,32 +70,6 @@ export function BookingForm({
           </Field>
         </div>
       </Card>
-
-      <Card>
-        <CardHeader title="Detalle de parques y hotel" description="Opcional: datos generales para el itinerario y la IA. Los importes, pagos y comisiones se cargan en cada reserva del viaje." />
-        <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3">
-          <Field label="Hotel / resort">
-            <Input name="resort" defaultValue={n(booking?.resort)} placeholder="Ej: Disney's Pop Century Resort" />
-          </Field>
-          <Field label="Tipo de habitación">
-            <Input name="roomType" defaultValue={n(booking?.roomType)} />
-          </Field>
-          <Field label="Plan de comidas">
-            <Input name="diningPlan" defaultValue={n(booking?.diningPlan)} />
-          </Field>
-          <Field label="Tipo de entrada">
-            <Input name="ticketType" defaultValue={n(booking?.ticketType)} placeholder="Ej: Park Hopper" />
-          </Field>
-          <Field label="Días de parque">
-            <Input type="number" min={0} name="parkDays" defaultValue={n(booking?.parkDays)} />
-          </Field>
-          <div className="flex flex-col justify-end gap-2 pb-1">
-            <Checkbox name="lightningLane" label="Lightning Lane" defaultChecked={booking?.lightningLane} />
-            <Checkbox name="memoryMaker" label="Memory Maker" defaultChecked={booking?.memoryMaker} />
-          </div>
-        </div>
-      </Card>
-
 
       <Card>
         <CardHeader title="Notas" />

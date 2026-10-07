@@ -5,6 +5,7 @@ import { requireClientAccount } from "@/lib/auth";
 import { Avatar, buttonClass } from "@/components/ui";
 import { DESTINATION_LABEL } from "@/lib/labels";
 import { daysBetween, formatRange, todayUTC } from "@/lib/format";
+import { mainStay } from "@/lib/trips";
 
 export const metadata = { title: "Mis viajes" };
 
@@ -15,6 +16,7 @@ export default async function PortalHome() {
   const [bookings, pendingQuotes] = await Promise.all([
     db.booking.findMany({
       where: { clientId: client.id, status: { not: "CANCELLED" } },
+      include: { items: { select: { type: true, status: true, description: true }, orderBy: { position: "asc" } } },
       orderBy: { startDate: { sort: "asc", nulls: "last" } },
     }),
     db.quote.findMany({
@@ -62,7 +64,7 @@ export default async function PortalHome() {
           <h1 className="mt-1 text-3xl leading-tight font-semibold">{next.title}</h1>
           <p className="mt-2 text-white/80">
             {formatRange(next.startDate, next.endDate)} · {next.adults} adultos{next.children ? `, ${next.children} menores` : ""}
-            {next.resort && ` · ${next.resort}`}
+            {mainStay(next.items) && ` · ${mainStay(next.items)}`}
           </p>
           {daysLeft !== null && daysLeft > 0 && (
             <p className="mt-6 flex items-baseline gap-3">

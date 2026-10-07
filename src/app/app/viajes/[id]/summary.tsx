@@ -33,9 +33,6 @@ export function Summary({ booking: b }: { booking: LoadedBooking }) {
           <Item label="Destino" value={DESTINATION_LABEL[b.destination]} />
           <Item label="Fechas" value={formatRange(b.startDate, b.endDate)} />
           <Item label="Pasajeros" value={`${b.adults} adultos, ${b.children} menores`} />
-          <Item label="Hotel" value={[b.resort, b.roomType].filter(Boolean).join(" · ") || "—"} />
-          <Item label="Entradas" value={[b.ticketType, b.parkDays && `${b.parkDays} días`].filter(Boolean).join(" · ") || "—"} />
-          <Item label="Extras" value={[b.lightningLane && "Lightning Lane", b.memoryMaker && "Memory Maker", b.diningPlan].filter(Boolean).join(" · ") || "—"} />
           <Item label="Grupo" value={b.group ? <Link className="text-brand-700 hover:underline" href={`/app/grupos/${b.group.id}`}>{b.group.name}</Link> : "—"} />
         </dl>
         {(b.notes || b.clientNotes) && (

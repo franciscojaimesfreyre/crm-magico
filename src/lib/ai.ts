@@ -80,10 +80,6 @@ function describeTrip(trip: Trip) {
     `Título: ${trip.title}`,
     `Fechas: ${trip.startDate ? toDateInput(trip.startDate) : "a definir"} a ${trip.endDate ? toDateInput(trip.endDate) : "a definir"}`,
     `Grupo: ${trip.adults} adultos, ${trip.children} menores`,
-    trip.resort && `Hotel / resort: ${trip.resort}${trip.roomType ? ` (${trip.roomType})` : ""}`,
-    trip.ticketType && `Entradas: ${trip.ticketType}${trip.parkDays ? `, ${trip.parkDays} días de parque` : ""}`,
-    `Lightning Lane: ${trip.lightningLane ? "sí" : "no"} · Memory Maker: ${trip.memoryMaker ? "sí" : "no"}`,
-    trip.diningPlan && `Plan de comidas: ${trip.diningPlan}`,
     trip.items.length > 0 &&
       `Servicios contratados:\n${trip.items
         .map((i) => `- ${ITEM_TYPE_LABEL[i.type]}: ${i.description}${i.startDate ? ` (${toDateInput(i.startDate)}${i.endDate ? ` a ${toDateInput(i.endDate)}` : ""})` : ""}`)
@@ -179,7 +175,7 @@ export async function generateItinerary(opts: {
   const dayCount =
     trip.startDate && trip.endDate
       ? Math.max(1, Math.round((trip.endDate.getTime() - trip.startDate.getTime()) / 86_400_000) + 1)
-      : Math.max(trip.parkDays ?? 5, 1);
+      : 5;
 
   const keyDates = computeKeyDates(trip)
     .map((k) => `- ${formatDate(k.date)}: ${k.label}`)

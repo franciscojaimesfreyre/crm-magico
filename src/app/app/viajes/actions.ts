@@ -205,9 +205,19 @@ export async function updateBookingItem(itemId: string, _: ActionState, formData
 }
 
 /** Accesos rápidos desde la lista de reservas del viaje. */
-export async function quickItemAction(itemId: string, action: "confirm" | "cancel") {
+/** Confirmar o cancelar en un clic. Al confirmar se pueden cargar el n° de confirmación y las fechas. */
+export async function quickItemAction(itemId: string, action: "confirm" | "cancel", formData?: FormData) {
   const { user, item } = await ownItem(itemId);
-  const data = action === "confirm" ? confirmationData(item) : { status: "CANCELLED" as const };
+  const data: { status: ReservationStatus; saleDate?: Date; confirmationNumber?: string; startDate?: Date; endDate?: Date } =
+    action === "confirm" ? confirmationData(item) : { status: "CANCELLED" };
+  if (action === "confirm" && formData) {
+    const confirmationNumber = str(formData, "confirmationNumber");
+    const startDate = parseDateInput(formData.get("startDate"));
+    const endDate = parseDateInput(formData.get("endDate"));
+    if (confirmationNumber) data.confirmationNumber = confirmationNumber;
+    if (startDate) data.startDate = startDate;
+    if (endDate && (!startDate || endDate >= startDate)) data.endDate = endDate;
+  }
   await db.bookingItem.update({ where: { id: itemId }, data });
   const label = action === "confirm" ? "confirmada" : "cancelada";
   await logActivity({ organizationId: user.organizationId, clientId: item.booking.clientId, bookingId: item.bookingId, userId: user.id, type: "item", description: `Reserva ${label}: ${item.description}` });

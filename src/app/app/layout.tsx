@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bell, LogOut, Menu, Sparkles } from "lucide-react";
+import { Bell, LogOut, Menu, ShieldCheck, Sparkles } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Avatar } from "@/components/ui";
@@ -31,7 +31,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </span>
           <span className="font-semibold">CRM Mágico</span>
         </Link>
-        <Nav unreadMessages={unreadMessages} />
+        <Nav unreadMessages={unreadMessages} isPlatformAdmin={user.isPlatformAdmin} />
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-20 flex h-14 print:hidden items-center justify-between border-b border-slate-200 bg-white/90 px-6 backdrop-blur">
@@ -41,7 +41,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 <Menu className="size-5" />
               </summary>
               <div className="absolute top-8 left-0 z-30 flex max-h-[80vh] w-64 flex-col overflow-y-auto rounded-xl bg-slate-900 shadow-xl">
-                <Nav unreadMessages={unreadMessages} />
+                <Nav unreadMessages={unreadMessages} isPlatformAdmin={user.isPlatformAdmin} />
               </div>
             </details>
             {user.organization.name}
@@ -58,6 +58,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <div className="flex items-center gap-2">
               <Avatar name={user.name} />
               <span className="hidden text-sm text-slate-700 sm:inline">{user.name}</span>
+              {user.isPlatformAdmin && (
+                <span
+                  title="Administrás el catálogo de parques y las novedades globales de la plataforma"
+                  className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap text-amber-800"
+                >
+                  <ShieldCheck className="size-3" /> <span className="hidden sm:inline">Admin general</span>
+                </span>
+              )}
             </div>
             <form action={logout}>
               <button className="text-slate-400 hover:text-slate-700" title="Salir">

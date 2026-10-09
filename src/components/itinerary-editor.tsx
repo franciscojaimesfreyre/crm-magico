@@ -95,6 +95,11 @@ function prettyDate(date: string | null) {
 
 // ─── Editor ──────────────────────────────────────────────────────────────────
 
+const DETAIL_OPTIONS = [
+  { value: "detailed", label: "Detallado", hint: "Hora por hora: atracciones, shows, comidas, descansos y traslados." },
+  { value: "summary", label: "Resumido", hint: "Solo lo clave: check-in y check-out, el parque de cada día, shows contratados y reservas de restaurantes." },
+] as const;
+
 export function ItineraryEditor({
   target,
   initialDays,
@@ -124,6 +129,7 @@ export function ItineraryEditor({
   const [saving, startSave] = useTransition();
   const [aiOpen, setAiOpen] = useState(initialDays.length === 0 && aiEnabled);
   const [aiInstructions, setAiInstructions] = useState("");
+  const [aiDetail, setAiDetail] = useState<"detailed" | "summary">("detailed");
   const [aiResult, setAiResult] = useState<{ summary: string; warnings: string[]; knowledge: { id: string; title: string }[]; added: string[] } | null>(null);
   const [generating, startGenerate] = useTransition();
 
@@ -351,15 +357,14 @@ export function ItineraryEditor({
     if (days.some((d) => d.items.length > 0) && !window.confirm("La propuesta de la IA va a reemplazar el itinerario actual en el editor (no se guarda hasta que hagas clic en Guardar). ¿Continuar?")) return;
     startGenerate(async () => {
       setMessage(null);
-      const res = await proposeItinerary(target.id, aiInstructions);
+      const res = await proposeItinerary(target.id, aiInstructions, aiDetail);
       if ("error" in res && res.error) {
         setMessage({ tone: "error", text: res.error });
         return;
       }
       if (!("result" in res) || !res.result) return;
       const r = res.result;
-      const proposed = withMustDos(
-        toState(
+      const state = toState(
           r.days.map((d) => ({
             date: d.date && /^\d{4}-\d{2}-\d{2}$/.test(d.date) ? d.date : null,
             title: withoutMustDoTag(d.title) || d.title,
@@ -375,10 +380,9 @@ export function ItineraryEditor({
               confirmationNumber: null,
             })),
           })),
-        ),
-        catalog,
-        mustDoItem,
       );
+      // En la versión resumida no se suman atracciones sueltas: los imperdibles quedan en la revisión para agregarlos a mano.
+      const proposed = aiDetail === "detailed" ? withMustDos(state, catalog, mustDoItem) : { days: state, added: [] };
       setDays(proposed.days);
       setDirty(true);
       setAiResult({ summary: r.summary, warnings: r.warnings, knowledge: res.knowledgeUsed, added: proposed.added.map((e) => e.name) });
@@ -431,6 +435,26 @@ export function ItineraryEditor({
               <X className="size-4" />
             </button>
           </div>
+          <fieldset className="mt-3">
+            <legend className="mb-1.5 text-xs font-semibold tracking-wide text-slate-500 uppercase">Nivel de detalle</legend>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {DETAIL_OPTIONS.map((o) => (
+                <label
+                  key={o.value}
+                  className={clsx(
+                    "flex cursor-pointer gap-2.5 rounded-lg border bg-white p-3 text-sm",
+                    aiDetail === o.value ? "border-brand-500 ring-1 ring-brand-500" : "border-slate-200 hover:border-slate-300",
+                  )}
+                >
+                  <input type="radio" name="aiDetail" value={o.value} checked={aiDetail === o.value} onChange={() => setAiDetail(o.value)} className="mt-0.5" />
+                  <span>
+                    <span className="font-medium text-slate-900">{o.label}</span>
+                    <span className="block text-xs text-slate-500">{o.hint}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
           <textarea
             value={aiInstructions}
             onChange={(e) => setAiInstructions(e.target.value)}

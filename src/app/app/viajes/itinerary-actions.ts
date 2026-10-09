@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { AIError, generateItinerary } from "@/lib/ai";
+import { AIError, generateItinerary, ITINERARY_DETAILS, type ItineraryDetail } from "@/lib/ai";
 import { logActivity, notifyClient } from "@/lib/events";
 import { ACTIVITY_TYPE_LABEL } from "@/lib/labels";
 import type { ActivityType } from "@/generated/prisma/enums";
@@ -99,10 +99,11 @@ export async function saveItinerary(target: ItineraryTarget, days: ItineraryDayI
 }
 
 /** Propuesta de la IA. No guarda nada: el editor la carga para que el agente la revise. */
-export async function proposeItinerary(bookingId: string, instructions: string) {
+export async function proposeItinerary(bookingId: string, instructions: string, detail: ItineraryDetail = "detailed") {
   const user = await requireUser();
   try {
-    const result = await generateItinerary({ bookingId, organizationId: user.organizationId, instructions });
+    if (!ITINERARY_DETAILS.includes(detail)) detail = "detailed";
+    const result = await generateItinerary({ bookingId, organizationId: user.organizationId, instructions, detail });
     const used = await db.knowledgeItem.findMany({
       where: { id: { in: result.knowledgeUsed } },
       select: { id: true, title: true },

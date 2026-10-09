@@ -18,6 +18,7 @@ import {
   MessageCircle,
   PieChart,
   Settings,
+  ShieldCheck,
   Sparkles,
   Users,
   UsersRound,
@@ -47,8 +48,8 @@ const SECTIONS = [
   {
     title: "Herramientas",
     items: [
-      { href: "/app/novedades", label: "Novedades e IA", icon: Sparkles },
-      { href: "/app/catalogo", label: "Catálogo de parques", icon: Castle },
+      { href: "/app/novedades", label: "Novedades e IA", icon: Sparkles, admin: "Como admin general podés publicar y editar novedades globales" },
+      { href: "/app/catalogo", label: "Catálogo de parques", icon: Castle, admin: "Como admin general podés cargar, editar y verificar el catálogo" },
       { href: "/app/documentos", label: "Documentos", icon: FolderOpen },
       { href: "/app/contratos", label: "Contratos", icon: FileSignature },
       { href: "/app/formularios", label: "Formularios", icon: ClipboardList },
@@ -59,7 +60,8 @@ const SECTIONS = [
   },
 ];
 
-export function Nav({ unreadMessages }: { unreadMessages: number }) {
+/** Las opciones con funciones de admin general llevan un escudo, solo para quien lo es. */
+export function Nav({ unreadMessages, isPlatformAdmin = false }: { unreadMessages: number; isPlatformAdmin?: boolean }) {
   const pathname = usePathname();
   return (
     <nav className="flex flex-1 flex-col gap-6 overflow-y-auto px-3 py-4">
@@ -72,6 +74,7 @@ export function Nav({ unreadMessages }: { unreadMessages: number }) {
             {section.items.map((item) => {
               const active = "exact" in item && item.exact ? pathname === item.href : pathname.startsWith(item.href);
               const badge = "badgeKey" in item && item.badgeKey === "messages" ? unreadMessages : 0;
+              const adminHint = isPlatformAdmin && "admin" in item ? item.admin : null;
               return (
                 <li key={item.href}>
                   <Link
@@ -83,6 +86,11 @@ export function Nav({ unreadMessages }: { unreadMessages: number }) {
                   >
                     <item.icon className="size-4 shrink-0" />
                     <span className="flex-1">{item.label}</span>
+                    {adminHint && (
+                      <span title={adminHint} aria-label={adminHint} className="text-amber-300">
+                        <ShieldCheck className="size-3.5" />
+                      </span>
+                    )}
                     {badge > 0 && (
                       <span className="rounded-full bg-fuchsia-500 px-1.5 text-[11px] font-semibold text-white">{badge}</span>
                     )}

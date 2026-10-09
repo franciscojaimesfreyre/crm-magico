@@ -81,7 +81,7 @@ export function TripDatesGuard({ tripStart, tripEnd }: { tripStart: string | nul
   }, [tripStart, tripEnd]);
 
   return (
-    <span ref={ref}>
+    <span ref={ref} className="contents">
       <dialog
         ref={dialog}
         className="m-auto w-full max-w-md rounded-2xl p-0 shadow-xl backdrop:bg-slate-900/40"

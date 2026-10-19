@@ -11,6 +11,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import type { Destination, KnowledgeCategory } from "@/generated/prisma/enums";
 import { deleteKnowledge } from "./actions";
 import { AskBox } from "./ask-box";
+import { KnowledgeImportExport } from "./import-export";
 
 export const metadata = { title: "Novedades e IA" };
 
@@ -39,7 +40,12 @@ export default async function KnowledgePage({
       <PageHeader
         title="Novedades e IA"
         description="Aperturas, cierres, eventos, promociones y tips. La IA usa esta información (vigente y publicada) para proponer itinerarios y redactar cotizaciones."
-        actions={<LinkButton href="/app/novedades/nueva">Nueva novedad</LinkButton>}
+        actions={
+          <div className="flex flex-wrap items-start gap-2">
+            <KnowledgeImportExport />
+            <LinkButton href="/app/novedades/nueva">Nueva novedad</LinkButton>
+          </div>
+        }
       />
       <div className="mb-6">
         <AskBox />

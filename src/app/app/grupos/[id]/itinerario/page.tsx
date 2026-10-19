@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { PageHeader } from "@/components/ui";
 import { ItineraryEditor } from "@/components/itinerary-editor";
+import { parseGuide } from "@/lib/place-guide";
 import { formatRange, toDateInput } from "@/lib/format";
 import { catalogChecks, catalogDestinations } from "@/lib/catalog";
 
@@ -42,6 +43,7 @@ export default async function GroupItineraryPage({ params }: { params: Promise<{
             location: i.location,
             notes: i.notes,
             confirmationNumber: i.confirmationNumber,
+            guide: parseGuide(i.guide),
           })),
         }))}
       />

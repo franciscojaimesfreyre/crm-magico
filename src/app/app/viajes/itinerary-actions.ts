@@ -4,10 +4,12 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { AIError, generateItinerary, ITINERARY_DETAILS, type ItineraryDetail } from "@/lib/ai";
+import { AIError, generateItinerary, generatePlaceGuide, ITINERARY_DETAILS, type GuidePlace, type ItineraryDetail } from "@/lib/ai";
+import { PlaceGuideSchema } from "@/lib/place-guide";
 import { logActivity, notifyClient } from "@/lib/events";
 import { ACTIVITY_TYPE_LABEL } from "@/lib/labels";
 import type { ActivityType } from "@/generated/prisma/enums";
+import { Prisma } from "@/generated/prisma/client";
 
 const ACTIVITY_TYPES = Object.keys(ACTIVITY_TYPE_LABEL) as [ActivityType, ...ActivityType[]];
 const time = z.string().regex(/^\d{2}:\d{2}$/).nullable();
@@ -26,12 +28,13 @@ const DaySchema = z.object({
         location: z.string().max(300).nullable(),
         notes: z.string().max(5000).nullable(),
         confirmationNumber: z.string().max(100).nullable(),
+        guide: PlaceGuideSchema.nullable().default(null),
       }),
     )
     .max(80),
 });
 
-export type ItineraryDayInput = z.infer<typeof DaySchema>;
+export type ItineraryDayInput = z.input<typeof DaySchema>;
 export type ItineraryTarget = { kind: "booking" | "group"; id: string };
 
 async function checkTarget(target: ItineraryTarget) {
@@ -63,7 +66,7 @@ export async function saveItinerary(target: ItineraryTarget, days: ItineraryDayI
           date: d.date ? new Date(`${d.date}T00:00:00.000Z`) : null,
           title: d.title,
           notes: d.notes,
-          items: { create: d.items.map((i, pos) => ({ ...i, position: pos })) },
+          items: { create: d.items.map(({ guide, ...i }, pos) => ({ ...i, guide: guide ?? Prisma.DbNull, position: pos })) },
         },
       });
     }
@@ -99,11 +102,11 @@ export async function saveItinerary(target: ItineraryTarget, days: ItineraryDayI
 }
 
 /** Propuesta de la IA. No guarda nada: el editor la carga para que el agente la revise. */
-export async function proposeItinerary(bookingId: string, instructions: string, detail: ItineraryDetail = "detailed") {
+export async function proposeItinerary(bookingId: string, instructions: string, detail: ItineraryDetail = "detailed", withGuides = false) {
   const user = await requireUser();
   try {
     if (!ITINERARY_DETAILS.includes(detail)) detail = "detailed";
-    const result = await generateItinerary({ bookingId, organizationId: user.organizationId, instructions, detail });
+    const result = await generateItinerary({ bookingId, organizationId: user.organizationId, instructions, detail, withGuides: withGuides === true });
     const used = await db.knowledgeItem.findMany({
       where: { id: { in: result.knowledgeUsed } },
       select: { id: true, title: true },
@@ -113,5 +116,20 @@ export async function proposeItinerary(bookingId: string, instructions: string, 
     if (e instanceof AIError) return { error: e.message };
     console.error("Error generando itinerario", e);
     return { error: "No se pudo generar el itinerario. Revisá la configuración de la IA e intentá de nuevo." };
+  }
+}
+
+/** Recomendaciones y tips de la IA para un parque o un día de crucero. No guarda nada: el editor la suma a la actividad. */
+export async function proposePlaceGuide(bookingId: string, place: GuidePlace, instructions: string) {
+  const user = await requireUser();
+  if (place.type !== "PARK" && place.type !== "CRUISE") return { error: "Solo los parques y los días de crucero llevan guía." };
+  try {
+    const guide = await generatePlaceGuide({ bookingId, organizationId: user.organizationId, place, instructions });
+    if (guide.picks.length + guide.tips.length === 0) return { error: "La IA no devolvió recomendaciones para este lugar." };
+    return { guide };
+  } catch (e) {
+    if (e instanceof AIError) return { error: e.message };
+    console.error("Error generando la guía del parque", e);
+    return { error: "No se pudieron generar las recomendaciones. Intentá de nuevo." };
   }
 }

@@ -17,7 +17,7 @@ export type CheckEntry = {
 
 export type CheckTraveler = { name: string; heightCm: number | null; age: number | null };
 
-type Item = { type: string; title: string; location: string | null };
+type Item = { type: string; title: string; location: string | null; guide?: { picks: { name: string }[] } | null };
 type Day = { date: string | null; title: string | null; items: Item[] };
 
 export type ItemWarning = { tone: "error" | "warn"; text: string };
@@ -115,7 +115,12 @@ export function checkItinerary(days: Day[], entries: CheckEntry[], travelers: Ch
 
   // Imperdibles que faltan en los parques que se visitan.
   const areasByDay = dayAreas(days, entries);
-  const present = new Set(days.flatMap((d) => d.items.map((i) => matchEntry(i, entries)?.id).filter(Boolean)));
+  // Un imperdible recomendado en la guía del parque cuenta como incluido.
+  const present = new Set(
+    days.flatMap((d) =>
+      d.items.flatMap((i) => [i, ...(i.guide?.picks ?? []).map((p) => ({ type: "RIDE", title: p.name, location: null }))]).map((i) => matchEntry(i, entries)?.id).filter(Boolean),
+    ),
+  );
   const missing: { entry: CheckEntry; dayIndex: number }[] = [];
   const visited = new Set<string>();
   areasByDay.forEach((areas, di) => {

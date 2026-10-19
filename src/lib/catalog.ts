@@ -7,7 +7,7 @@ import { ageOn, toDateInput } from "@/lib/format";
 import { DINING_STYLE_LABEL, itemBrand, priceSigns } from "@/lib/labels";
 import type { CatalogEntry } from "@/generated/prisma/client";
 import type { Destination } from "@/generated/prisma/enums";
-import type { CheckEntry, CheckTraveler } from "@/lib/itinerary-checks";
+import { normalize, type CheckEntry, type CheckTraveler } from "@/lib/itinerary-checks";
 
 /** Altura mínima en cm (redondeada hacia arriba, para no dejar subir a quien no llega). */
 export const inchesToCm = (inches: number) => Math.ceil(inches * 2.54);
@@ -56,10 +56,11 @@ type TripForCatalog = {
 
 /**
  * Lo que la IA recibe del catálogo para un viaje: los lugares que existen (agrupados por parque o
- * zona), con sus imperdibles. Las alturas no: las revisa el sistema en el editor (itinerary-checks).
+ * zona), con sus imperdibles. Las alturas no van en números (las revisa el sistema en el editor):
+ * attractionNote puede sumar a cada atracción una nota ya calculada, como quién no llega.
  * Devuelve null si no hay catálogo para el destino.
  */
-export async function catalogForTrip(trip: TripForCatalog) {
+export async function catalogForTrip(trip: TripForCatalog, attractionNote?: (e: CatalogEntry) => string | null) {
   const destinations = catalogDestinations(trip);
   if (destinations.length === 0) return null;
   // Los shoppings de Orlando sirven para cualquier viaje a Orlando, sea de Disney o de Universal.
@@ -80,6 +81,7 @@ export async function catalogForTrip(trip: TripForCatalog) {
   const describe = (e: CatalogEntry) => {
     const meta = [
       e.mustDo && "IMPERDIBLE",
+      e.kind === "ATTRACTION" && attractionNote?.(e),
       e.diningStyle && DINING_STYLE_LABEL[e.diningStyle].toLowerCase(),
       e.priceLevel && priceSigns(e.priceLevel),
       e.notes,
@@ -132,4 +134,30 @@ export function checkTravelers(
   at: Date | null,
 ): CheckTraveler[] {
   return travelers.map(({ traveler: t }) => ({ name: t.firstName, heightCm: t.heightCm, age: ageOn(t.birthDate, at ?? new Date()) }));
+}
+
+/**
+ * Parque (zona del catálogo) al que se refiere una actividad del itinerario, por su título o su lugar,
+ * y lo que está abierto ahí ese día. Gana el nombre de zona más largo ("Animal Kingdom Lodge" antes
+ * que "Animal Kingdom"). Devuelve null si el catálogo no tiene ese lugar.
+ */
+export async function catalogForPlace(trip: TripForCatalog, place: { title: string; location: string | null; date: string | null }) {
+  const destinations = catalogDestinations(trip);
+  if (destinations.length === 0) return null;
+  const entries = await db.catalogEntry.findMany({
+    where: { destination: { in: destinations } },
+    orderBy: [{ kind: "asc" }, { name: "asc" }],
+  });
+  const haystacks = [place.title, place.location ?? ""].map((t) => ` ${normalize(t)} `);
+  let area: string | null = null;
+  for (const text of haystacks) {
+    for (const a of new Set(entries.map((e) => e.area))) {
+      const name = normalize(a);
+      if (name.length >= 4 && text.includes(` ${name} `) && (!area || name.length > normalize(area).length)) area = a;
+    }
+    if (area) break;
+  }
+  if (!area) return null;
+  const day = place.date ? new Date(`${place.date}T00:00:00.000Z`) : (trip.startDate ?? new Date());
+  return { area, entries: entries.filter((e) => e.area === area && !closedDuring(e, day, day)) };
 }

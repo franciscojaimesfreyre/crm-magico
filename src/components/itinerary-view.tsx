@@ -3,6 +3,8 @@ import { Clock, MapPin } from "lucide-react";
 import { ACTIVITY_TYPE_COLOR, ACTIVITY_TYPE_LABEL } from "@/lib/labels";
 import { formatDateLong } from "@/lib/format";
 import type { ActivityType } from "@/generated/prisma/enums";
+import { parseGuide } from "@/lib/place-guide";
+import { PlaceGuideCard } from "@/components/place-guide";
 
 export type ItineraryDayView = {
   id: string;
@@ -19,6 +21,8 @@ export type ItineraryDayView = {
     location: string | null;
     notes: string | null;
     confirmationNumber: string | null;
+    /** Recomendaciones y tips de parques y cruceros (JSON, ver lib/place-guide). */
+    guide?: unknown;
   }[];
 };
 
@@ -63,12 +67,23 @@ export function ItineraryView({ days, compact = false }: { days: ItineraryDayVie
                     {i.confirmationNumber && <span>Conf. {i.confirmationNumber}</span>}
                   </div>
                   {i.notes && !compact && <p className="mt-1 text-xs whitespace-pre-line text-slate-600">{i.notes}</p>}
+                  {!compact && <ItemGuide item={i} />}
                 </li>
               ))}
             </ul>
           )}
         </section>
       ))}
+    </div>
+  );
+}
+
+function ItemGuide({ item }: { item: ItineraryDayView["items"][number] }) {
+  const guide = parseGuide(item.guide);
+  if (!guide) return null;
+  return (
+    <div className="mt-2.5">
+      <PlaceGuideCard guide={guide} cruise={item.type === "CRUISE"} />
     </div>
   );
 }

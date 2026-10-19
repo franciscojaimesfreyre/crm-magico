@@ -16,12 +16,15 @@ import {
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import clsx from "clsx";
-import { AlertTriangle, ArrowDownUp, CalendarPlus, Clock, GripVertical, MapPin, Plus, Save, ShieldCheck, Star, Trash2, Wand2, X } from "lucide-react";
+import { AlertTriangle, ArrowDownUp, BookmarkPlus, CalendarPlus, ChevronDown, ChevronUp, Clock, GripVertical, MapPin, Pencil, Plus, RefreshCw, Save, ShieldCheck, Sparkles, Star, Trash2, Wand2, X } from "lucide-react";
 import { ACTIVITY_TYPES, ACTIVITY_TYPE_COLOR, ACTIVITY_TYPE_LABEL } from "@/lib/labels";
 import { buttonClass } from "@/components/ui";
 import type { ActivityType } from "@/generated/prisma/enums";
-import { checkItinerary, withMustDos, type CheckEntry, type CheckTraveler, type ItemWarning } from "@/lib/itinerary-checks";
-import { proposeItinerary, saveItinerary, type ItineraryDayInput, type ItineraryTarget } from "@/app/app/viajes/itinerary-actions";
+import { checkItinerary, matchEntry, minHeightCm, withMustDos, type CheckEntry, type CheckTraveler, type ItemWarning } from "@/lib/itinerary-checks";
+import { proposeItinerary, proposePlaceGuide, saveItinerary, type ItineraryDayInput, type ItineraryTarget } from "@/app/app/viajes/itinerary-actions";
+import { saveActivityFromItinerary } from "@/app/app/plantillas/actions";
+import { GUIDE_PICK_KINDS, GUIDE_PICK_LABEL, hasGuide, type GuidePick, type GuidePickKind, type PlaceGuide } from "@/lib/place-guide";
+import { PlaceGuideCard } from "@/components/place-guide";
 
 // ─── Estado del editor ───────────────────────────────────────────────────────
 
@@ -34,7 +37,12 @@ type ItemState = {
   location: string | null;
   notes: string | null;
   confirmationNumber: string | null;
+  /** Parques y cruceros: atracciones recomendadas y tips (lo ve el viajero). */
+  guide: PlaceGuide | null;
 };
+
+/** Estado de la guía de cada actividad mientras la arma la IA. */
+type GuideStatus = { loading?: boolean; error?: string };
 
 type DayState = { key: string; date: string | null; title: string | null; notes: string | null; items: ItemState[] };
 
@@ -46,7 +54,7 @@ let counter = 0;
 const newKey = (p: string) => `${p}-${Date.now().toString(36)}-${(counter++).toString(36)}`;
 
 function toState(days: ItineraryDayInput[]): DayState[] {
-  return days.map((d) => ({ ...d, key: newKey("d"), items: d.items.map((i) => ({ ...i, key: newKey("i") })) }));
+  return days.map((d) => ({ ...d, key: newKey("d"), items: d.items.map((i) => ({ ...i, guide: i.guide ?? null, key: newKey("i") })) }));
 }
 
 function addMinutes(time: string, minutes: number) {
@@ -74,7 +82,16 @@ function mustDoItem(e: CheckEntry): ItemState {
     location: e.area,
     notes: null,
     confirmationNumber: null,
+    guide: null,
   };
+}
+
+/** La guía como se guarda: sin recomendaciones ni tips vacíos (null si no queda nada). */
+function cleanGuide(guide: PlaceGuide | null): PlaceGuide | null {
+  if (!guide) return null;
+  const picks = guide.picks.map((p) => ({ ...p, name: p.name.trim(), why: p.why.trim() })).filter((p) => p.name);
+  const tips = guide.tips.map((t) => t.trim()).filter(Boolean);
+  return picks.length + tips.length > 0 ? { picks, tips } : null;
 }
 
 function datesBetween(start: string, end: string) {
@@ -105,7 +122,7 @@ export function ItineraryEditor({
   initialDays,
   startDate,
   endDate,
-  templates,
+  templates: initialTemplates,
   aiEnabled,
   catalog = NONE,
   travelers = NONE,
@@ -121,6 +138,7 @@ export function ItineraryEditor({
   travelers?: CheckTraveler[];
 }) {
   const [days, setDays] = useState<DayState[]>(() => toState(initialDays));
+  const [templates, setTemplates] = useState(initialTemplates);
   const [dirty, setDirty] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [activeLabel, setActiveLabel] = useState<string | null>(null);
@@ -129,9 +147,11 @@ export function ItineraryEditor({
   const [saving, startSave] = useTransition();
   const [aiOpen, setAiOpen] = useState(initialDays.length === 0 && aiEnabled);
   const [aiInstructions, setAiInstructions] = useState("");
-  const [aiDetail, setAiDetail] = useState<"detailed" | "summary">("detailed");
+  const [aiDetail, setAiDetail] = useState<"detailed" | "summary">("summary");
   const [aiResult, setAiResult] = useState<{ summary: string; warnings: string[]; knowledge: { id: string; title: string }[]; added: string[] } | null>(null);
   const [generating, startGenerate] = useTransition();
+  const [guideStatus, setGuideStatus] = useState<Record<string, GuideStatus>>({});
+  const [aiGuides, setAiGuides] = useState(true);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -233,6 +253,7 @@ export function ItineraryEditor({
       location: null,
       notes: null,
       confirmationNumber: null,
+      guide: null,
       ...item,
     };
     update((prev) => prev.map((d) => (d.key === dayKey ? { ...d, items: [...d.items, created] } : d)));
@@ -301,6 +322,7 @@ export function ItineraryEditor({
         location: null,
         notes: null,
         confirmationNumber: null,
+        guide: null,
         ...pal,
       };
       update((prev) =>
@@ -341,6 +363,7 @@ export function ItineraryEditor({
         location: i.location?.trim() || null,
         notes: i.notes?.trim() || null,
         confirmationNumber: i.confirmationNumber?.trim() || null,
+        guide: hasGuide(i.type) ? cleanGuide(i.guide) : null,
       })),
     }));
     startSave(async () => {
@@ -353,11 +376,50 @@ export function ItineraryEditor({
     });
   }
 
+  // ── Guías de parques y cruceros
+
+  /** Pide a la IA la guía de una actividad. Toma el día y la actividad como están ahora. */
+  async function requestGuide(day: DayState, item: ItemState) {
+    setGuideStatus((s) => ({ ...s, [item.key]: { loading: true } }));
+    const res = await proposePlaceGuide(
+      target.id,
+      {
+        type: item.type as "PARK" | "CRUISE",
+        title: item.title,
+        location: item.location,
+        date: day.date,
+        dayTitle: day.title,
+        dayNotes: day.notes,
+        notes: item.notes,
+      },
+      aiInstructions,
+    ).catch(() => ({ error: "No se pudieron generar las recomendaciones. Intentá de nuevo." }));
+    if ("guide" in res && res.guide) {
+      const guide = res.guide;
+      setDays((prev) => prev.map((d) => ({ ...d, items: d.items.map((i) => (i.key === item.key ? { ...i, guide } : i)) })));
+      setDirty(true);
+      setGuideStatus((s) => ({ ...s, [item.key]: {} }));
+    } else {
+      setGuideStatus((s) => ({ ...s, [item.key]: { error: "error" in res ? res.error : "No se pudieron generar las recomendaciones." } }));
+    }
+  }
+
+  /** Guías para todos los parques y cruceros que todavía no tienen, de a tres a la vez. */
+  async function requestGuides(source: DayState[]) {
+    const queue = source.flatMap((d) => d.items.filter((i) => hasGuide(i.type) && !i.guide).map((i) => [d, i] as const));
+    const worker = async () => {
+      for (let next = queue.shift(); next; next = queue.shift()) await requestGuide(...next);
+    };
+    await Promise.all([worker(), worker(), worker()]);
+  }
+
+  const missingGuides = days.reduce((n, d) => n + d.items.filter((i) => hasGuide(i.type) && !i.guide && !guideStatus[i.key]?.loading).length, 0);
+
   function generate() {
     if (days.some((d) => d.items.length > 0) && !window.confirm("La propuesta de la IA va a reemplazar el itinerario actual en el editor (no se guarda hasta que hagas clic en Guardar). ¿Continuar?")) return;
     startGenerate(async () => {
       setMessage(null);
-      const res = await proposeItinerary(target.id, aiInstructions, aiDetail);
+      const res = await proposeItinerary(target.id, aiInstructions, aiDetail, aiGuides);
       if ("error" in res && res.error) {
         setMessage({ tone: "error", text: res.error });
         return;
@@ -378,6 +440,7 @@ export function ItineraryEditor({
               location: i.location,
               notes: withoutMustDoTag(i.notes ?? "") || null,
               confirmationNumber: null,
+              guide: i.guide,
             })),
           })),
       );
@@ -386,6 +449,8 @@ export function ItineraryEditor({
       setDays(proposed.days);
       setDirty(true);
       setAiResult({ summary: r.summary, warnings: r.warnings, knowledge: res.knowledgeUsed, added: proposed.added.map((e) => e.name) });
+      // Las guías vienen en la misma respuesta; si a algún parque o día de crucero le faltó, se pide aparte.
+      if (aiGuides) requestGuides(proposed.days);
       setAiOpen(false);
     });
   }
@@ -406,6 +471,11 @@ export function ItineraryEditor({
           {aiEnabled && (
             <button type="button" onClick={() => setAiOpen((v) => !v)} className={buttonClass("magic", "sm")}>
               <Wand2 className="size-4" /> Proponer con IA
+            </button>
+          )}
+          {aiEnabled && missingGuides > 0 && (
+            <button type="button" onClick={() => requestGuides(days)} className={buttonClass("secondary", "sm")}>
+              <Sparkles className="size-4 text-fuchsia-600" /> Recomendaciones para {missingGuides === 1 ? "1 parque" : `${missingGuides} parques`}
             </button>
           )}
         </div>
@@ -455,6 +525,15 @@ export function ItineraryEditor({
               ))}
             </div>
           </fieldset>
+          <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-lg border border-slate-200 bg-white p-3 text-sm">
+            <input type="checkbox" checked={aiGuides} onChange={(e) => setAiGuides(e.target.checked)} className="mt-0.5 rounded border-slate-300" />
+            <span>
+              <span className="font-medium text-slate-900">Sumar atracciones recomendadas y tips en cada parque</span>
+              <span className="block text-xs text-slate-500">
+                También en los días de crucero. Se arman según los viajeros y estas instrucciones, y después podés editarlas o pedirlas parque por parque.
+              </span>
+            </span>
+          </label>
           <textarea
             value={aiInstructions}
             onChange={(e) => setAiInstructions(e.target.value)}
@@ -545,16 +624,24 @@ export function ItineraryEditor({
               ))}
             </div>
           </div>
-          {templates.length > 0 && (
-            <div>
-              <p className="label">Actividades guardadas</p>
+          <div>
+            <div className="mb-1.5 flex items-baseline justify-between gap-2">
+              <p className="label mb-0">Actividades guardadas</p>
+              {/* En otra pestaña, para no perder lo que no se guardó del itinerario. */}
+              <a href="/app/actividades" target="_blank" rel="noreferrer" className="text-xs font-medium text-brand-700 hover:underline">
+                Administrar
+              </a>
+            </div>
+            {templates.length > 0 ? (
               <div className="flex max-h-80 flex-wrap gap-1.5 overflow-y-auto lg:flex-col">
                 {templates.map((t) => (
                   <PaletteChip key={t.id} id={`tpl:${t.id}`} label={t.title} type={t.type} />
                 ))}
               </div>
-            </div>
-          )}
+            ) : (
+              <p className="text-xs text-slate-500">Guardá las actividades que más usás desde cualquier actividad del itinerario.</p>
+            )}
+          </div>
         </aside>
 
         {/* Días */}
@@ -570,6 +657,12 @@ export function ItineraryEditor({
               day={day}
               number={di + 1}
               warnings={checks.itemWarnings[di] ?? []}
+              guideStatus={guideStatus}
+              aiEnabled={aiEnabled}
+              travelers={travelers}
+              catalog={catalog}
+              onGuide={(item) => requestGuide(day, item)}
+              onTemplateSaved={(t) => setTemplates((prev) => [...prev, t].sort((a, b) => a.title.localeCompare(b.title)))}
               editing={editing}
               setEditing={setEditing}
               onPatch={(patch) => patchDay(day.key, patch)}
@@ -614,6 +707,12 @@ function DayColumn({
   day,
   number,
   warnings,
+  guideStatus,
+  aiEnabled,
+  travelers,
+  catalog,
+  onGuide,
+  onTemplateSaved,
   editing,
   setEditing,
   onPatch,
@@ -626,6 +725,12 @@ function DayColumn({
   day: DayState;
   number: number;
   warnings: ItemWarning[][];
+  guideStatus: Record<string, GuideStatus>;
+  aiEnabled: boolean;
+  travelers: CheckTraveler[];
+  catalog: CheckEntry[];
+  onGuide: (item: ItemState) => void;
+  onTemplateSaved: (t: EditorTemplate) => void;
   editing: string | null;
   setEditing: (k: string | null) => void;
   onPatch: (p: Partial<DayState>) => void;
@@ -667,6 +772,12 @@ function DayColumn({
               key={item.key}
               item={item}
               warnings={warnings[ii] ?? []}
+              guideStatus={guideStatus[item.key] ?? {}}
+              aiEnabled={aiEnabled}
+              travelers={travelers}
+              catalog={catalog}
+              onGuide={() => onGuide(item)}
+              onTemplateSaved={onTemplateSaved}
               open={editing === item.key}
               onToggle={() => setEditing(editing === item.key ? null : item.key)}
               onPatch={(p) => onPatchItem(item.key, p)}
@@ -695,6 +806,12 @@ function DayColumn({
 function SortableItem({
   item,
   warnings,
+  guideStatus,
+  aiEnabled,
+  travelers,
+  catalog,
+  onGuide,
+  onTemplateSaved,
   open,
   onToggle,
   onPatch,
@@ -702,6 +819,12 @@ function SortableItem({
 }: {
   item: ItemState;
   warnings: ItemWarning[];
+  guideStatus: GuideStatus;
+  aiEnabled: boolean;
+  travelers: CheckTraveler[];
+  catalog: CheckEntry[];
+  onGuide: () => void;
+  onTemplateSaved: (t: EditorTemplate) => void;
   open: boolean;
   onToggle: () => void;
   onPatch: (p: Partial<ItemState>) => void;
@@ -771,8 +894,242 @@ function SortableItem({
           <input className="field sm:col-span-3" value={item.location ?? ""} onChange={(e) => onPatch({ location: e.target.value })} placeholder="Lugar / parque / área" />
           <input className="field sm:col-span-3" value={item.confirmationNumber ?? ""} onChange={(e) => onPatch({ confirmationNumber: e.target.value })} placeholder="N° de confirmación" />
           <textarea className="field sm:col-span-6" rows={2} value={item.notes ?? ""} onChange={(e) => onPatch({ notes: e.target.value })} placeholder="Notas y tips para el cliente" />
+          <SaveAsTemplate item={item} onSaved={onTemplateSaved} />
         </div>
       )}
+      {hasGuide(item.type) && (
+        <GuideSection item={item} status={guideStatus} aiEnabled={aiEnabled} travelers={travelers} catalog={catalog} onGuide={onGuide} onPatch={onPatch} />
+      )}
+    </div>
+  );
+}
+
+function GuideSection({
+  item,
+  status,
+  aiEnabled,
+  travelers,
+  catalog,
+  onGuide,
+  onPatch,
+}: {
+  item: ItemState;
+  status: GuideStatus;
+  aiEnabled: boolean;
+  travelers: CheckTraveler[];
+  catalog: CheckEntry[];
+  onGuide: () => void;
+  onPatch: (p: Partial<ItemState>) => void;
+}) {
+  const [editingGuide, setEditingGuide] = useState(false);
+  const guide = item.guide;
+  const place = item.type === "CRUISE" ? "este día de crucero" : "este parque";
+  if (status.loading) {
+    return (
+      <div className="px-3 pb-3">
+        <p className="flex animate-pulse items-center gap-2 rounded-lg bg-white/80 px-3 py-2.5 text-xs text-fuchsia-700">
+          <Sparkles className="size-4" /> Armando recomendaciones y tips para {place}…
+        </p>
+      </div>
+    );
+  }
+  if (!guide) {
+    return (
+      <div className="px-3 pb-3">
+        <div className="flex flex-wrap gap-2">
+          {aiEnabled && (
+            <button
+              type="button"
+              onClick={onGuide}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-dashed border-fuchsia-300 bg-white/70 px-3 py-2 text-xs font-medium text-fuchsia-700 hover:border-fuchsia-500 hover:bg-white"
+            >
+              <Sparkles className="size-3.5" /> Sumar atracciones recomendadas y tips con IA
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              onPatch({ guide: { picks: [], tips: [] } });
+              setEditingGuide(true);
+            }}
+            className="flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300 bg-white/70 px-3 py-2 text-xs font-medium text-slate-600 hover:border-slate-400 hover:bg-white"
+          >
+            <Pencil className="size-3.5" /> Escribirlas a mano
+          </button>
+        </div>
+        {status.error && <p className="mt-1.5 text-xs text-rose-700">{status.error}</p>}
+      </div>
+    );
+  }
+
+  if (editingGuide) {
+    return <GuideForm guide={guide} catalog={catalog} onChange={(g) => onPatch({ guide: g })} onDone={() => setEditingGuide(false)} />;
+  }
+
+  // Quién del grupo no llega a la altura de cada recomendación (lo ve solo el agente).
+  const pickNotes = guide.picks.map((p) => {
+    if (!p.minHeightIn) return null;
+    const short = travelers.filter((t) => t.heightCm && t.heightCm < minHeightCm(p.minHeightIn!));
+    return short.length ? `${short.map((t) => `${t.name} (${t.heightCm} cm)`).join(" y ")} no ${short.length > 1 ? "llegan" : "llega"}: rider switch.` : null;
+  });
+  return (
+    <div className="px-3 pb-3">
+      <PlaceGuideCard
+        guide={guide}
+        cruise={item.type === "CRUISE"}
+        pickNotes={pickNotes}
+        onRemovePick={(index) => onPatch({ guide: { ...guide, picks: guide.picks.filter((_, i) => i !== index) } })}
+        onRemoveTip={(index) => onPatch({ guide: { ...guide, tips: guide.tips.filter((_, i) => i !== index) } })}
+      />
+      <div className="mt-1.5 flex flex-wrap items-center justify-end gap-3 text-xs">
+        {status.error && <span className="mr-auto text-rose-700">{status.error}</span>}
+        <button type="button" onClick={() => setEditingGuide(true)} className="inline-flex items-center gap-1 font-medium text-brand-700 hover:underline">
+          <Pencil className="size-3" /> Editar
+        </button>
+        {aiEnabled && (
+          <button
+            type="button"
+            onClick={() => window.confirm("¿Reemplazar estas recomendaciones por unas nuevas de la IA? Se pierden los cambios que les hiciste.") && onGuide()}
+            className="inline-flex items-center gap-1 text-slate-500 hover:text-brand-700"
+          >
+            <RefreshCw className="size-3" /> Regenerar con IA
+          </button>
+        )}
+        <button type="button" onClick={() => onPatch({ guide: null })} className="inline-flex items-center gap-1 text-slate-400 hover:text-rose-600">
+          <Trash2 className="size-3" /> Quitar recomendaciones
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Edición de la guía: cada recomendación (nombre, tipo, por qué) y cada tip, más agregar y ordenar. */
+function GuideForm({ guide, catalog, onChange, onDone }: { guide: PlaceGuide; catalog: CheckEntry[]; onChange: (g: PlaceGuide) => void; onDone: () => void }) {
+  function patchPick(index: number, patch: Partial<GuidePick>) {
+    onChange({ ...guide, picks: guide.picks.map((p, i) => (i === index ? { ...p, ...patch } : p)) });
+  }
+  function renamePick(index: number, name: string) {
+    // La altura mínima y el imperdible salen del catálogo, no de lo que se escribe.
+    const entry = matchEntry({ type: "RIDE", title: name, location: null }, catalog);
+    const kind = entry ? (entry.kind === "SHOW" ? "SHOW" : "RIDE") : guide.picks[index].kind;
+    patchPick(index, { name, kind, minHeightIn: entry?.minHeightIn ?? null, mustDo: entry?.mustDo ?? false });
+  }
+  function movePick(index: number, delta: number) {
+    const to = index + delta;
+    if (to < 0 || to >= guide.picks.length) return;
+    onChange({ ...guide, picks: arrayMove(guide.picks, index, to) });
+  }
+  const listId = useMemo(() => newKey("catalog"), []);
+  return (
+    <div className="mx-3 mb-3 space-y-3 rounded-xl bg-white p-3 ring-1 ring-brand-200">
+      <datalist id={listId}>
+        {catalog.map((e) => (
+          <option key={e.id} value={e.name}>
+            {e.area}
+          </option>
+        ))}
+      </datalist>
+      <div>
+        <p className="mb-1.5 text-xs font-semibold tracking-wide text-brand-700 uppercase">Recomendaciones</p>
+        <ul className="space-y-2">
+          {guide.picks.map((p, i) => (
+            <li key={i} className="grid gap-1.5 rounded-lg bg-slate-50 p-2 sm:grid-cols-[minmax(0,1fr)_9rem_auto]">
+              <input className="field" value={p.name} onChange={(e) => renamePick(i, e.target.value)} list={listId} placeholder="Atracción, show, restaurante…" />
+              <select className="field" value={p.kind} onChange={(e) => patchPick(i, { kind: e.target.value as GuidePickKind })}>
+                {GUIDE_PICK_KINDS.map((k) => (
+                  <option key={k} value={k}>
+                    {GUIDE_PICK_LABEL[k]}
+                  </option>
+                ))}
+              </select>
+              <div className="flex items-center justify-end gap-1 text-slate-400">
+                <button type="button" onClick={() => movePick(i, -1)} disabled={i === 0} className="p-1 hover:text-slate-700 disabled:opacity-30" title="Subir">
+                  <ChevronUp className="size-4" />
+                </button>
+                <button type="button" onClick={() => movePick(i, 1)} disabled={i === guide.picks.length - 1} className="p-1 hover:text-slate-700 disabled:opacity-30" title="Bajar">
+                  <ChevronDown className="size-4" />
+                </button>
+                <button type="button" onClick={() => onChange({ ...guide, picks: guide.picks.filter((_, j) => j !== i) })} className="p-1 hover:text-rose-600" title="Quitar">
+                  <Trash2 className="size-3.5" />
+                </button>
+              </div>
+              <textarea className="field sm:col-span-3" rows={2} value={p.why} onChange={(e) => patchPick(i, { why: e.target.value })} placeholder="Por qué se la recomendás a esta familia" />
+            </li>
+          ))}
+        </ul>
+        <button
+          type="button"
+          onClick={() => onChange({ ...guide, picks: [...guide.picks, { name: "", kind: "RIDE", why: "", minHeightIn: null, mustDo: false }] })}
+          className="mt-1.5 text-xs font-medium text-brand-700 hover:underline"
+        >
+          + Agregar recomendación
+        </button>
+      </div>
+      <div>
+        <p className="mb-1.5 text-xs font-semibold tracking-wide text-amber-800 uppercase">Tips</p>
+        <ul className="space-y-1.5">
+          {guide.tips.map((t, i) => (
+            <li key={i} className="flex items-start gap-1.5">
+              <textarea
+                className="field flex-1"
+                rows={2}
+                value={t}
+                onChange={(e) => onChange({ ...guide, tips: guide.tips.map((x, j) => (j === i ? e.target.value : x)) })}
+                placeholder="Un consejo práctico para ese día"
+              />
+              <button type="button" onClick={() => onChange({ ...guide, tips: guide.tips.filter((_, j) => j !== i) })} className="p-1 pt-2 text-slate-400 hover:text-rose-600" title="Quitar">
+                <Trash2 className="size-3.5" />
+              </button>
+            </li>
+          ))}
+        </ul>
+        <button type="button" onClick={() => onChange({ ...guide, tips: [...guide.tips, ""] })} className="mt-1.5 text-xs font-medium text-brand-700 hover:underline">
+          + Agregar tip
+        </button>
+      </div>
+      <div className="flex justify-end">
+        <button type="button" onClick={onDone} className={buttonClass("secondary", "sm")}>
+          Listo
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Minutos entre dos horarios HH:MM (null si falta alguno o el fin no es posterior). */
+function minutesBetween(start: string | null, end: string | null) {
+  if (!start || !end) return null;
+  const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+  const diff = toMin(end) - toMin(start);
+  return diff > 0 ? diff : null;
+}
+
+/** Guarda la actividad en "Actividades guardadas" para arrastrarla a otros itinerarios. */
+function SaveAsTemplate({ item, onSaved }: { item: ItemState; onSaved: (t: EditorTemplate) => void }) {
+  const [state, setState] = useState<{ saved?: string; error?: string }>({});
+  const [pending, startSaving] = useTransition();
+  const done = state.saved === `${item.type}|${item.title}|${item.location}|${item.notes}`;
+  function save() {
+    startSaving(async () => {
+      const res = await saveActivityFromItinerary({
+        type: item.type,
+        title: item.title,
+        location: item.location,
+        notes: item.notes,
+        durationMin: minutesBetween(item.startTime, item.endTime),
+      });
+      if ("template" in res && res.template) {
+        onSaved(res.template);
+        setState({ saved: `${item.type}|${item.title}|${item.location}|${item.notes}` });
+      } else setState({ error: "error" in res ? res.error : "No se pudo guardar." });
+    });
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-2 sm:col-span-6">
+      <button type="button" onClick={save} disabled={pending || done || !item.title.trim()} className={buttonClass("secondary", "sm")}>
+        <BookmarkPlus className="size-4" /> {done ? "Guardada en mis actividades" : pending ? "Guardando…" : "Guardar en mis actividades"}
+      </button>
+      <span className="text-xs text-slate-500">{state.error ?? "Para reusarla en otros itinerarios. La IA también la tiene en cuenta."}</span>
     </div>
   );
 }

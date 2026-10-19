@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import type { ActionState } from "@/components/form-controls";
+import { ACTIVITY_TYPE_LABEL } from "@/lib/labels";
 import type { ActivityType, TemplateCategory } from "@/generated/prisma/enums";
 
 // ─── Plantillas de email ─────────────────────────────────────────────────────
@@ -39,23 +40,53 @@ export async function deleteEmailTemplate(id: string) {
 
 // ─── Actividades reutilizables del itinerario ────────────────────────────────
 
+const ACTIVITY_TYPES = Object.keys(ACTIVITY_TYPE_LABEL) as ActivityType[];
+
+/** Crea una actividad guardada o, con id, la edita. Las que crea o edita el agente son propias (custom). */
 export async function saveActivityTemplate(_: ActionState, formData: FormData): Promise<ActionState> {
   const user = await requireUser();
+  const id = String(formData.get("id") ?? "");
   const title = String(formData.get("title") ?? "").trim();
   if (!title) return { error: "Poné un título" };
+  const type = String(formData.get("type") ?? "CUSTOM") as ActivityType;
   const duration = Number(formData.get("durationMin"));
-  await db.activityTemplate.create({
+  const data = {
+    title: title.slice(0, 300),
+    type: ACTIVITY_TYPES.includes(type) ? type : "CUSTOM",
+    location: String(formData.get("location") ?? "").trim().slice(0, 300) || null,
+    durationMin: Number.isFinite(duration) && duration > 0 ? Math.round(duration) : null,
+    notes: String(formData.get("notes") ?? "").trim().slice(0, 2000) || null,
+    custom: true,
+  };
+  if (id) {
+    const res = await db.activityTemplate.updateMany({ where: { id, organizationId: user.organizationId }, data });
+    if (res.count === 0) return { error: "No se encontró la actividad" };
+  } else {
+    await db.activityTemplate.create({ data: { ...data, organizationId: user.organizationId } });
+  }
+  revalidatePath("/app/actividades");
+  return { ok: id ? "Cambios guardados" : "Actividad guardada" };
+}
+
+/** Guarda una actividad de un itinerario en las actividades del agente, para reusarla. */
+export async function saveActivityFromItinerary(item: { type: ActivityType; title: string; location: string | null; notes: string | null; durationMin: number | null }) {
+  const user = await requireUser();
+  const title = item.title.trim().slice(0, 300);
+  if (!title) return { error: "La actividad necesita un título" };
+  const template = await db.activityTemplate.create({
     data: {
       organizationId: user.organizationId,
+      type: ACTIVITY_TYPES.includes(item.type) ? item.type : "CUSTOM",
       title,
-      type: String(formData.get("type") ?? "CUSTOM") as ActivityType,
-      location: String(formData.get("location") ?? "").trim() || null,
-      durationMin: Number.isFinite(duration) && duration > 0 ? duration : null,
-      notes: String(formData.get("notes") ?? "").trim() || null,
+      location: item.location?.trim().slice(0, 300) || null,
+      notes: item.notes?.trim().slice(0, 2000) || null,
+      durationMin: item.durationMin && item.durationMin > 0 ? Math.round(item.durationMin) : null,
+      custom: true,
     },
+    select: { id: true, type: true, title: true, location: true, durationMin: true, notes: true },
   });
   revalidatePath("/app/actividades");
-  return { ok: "Actividad guardada" };
+  return { template };
 }
 
 export async function deleteActivityTemplate(id: string) {

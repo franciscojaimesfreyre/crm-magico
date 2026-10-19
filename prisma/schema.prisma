@@ -483,6 +483,7 @@ enum ActivityType {
   TRAVEL
   SHOPPING
   POOL
+  CRUISE // día de crucero: embarque, navegación o puerto
   CUSTOM
 }
 
@@ -515,6 +516,7 @@ model ItineraryItem {
   notes              String?
   confirmationNumber String?
   position           Int          @default(0)
+  guide              Json? // parques y cruceros: atracciones recomendadas y tips (ver lib/place-guide)
 }
 
 model ActivityTemplate {
@@ -526,6 +528,7 @@ model ActivityTemplate {
   location       String?
   durationMin    Int?
   notes          String?
+  custom         Boolean      @default(false) // la creó el agente (las precargadas no): la IA la tiene como referencia
   createdAt      DateTime     @default(now())
 }
 

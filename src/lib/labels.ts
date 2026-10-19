@@ -188,6 +188,7 @@ export const ACTIVITY_TYPE_LABEL: Record<ActivityType, string> = {
   TRAVEL: "Traslado",
   SHOPPING: "Compras",
   POOL: "Pileta",
+  CRUISE: "Crucero",
   CUSTOM: "Otro",
 };
 export const ACTIVITY_TYPES = options(ACTIVITY_TYPE_LABEL);
@@ -201,6 +202,7 @@ export const ACTIVITY_TYPE_COLOR: Record<ActivityType, string> = {
   TRAVEL: "border-l-sky-500 bg-sky-50",
   SHOPPING: "border-l-orange-500 bg-orange-50",
   POOL: "border-l-cyan-500 bg-cyan-50",
+  CRUISE: "border-l-blue-600 bg-blue-50",
   CUSTOM: "border-l-slate-400 bg-slate-50",
 };
 

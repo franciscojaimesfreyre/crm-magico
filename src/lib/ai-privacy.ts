@@ -40,7 +40,9 @@ export function createPseudonymizer(travelers: Person[], others: Person[] = []) 
 
   function unmask(text: string): string {
     // Plural: "los Viajeros A, B y D" → "Amanda, Diego y Tomás" (cada letra por su nombre, mismos separadores).
-    let out = text.replace(/(?:(?<![\p{L}])(?:[Ll]os|[Ll]as) )?[Vv]iajeros ([A-Z](?:, [A-Z])*(?: y [A-Z])?)(?![\p{L}\p{N}])/gu, (all, list: string) => {
+    // También en singular con varias letras ("Viajero A, B y C"), que el modelo a veces escribe así.
+    let out = text.replace(/(?:(?<![\p{L}])(?:[Ll]os|[Ll]as|[Ee]l|[Ll]a) )?(?:[Vv]iajeros ([A-Z](?:, [A-Z])*(?: y [A-Z])?)|[Vv]iajero ([A-Z](?:, [A-Z])* y [A-Z]))(?![\p{L}\p{N}])/gu, (all, plural: string | undefined, singular: string | undefined) => {
+      const list = (plural ?? singular)!;
       const name = (l: string) => aliases.find((a) => a.alias === `Viajero ${l}`)?.firstName;
       if (list.match(/[A-Z]/g)!.some((l) => !name(l))) return all;
       return list.replace(/[A-Z]/g, (l) => name(l)!);

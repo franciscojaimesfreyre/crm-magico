@@ -188,6 +188,51 @@ function jsonSchemaFor(schema: z.ZodType) {
   return json;
 }
 
+/**
+ * JSON.parse que tolera corchetes de cierre olvidados, el error típico de los modelos en respuestas
+ * largas y anidadas: `"]}]},{"dayNumber"` en vez de `"]}}]},{…` o `"}]}` al final en vez de `"]}]}`.
+ * Si aparece un cierre que no corresponde al último abierto (algo que en un JSON válido nunca pasa),
+ * se agregan antes los cierres que faltan; al final se cierra lo que quedó abierto. El resultado se
+ * sigue validando contra el esquema.
+ */
+export function parseJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    const repaired = closeBrackets(text);
+    if (repaired === null) throw error;
+    const value = JSON.parse(repaired);
+    console.warn("[IA] la respuesta tenía corchetes sin cerrar: se reparó");
+    return value;
+  }
+}
+
+function closeBrackets(text: string): string | null {
+  const stack: string[] = [];
+  let out = "";
+  let inString = false;
+  let escaped = false;
+  for (const ch of text) {
+    if (inString) {
+      out += ch;
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === "{" || ch === "[") stack.push(ch === "{" ? "}" : "]");
+    else if (ch === "}" || ch === "]") {
+      if (!stack.includes(ch)) return null; // sobra un cierre: no se puede reparar con seguridad
+      while (stack[stack.length - 1] !== ch) out += stack.pop();
+      stack.pop();
+    }
+    out += ch;
+  }
+  if (inString) return null;
+  return out + stack.reverse().join("");
+}
+
 type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
 
 async function callOpenAICompatible<T extends z.ZodType>(p: OpenAICompatible, model: string, opts: StructuredRequest<T>): Promise<z.infer<T>> {
@@ -210,12 +255,15 @@ async function callOpenAICompatible<T extends z.ZodType>(p: OpenAICompatible, mo
     let parsed: unknown;
     let problem: string;
     try {
-      parsed = JSON.parse(content);
+      parsed = parseJson(content);
       const result = opts.schema.safeParse(parsed);
       if (result.success) return result.data;
       problem = z.prettifyError(result.error);
-    } catch {
-      problem = "no es un JSON válido";
+    } catch (error) {
+      problem = `no es un JSON válido (${error instanceof Error ? error.message : error})`;
+      // Para diagnosticar: dónde se rompe (sin datos personales: los viajeros van con alias).
+      const at = Number(/position (\d+)/.exec(String(error))?.[1] ?? -1);
+      console.warn(`[IA] respuesta de ${content.length} caracteres; inicio: ${JSON.stringify(content.slice(0, 120))}; ${at >= 0 ? `cerca del error: ${JSON.stringify(content.slice(Math.max(0, at - 150), at + 150))}` : `final: ${JSON.stringify(content.slice(-200))}`}`);
     }
     console.warn(`[IA] ${p.label} (${model}) devolvió un formato inválido (intento ${attempt}): ${problem.slice(0, 500)}`);
     if (attempt === 2) break;

@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { PageHeader } from "@/components/ui";
 import { ItineraryEditor } from "@/components/itinerary-editor";
+import { parseGuide } from "@/lib/place-guide";
 import { DESTINATION_LABEL } from "@/lib/labels";
 import { formatRange, toDateInput } from "@/lib/format";
 import { catalogChecks, catalogDestinations, checkTravelers } from "@/lib/catalog";
@@ -57,6 +58,7 @@ export default async function ItineraryPage({ params }: { params: Promise<{ id: 
             location: i.location,
             notes: i.notes,
             confirmationNumber: i.confirmationNumber,
+            guide: parseGuide(i.guide),
           })),
         }))}
       />

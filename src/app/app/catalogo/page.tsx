@@ -12,6 +12,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import type { CatalogKind, Destination } from "@/generated/prisma/enums";
 import { deleteCatalogEntry, markCatalogVerified, toggleCatalogMustDo } from "./actions";
 import { CatalogTabs } from "./tabs";
+import { CatalogImportExport } from "./import-export";
 
 export const metadata = { title: "Catálogo de parques" };
 
@@ -52,7 +53,12 @@ export default async function CatalogPage({
       <PageHeader
         title="Catálogo de parques"
         description="Atracciones con su altura mínima, shows, restaurantes y shoppings que existen en cada destino. La IA arma los itinerarios solo con lo que figura acá, los imperdibles se suman siempre y el editor avisa a qué no llega cada chico."
-        actions={user.isPlatformAdmin && <LinkButton href="/app/catalogo/nueva">Agregar</LinkButton>}
+        actions={
+          <div className="flex flex-wrap items-start gap-2">
+            <CatalogImportExport canImport={user.isPlatformAdmin} />
+            {user.isPlatformAdmin && <LinkButton href="/app/catalogo/nueva">Agregar</LinkButton>}
+          </div>
+        }
       />
       <CatalogTabs active="lugares" />
       <form className="mb-4 grid gap-2 rounded-xl border border-slate-200 bg-white p-3 sm:grid-cols-7">

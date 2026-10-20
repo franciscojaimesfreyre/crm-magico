@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { parseDateInput } from "@/lib/format";
 import type { ActionState } from "@/components/form-controls";
+import { CATALOG_FORMAT, CatalogEntryExportSchema, CatalogFileSchema, ParkGuideExportSchema } from "@/lib/catalog-io";
 import type { CatalogKind, Destination, DiningStyle } from "@/generated/prisma/enums";
 
 /** El catálogo es de toda la plataforma: solo lo editan sus administradores. */
@@ -90,4 +91,56 @@ export async function deleteCatalogEntry(id: string) {
   await requirePlatformAdmin();
   await db.catalogEntry.delete({ where: { id } });
   revalidatePath("/app/catalogo");
+}
+
+// ─── Exportar / importar todo el catálogo ────────────────────────────────────
+
+const toDay = (iso: string | null) => (iso ? new Date(`${iso}T00:00:00.000Z`) : null);
+
+/**
+ * Importa un JSON exportado del catálogo. El catálogo es uno solo para toda la plataforma, así que
+ * actualiza lo que ya existe (el mismo lugar en el mismo destino y zona; la misma ficha por nombre)
+ * y agrega lo nuevo. No borra nada.
+ */
+export async function importCatalog(json: string) {
+  await requirePlatformAdmin();
+  if (json.length > 20_000_000) return { error: "El archivo es demasiado grande (máximo 20 MB)." };
+  let raw: unknown;
+  try {
+    raw = JSON.parse(json);
+  } catch {
+    return { error: "El archivo no es un JSON válido." };
+  }
+  const file = CatalogFileSchema.safeParse(raw);
+  if (!file.success || (file.data.format && file.data.format !== CATALOG_FORMAT)) return { error: "El JSON no tiene el formato del catálogo exportado." };
+
+  const r = { entriesCreated: 0, entriesUpdated: 0, guidesCreated: 0, guidesUpdated: 0, invalid: 0 };
+  for (const item of file.data.entries) {
+    const parsed = CatalogEntryExportSchema.safeParse(item);
+    if (!parsed.success || (parsed.data.closedFrom && parsed.data.closedTo && parsed.data.closedTo < parsed.data.closedFrom)) {
+      r.invalid++;
+      continue;
+    }
+    const { closedFrom, closedTo, verifiedAt, ...e } = parsed.data;
+    const data = { ...e, closedFrom: toDay(closedFrom), closedTo: toDay(closedTo), verifiedAt: verifiedAt ? new Date(verifiedAt) : null };
+    const key = { destination_area_name: { destination: e.destination, area: e.area, name: e.name } };
+    const exists = await db.catalogEntry.findUnique({ where: key, select: { id: true } });
+    await db.catalogEntry.upsert({ where: key, create: data, update: data });
+    r[exists ? "entriesUpdated" : "entriesCreated"]++;
+  }
+  for (const item of file.data.guides) {
+    const parsed = ParkGuideExportSchema.safeParse(item);
+    if (!parsed.success || (parsed.data.kind === "EVENT" && !parsed.data.park)) {
+      r.invalid++;
+      continue;
+    }
+    const g = parsed.data;
+    const existing = await db.parkGuide.findFirst({ where: { name: { equals: g.name, mode: "insensitive" } }, select: { id: true } });
+    if (existing) await db.parkGuide.update({ where: { id: existing.id }, data: g });
+    else await db.parkGuide.create({ data: g });
+    r[existing ? "guidesUpdated" : "guidesCreated"]++;
+  }
+  revalidatePath("/app/catalogo");
+  revalidatePath("/app/catalogo/fichas");
+  return r;
 }

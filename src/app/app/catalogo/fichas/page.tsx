@@ -8,6 +8,7 @@ import { DESTINATION_LABEL } from "@/lib/labels";
 import { parseSections } from "@/lib/park-sheet";
 import { CatalogTabs } from "../tabs";
 import { loadDefaultGuides } from "./actions";
+import { CatalogImportExport } from "../import-export";
 
 export const metadata = { title: "Fichas de parques" };
 
@@ -23,22 +24,25 @@ export default async function ParkGuidesPage() {
         title="Catálogo de parques"
         description="Cada parque y cada evento especial tiene su ficha: horarios, llegada recomendada, imperdibles, atracciones leves, shows, personajes, dónde comer, snacks y tips. Cuando se suma un parque al itinerario (a mano o con la IA) se copia su ficha, y el agente la puede editar para ese viaje. Si el viaje tiene un evento reservado, ese día aparece la ficha del evento."
         actions={
-          user.isPlatformAdmin && (
-            <div className="flex flex-wrap gap-2">
-              <form
-                action={async () => {
-                  "use server";
-                  await loadDefaultGuides();
-                }}
-              >
-                <button className={buttonClass("secondary")}>Cargar fichas base</button>
-              </form>
-              <LinkButton href="/app/catalogo/fichas/nueva?tipo=EVENT" variant="secondary">
-                Nuevo evento
-              </LinkButton>
-              <LinkButton href="/app/catalogo/fichas/nueva">Nuevo parque</LinkButton>
-            </div>
-          )
+          <div className="flex flex-wrap items-start gap-2">
+            <CatalogImportExport canImport={user.isPlatformAdmin} />
+            {user.isPlatformAdmin && (
+              <div className="flex flex-wrap gap-2">
+                <form
+                  action={async () => {
+                    "use server";
+                    await loadDefaultGuides();
+                  }}
+                >
+                  <button className={buttonClass("secondary")}>Cargar fichas base</button>
+                </form>
+                <LinkButton href="/app/catalogo/fichas/nueva?tipo=EVENT" variant="secondary">
+                  Nuevo evento
+                </LinkButton>
+                <LinkButton href="/app/catalogo/fichas/nueva">Nuevo parque</LinkButton>
+              </div>
+            )}
+          </div>
         }
       />
       <CatalogTabs active="fichas" />

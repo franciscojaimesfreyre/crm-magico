@@ -10,10 +10,52 @@ export type CheckEntry = {
   name: string;
   minHeightIn: number | null;
   mustDo: boolean;
-  closedFrom: string | null; // YYYY-MM-DD
-  closedTo: string | null;
+  /** Cierres cargados en el catálogo y en las novedades de cierre o remodelación. */
+  closures: Closure[];
   notes: string | null;
 };
+
+/** Período en que una atracción está cerrada (fechas YYYY-MM-DD; null = sin límite). */
+export type Closure = { from: string | null; to: string | null; reason: string | null };
+
+/** El cierre que rige en una fecha, si lo hay. */
+export function closureOn(e: Pick<CheckEntry, "closures">, date: string | null) {
+  if (!date) return null;
+  return e.closures.find((c) => (!c.from || c.from <= date) && (!c.to || c.to >= date)) ?? null;
+}
+
+const ddmm = (iso: string) => iso.slice(8, 10) + "/" + iso.slice(5, 7) + "/" + iso.slice(0, 4);
+
+/** "Cerrada hasta el 31/12/2026" (o "sin fecha de reapertura confirmada"). */
+export function closureText(c: Closure) {
+  return `Cerrada${c.to ? ` hasta el ${ddmm(c.to)}` : " · sin fecha de reapertura confirmada"}`;
+}
+
+/** Texto de cierre de cada atracción de una ficha en una fecha (undefined si no hay cierres que mirar). */
+export function closedNoteFor(closures: CheckEntry[], date: string | null) {
+  if (!date || closures.length === 0) return undefined;
+  return (name: string) => {
+    const entry = matchEntry({ type: "RIDE", title: name, location: null }, closures);
+    const closure = entry ? closureOn(entry, date) : null;
+    return closure ? closureText(closure) : null;
+  };
+}
+
+/**
+ * Atracciones del catálogo que nombra un texto (el título de una novedad de cierre). Reconoce el
+ * nombre completo o sus partes ("Carousel of Progress" en "Walt Disney's Carousel of Progress");
+ * si un nombre está contenido en otro que también aparece, queda el más largo.
+ */
+export function entriesNamedIn<E extends { name: string }>(text: string, entries: E[]): E[] {
+  const t = ` ${normalize(text)} `;
+  const hits = entries.filter((e) => {
+    const name = normalize(e.name);
+    const short = name.replace(/^(walt disney|disney|universal|universals) /, "");
+    const parts = e.name.split(/\s[–-]\s|:\s/).map(normalize).filter((x) => x.length >= 8);
+    return [name, short, ...parts].some((n) => n.length >= 5 && t.includes(` ${n} `));
+  });
+  return hits.filter((e) => !hits.some((o) => o !== e && normalize(o.name).length > normalize(e.name).length && normalize(o.name).includes(normalize(e.name))));
+}
 
 export type CheckTraveler = { name: string; heightCm: number | null; age: number | null };
 
@@ -65,10 +107,7 @@ export function matchEntry(item: Item, entries: CheckEntry[]) {
   return best;
 }
 
-function closedOn(e: CheckEntry, date: string | null) {
-  if (!e.closedFrom || !date) return false;
-  return e.closedFrom <= date && (!e.closedTo || e.closedTo >= date);
-}
+const closedOn = (e: CheckEntry, date: string | null) => closureOn(e, date) !== null;
 
 /** Parque de cada día: el que más actividades del catálogo tiene, o el que nombra el título del día. */
 function dayAreas(days: Day[], entries: CheckEntry[]) {
@@ -94,9 +133,8 @@ export function checkItinerary(days: Day[], entries: CheckEntry[], travelers: Ch
         if (item.type === "RIDE" && entries.length > 0) out.push({ tone: "warn", text: "No figura en el catálogo: verificá que exista y esté abierta." });
         return out;
       }
-      if (closedOn(e, d.date)) {
-        out.push({ tone: "error", text: `Cerrada ese día${e.closedTo ? ` (reabre el ${e.closedTo})` : " (sin fecha de reapertura confirmada)"}.` });
-      }
+      const closure = closureOn(e, d.date);
+      if (closure) out.push({ tone: "error", text: `${closureText(closure)}${closure.reason ? ` (${closure.reason})` : ""}.` });
       if (e.minHeightIn) {
         const min = minHeightCm(e.minHeightIn);
         const short = travelers.filter((t) => t.heightCm && t.heightCm < min);

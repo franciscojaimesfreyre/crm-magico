@@ -1,6 +1,6 @@
 import clsx from "clsx";
 import type { ReactNode } from "react";
-import { AlertTriangle, BedDouble, CalendarDays, Car, CheckCircle2, Hash, Building2, Plane, Plus, Package, Ship, Shield, Ticket, Trash2, Utensils, Bus, Sparkles, Ban } from "lucide-react";
+import { AlertTriangle, BedDouble, CalendarDays, Car, CheckCircle2, FileText, Hash, Building2, Plane, Plus, Package, PartyPopper, Ship, Shield, Ticket, Trash2, Users, Utensils, Bus, Sparkles, Ban } from "lucide-react";
 import { ConfirmButton } from "@/components/form-controls";
 import { Badge, Card, CardHeader, buttonClass } from "@/components/ui";
 import {
@@ -11,7 +11,8 @@ import {
   RESERVATION_STATUS_COLOR,
   RESERVATION_STATUS_LABEL,
 } from "@/lib/labels";
-import { daysBetween, formatDate, formatRange, money, percent, toDateInput, toNumber } from "@/lib/format";
+import { ageOn, daysBetween, formatDate, formatRange, money, percent, toDateInput, toNumber } from "@/lib/format";
+import { storageMode } from "@/lib/storage";
 import type { ItemType } from "@/generated/prisma/enums";
 import { paymentProgress } from "@/lib/trips";
 import { addBookingItem, deleteBookingItem, quickItemAction, updateBookingItem } from "../actions";
@@ -26,6 +27,7 @@ const ICON: Partial<Record<ItemType, typeof Package>> = {
   PACKAGE: Package,
   HOTEL: BedDouble,
   TICKETS: Ticket,
+  SPECIAL_EVENT: PartyPopper,
   CRUISE: Ship,
   FLIGHT: Plane,
   CAR: Car,
@@ -38,6 +40,12 @@ const ICON: Partial<Record<ItemType, typeof Package>> = {
 
 /** Las reservas que componen el viaje: cada una con su proveedor, pagos y comisión. */
 export function Items({ booking: b, defaultRate }: { booking: LoadedBooking; defaultRate: number }) {
+  const directUpload = storageMode() === "r2";
+  const tripTravelers = b.travelers.map((t) => t.travelerId);
+  const travelerOptions = b.client.travelers.map((t) => {
+    const age = ageOn(t.birthDate, b.startDate ?? undefined);
+    return { id: t.id, firstName: t.firstName, lastName: t.lastName, detail: age !== null ? `${age} años` : undefined };
+  });
   const active = b.items.filter((i) => i.status !== "CANCELLED");
   const progress = active.map((i) => ({ item: i, ...paymentProgress(i) }));
   const paid = progress.reduce((t, p) => t + p.paid, 0);
@@ -85,6 +93,7 @@ export function Items({ booking: b, defaultRate }: { booking: LoadedBooking; def
               </div>
               <div className="ml-14 sm:ml-0 sm:text-right">
                 <p className="font-semibold text-slate-900">{money(item.price, b.currency)}</p>
+                {item.taxAmount !== null && toNumber(item.taxAmount) > 0 && <p className="text-[11px] text-slate-500">Incluye tax {money(item.taxAmount, b.currency)}</p>}
                 <p className="text-xs text-emerald-700">
                   Comisión {money(item.commissionAmount, b.currency)} <span className="text-slate-400">({item.commissionFixed !== null ? "monto fijo" : percent(item.commissionRate ?? defaultRate)})</span>
                 </p>
@@ -104,7 +113,17 @@ export function Items({ booking: b, defaultRate }: { booking: LoadedBooking; def
               <details className="group w-full">
                 <summary className="cursor-pointer list-none text-xs font-medium text-brand-700">Editar todos los datos</summary>
                 <div className="pt-4 pb-2">
-                  <ReservationForm action={updateBookingItem.bind(null, item.id)} item={item} defaultRate={defaultRate} currency={b.currency} trip={b} submitLabel="Guardar reserva" />
+                  <ReservationForm
+                    action={updateBookingItem.bind(null, item.id)}
+                    item={item}
+                    defaultRate={defaultRate}
+                    currency={b.currency}
+                    trip={b}
+                    travelers={travelerOptions}
+                    selectedTravelers={item.travelers.map((t) => t.travelerId)}
+                    directUpload={directUpload}
+                    submitLabel="Guardar reserva"
+                  />
                   <form action={deleteBookingItem.bind(null, item.id)} className="mt-3">
                     <ConfirmButton message="¿Eliminar esta reserva? Si ya figura en una planilla de comisiones, también se quita de ahí.">
                       <Trash2 className="size-3.5" /> Eliminar reserva
@@ -123,7 +142,16 @@ export function Items({ booking: b, defaultRate }: { booking: LoadedBooking; def
             <CardHeader title={<span className="flex items-center gap-2"><Plus className="size-4" /> Agregar reserva</span>} description="Paquete, tickets, hotel, auto, vuelo, seguro…" />
           </summary>
           <div className="p-5">
-            <ReservationForm action={addBookingItem.bind(null, b.id)} defaultRate={defaultRate} currency={b.currency} trip={b} submitLabel="Agregar reserva" />
+            <ReservationForm
+              action={addBookingItem.bind(null, b.id)}
+              defaultRate={defaultRate}
+              currency={b.currency}
+              trip={b}
+              travelers={travelerOptions}
+              selectedTravelers={tripTravelers}
+              directUpload={directUpload}
+              submitLabel="Agregar reserva"
+            />
           </div>
         </details>
       </Card>
@@ -167,6 +195,27 @@ function ReservationBasics({ item }: { item: LoadedItem }) {
         </Datum>
       </dl>
       {item.notes && <p className="text-xs whitespace-pre-line text-slate-600">{item.notes}</p>}
+      {item.travelers.length > 0 && (
+        <p className="flex items-start gap-1.5 text-xs text-slate-600">
+          <Users className="mt-px size-3.5 shrink-0 text-slate-400" />
+          {item.travelers.map((t) => [t.traveler.firstName, t.traveler.lastName].filter(Boolean).join(" ")).join(", ")}
+        </p>
+      )}
+      {item.documents.length > 0 && (
+        <ul className="flex flex-wrap gap-1.5">
+          {item.documents.map((d) => (
+            <li key={d.id}>
+              <a
+                href={d.storageKey ? `/api/archivos/${d.id}` : (d.url ?? "#")}
+                target="_blank"
+                className="inline-flex max-w-56 items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-700 hover:bg-brand-50 hover:text-brand-700"
+              >
+                <FileText className="size-3 shrink-0" /> <span className="truncate">{d.name}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
       {flag && (
         <p className="flex items-center gap-1.5 text-xs text-amber-700">
           <AlertTriangle className="size-3.5 shrink-0" /> Está confirmada pero falta cargar {missing.join(" y ")}. Completalo en «Editar todos los datos».

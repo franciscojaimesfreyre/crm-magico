@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { ItineraryView } from "@/components/itinerary-view";
+import { bookingClosures } from "@/lib/catalog";
 import { DESTINATION_LABEL } from "@/lib/labels";
 import { formatRange } from "@/lib/format";
 
@@ -44,7 +45,7 @@ export default async function SharedItinerary({ params }: Props) {
         {days.length === 0 ? (
           <p className="rounded-2xl bg-white p-8 text-center text-slate-500">El itinerario todavía está en preparación.</p>
         ) : (
-          <ItineraryView days={days} />
+          <ItineraryView days={days} closures={await bookingClosures(b.id)} />
         )}
       </div>
     </div>

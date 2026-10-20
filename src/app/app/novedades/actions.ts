@@ -24,6 +24,9 @@ function fields(formData: FormData) {
     validFrom: parseDateInput(formData.get("validFrom")),
     validTo: parseDateInput(formData.get("validTo")),
     sourceUrl: /^https?:\/\//.test(url) ? url : null,
+    // Cierres: atracciones elegidas a mano (si no, se detectan del título al usarla).
+    closesManual: formData.get("closesManual") === "1",
+    closesEntryIds: formData.getAll("closesEntryIds").map(String),
     published: formData.get("published") === "on",
     pinned: formData.get("pinned") === "on",
   };

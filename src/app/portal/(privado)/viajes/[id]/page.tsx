@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { requireClientAccount } from "@/lib/auth";
 import { Chat } from "@/components/chat";
 import { ItineraryView } from "@/components/itinerary-view";
+import { bookingClosures } from "@/lib/catalog";
 import { DESTINATION_LABEL, ITEM_TYPE_LABEL } from "@/lib/labels";
 import { ageOn, daysBetween, fileSize, formatDate, formatRange, money, todayUTC } from "@/lib/format";
 import { computeKeyDates } from "@/lib/key-dates";
@@ -244,7 +245,7 @@ async function PortalItinerary({ bookingId, groupId }: { bookingId: string; grou
   if (days.length === 0) {
     return <p className="rounded-2xl bg-white p-8 text-center text-sm text-slate-500 shadow-sm">Tu agente todavía está armando el itinerario. ¡Te avisamos cuando esté listo!</p>;
   }
-  return <ItineraryView days={days} />;
+  return <ItineraryView days={days} closures={await bookingClosures(bookingId)} />;
 }
 
 async function PortalDocuments({ bookingId }: { bookingId: string }) {

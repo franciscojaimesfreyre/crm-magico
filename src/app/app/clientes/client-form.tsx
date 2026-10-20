@@ -41,9 +41,11 @@ export function ClientForm({ action, client, referrers, submitLabel, hiddenField
           <Field label="País">
             <Input name="country" defaultValue={client?.country ?? ""} />
           </Field>
-          <Field label="Etiquetas" hint="Separadas por coma. Ej: VIP, Primera vez, Fan de Star Wars">
-            <Input name="tags" defaultValue={client?.tags.join(", ")} />
-          </Field>
+          {client && (
+            <Field label="Etiquetas" hint="Separadas por coma. Ej: VIP, Primera vez, Fan de Star Wars">
+              <Input name="tags" defaultValue={client.tags.join(", ")} />
+            </Field>
+          )}
           <Field label="Referido por">
             <Select
               name="referredById"

@@ -5,7 +5,8 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { AIError, generateItinerary, generatePlaceGuide, ITINERARY_DETAILS, type GuidePlace, type ItineraryDetail } from "@/lib/ai";
-import { PlaceGuideSchema } from "@/lib/place-guide";
+import { PlaceGuideSchema, hasGuide } from "@/lib/place-guide";
+import { ParkSheetSchema, cleanSheet } from "@/lib/park-sheet";
 import { logActivity, notifyClient } from "@/lib/events";
 import { ACTIVITY_TYPE_LABEL } from "@/lib/labels";
 import type { ActivityType } from "@/generated/prisma/enums";
@@ -28,7 +29,10 @@ const DaySchema = z.object({
         location: z.string().max(300).nullable(),
         notes: z.string().max(5000).nullable(),
         confirmationNumber: z.string().max(100).nullable(),
+        /** Guía de la IA (días de crucero, y parques de itinerarios viejos). */
         guide: PlaceGuideSchema.nullable().default(null),
+        /** Ficha del parque o del evento especial (ver lib/park-sheet). */
+        sheet: ParkSheetSchema.nullable().default(null),
       }),
     )
     .max(80),
@@ -66,7 +70,13 @@ export async function saveItinerary(target: ItineraryTarget, days: ItineraryDayI
           date: d.date ? new Date(`${d.date}T00:00:00.000Z`) : null,
           title: d.title,
           notes: d.notes,
-          items: { create: d.items.map(({ guide, ...i }, pos) => ({ ...i, guide: guide ?? Prisma.DbNull, position: pos })) },
+          items: {
+            create: d.items.map(({ guide, sheet, ...i }, pos) => {
+              // En el mismo campo JSON: la ficha en los parques; la guía de la IA en los cruceros (o en parques viejos sin ficha).
+              const json = i.type === "PARK" && sheet ? cleanSheet(sheet) : hasGuide(i.type) ? guide : null;
+              return { ...i, guide: json ?? Prisma.DbNull, position: pos };
+            }),
+          },
         },
       });
     }
@@ -119,10 +129,11 @@ export async function proposeItinerary(bookingId: string, instructions: string, 
   }
 }
 
-/** Recomendaciones y tips de la IA para un parque o un día de crucero. No guarda nada: el editor la suma a la actividad. */
+/** Recomendaciones y tips de la IA para un día de crucero. No guarda nada: el editor la suma a la actividad. */
 export async function proposePlaceGuide(bookingId: string, place: GuidePlace, instructions: string) {
   const user = await requireUser();
-  if (place.type !== "PARK" && place.type !== "CRUISE") return { error: "Solo los parques y los días de crucero llevan guía." };
+  // Los parques usan la ficha del catálogo; la IA arma solo la de los días de crucero.
+  if (place.type !== "CRUISE") return { error: "Solo los días de crucero llevan guía de la IA." };
   try {
     const guide = await generatePlaceGuide({ bookingId, organizationId: user.organizationId, place, instructions });
     if (guide.picks.length + guide.tips.length === 0) return { error: "La IA no devolvió recomendaciones para este lugar." };

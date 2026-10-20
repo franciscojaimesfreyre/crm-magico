@@ -11,6 +11,7 @@ import { formatDate, todayUTC } from "@/lib/format";
 import type { Prisma } from "@/generated/prisma/client";
 import type { CatalogKind, Destination } from "@/generated/prisma/enums";
 import { deleteCatalogEntry, markCatalogVerified, toggleCatalogMustDo } from "./actions";
+import { CatalogTabs } from "./tabs";
 
 export const metadata = { title: "Catálogo de parques" };
 
@@ -53,6 +54,7 @@ export default async function CatalogPage({
         description="Atracciones con su altura mínima, shows, restaurantes y shoppings que existen en cada destino. La IA arma los itinerarios solo con lo que figura acá, los imperdibles se suman siempre y el editor avisa a qué no llega cada chico."
         actions={user.isPlatformAdmin && <LinkButton href="/app/catalogo/nueva">Agregar</LinkButton>}
       />
+      <CatalogTabs active="lugares" />
       <form className="mb-4 grid gap-2 rounded-xl border border-slate-200 bg-white p-3 sm:grid-cols-7">
         <Select name="destino" defaultValue={destination} options={destinations} className="sm:col-span-2" />
         <Select name="tipo" defaultValue={f.tipo ?? ""} options={CATALOG_KINDS} placeholder="Todos los tipos" />

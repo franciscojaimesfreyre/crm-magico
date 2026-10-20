@@ -16,14 +16,17 @@ import { computeKeyDates } from "@/lib/key-dates";
 import { saveTripNotes, setBookingTravelers } from "../actions";
 import type { LoadedBooking } from "./data";
 import { TripFlights } from "./flights";
+import { TripAlerts } from "./trip-alerts";
+import type { TripAlert } from "@/lib/knowledge-alerts";
 
-export function Summary({ booking: b }: { booking: LoadedBooking }) {
+export function Summary({ booking: b, alerts }: { booking: LoadedBooking; alerts: TripAlert[] | null }) {
   const today = todayUTC();
   const keyDates = computeKeyDates(b);
   const selected = new Set(b.travelers.map((t) => t.travelerId));
 
   return (
     <div className="grid gap-6 xl:grid-cols-2">
+      {alerts && <TripAlerts alerts={alerts} />}
       <Card>
         <CardHeader title="Detalle del viaje" />
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 p-5 text-sm">

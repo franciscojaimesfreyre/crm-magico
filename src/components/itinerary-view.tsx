@@ -1,10 +1,13 @@
 import clsx from "clsx";
 import { Clock, MapPin } from "lucide-react";
 import { ACTIVITY_TYPE_COLOR, ACTIVITY_TYPE_LABEL } from "@/lib/labels";
-import { formatDateLong } from "@/lib/format";
+import { formatDateLong, toDateInput } from "@/lib/format";
+import { closedNoteFor, type CheckEntry } from "@/lib/itinerary-checks";
 import type { ActivityType } from "@/generated/prisma/enums";
 import { parseGuide } from "@/lib/place-guide";
 import { PlaceGuideCard } from "@/components/place-guide";
+import { parseSheet } from "@/lib/park-sheet";
+import { ParkSheetCard } from "@/components/park-sheet";
 
 export type ItineraryDayView = {
   id: string;
@@ -21,13 +24,22 @@ export type ItineraryDayView = {
     location: string | null;
     notes: string | null;
     confirmationNumber: string | null;
-    /** Recomendaciones y tips de parques y cruceros (JSON, ver lib/place-guide). */
+    /** Ficha del parque o evento (lib/park-sheet) o guía de crucero (lib/place-guide), en JSON. */
     guide?: unknown;
   }[];
 };
 
 /** Itinerario de solo lectura (CRM, portal del cliente y link público). */
-export function ItineraryView({ days, compact = false }: { days: ItineraryDayView[]; compact?: boolean }) {
+export function ItineraryView({
+  days,
+  compact = false,
+  closures = [],
+}: {
+  days: ItineraryDayView[];
+  compact?: boolean;
+  /** Atracciones con cierres (catálogo y novedades): en las fichas se ven tachadas el día que están cerradas. */
+  closures?: CheckEntry[];
+}) {
   return (
     <div className="space-y-4">
       {days.map((d) => (
@@ -67,7 +79,7 @@ export function ItineraryView({ days, compact = false }: { days: ItineraryDayVie
                     {i.confirmationNumber && <span>Conf. {i.confirmationNumber}</span>}
                   </div>
                   {i.notes && !compact && <p className="mt-1 text-xs whitespace-pre-line text-slate-600">{i.notes}</p>}
-                  {!compact && <ItemGuide item={i} />}
+                  {!compact && <ItemGuide item={i} closedNote={closedNoteFor(closures, d.date ? toDateInput(d.date) : null)} />}
                 </li>
               ))}
             </ul>
@@ -78,7 +90,15 @@ export function ItineraryView({ days, compact = false }: { days: ItineraryDayVie
   );
 }
 
-function ItemGuide({ item }: { item: ItineraryDayView["items"][number] }) {
+function ItemGuide({ item, closedNote }: { item: ItineraryDayView["items"][number]; closedNote?: (name: string) => string | null }) {
+  const sheet = parseSheet(item.guide);
+  if (sheet) {
+    return (
+      <div className="mt-2.5">
+        <ParkSheetCard sheet={sheet} closedNote={closedNote} />
+      </div>
+    );
+  }
   const guide = parseGuide(item.guide);
   if (!guide) return null;
   return (

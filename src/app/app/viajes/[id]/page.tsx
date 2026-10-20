@@ -7,9 +7,10 @@ import { ActionForm, ConfirmButton, SubmitButton } from "@/components/form-contr
 import { Badge, Card, CardHeader, Checkbox, EmptyState, Field, Input, LinkButton, PageHeader, Select, Tabs, buttonClass } from "@/components/ui";
 import { Chat } from "@/components/chat";
 import { ItineraryView } from "@/components/itinerary-view";
+import { bookingClosures } from "@/lib/catalog";
 import { TaskList } from "@/components/task-list";
 import { TaskForm } from "@/components/task-form";
-import { BOOKING_STATUSES, BOOKING_STATUS_COLOR, BOOKING_STATUS_LABEL, CONTRACT_STATUS_COLOR, CONTRACT_STATUS_LABEL } from "@/lib/labels";
+import { BOOKING_STATUSES, BOOKING_STATUS_COLOR, BOOKING_STATUS_LABEL, CONTRACT_STATUS_COLOR, CONTRACT_STATUS_LABEL, ITEM_TYPE_LABEL } from "@/lib/labels";
 import { fileSize, formatDateTime, formatRange, toNumber } from "@/lib/format";
 import { loadThread } from "@/lib/messages";
 import { cancelBooking, deleteBooking, setBookingStatusForm } from "../actions";
@@ -23,6 +24,7 @@ import { Quotes } from "./quotes";
 import { appUrl } from "@/lib/app-url";
 import { FileUpload } from "@/components/file-upload";
 import { storageMode } from "@/lib/storage";
+import { tripKnowledgeAlerts } from "@/lib/knowledge-alerts";
 
 const TABS = [
   { key: "resumen", label: "Resumen" },
@@ -105,7 +107,7 @@ export default async function BookingPage({
 
       {tab === "resumen" && (
         <>
-          <Summary booking={b} />
+          <Summary booking={b} alerts={await tripKnowledgeAlerts(b)} />
           <div className="mt-8 flex flex-wrap gap-3 border-t border-slate-200 pt-6">
             {b.status !== "CANCELLED" && (
               <form action={cancelBooking.bind(null, b.id)} className="flex items-center gap-2">
@@ -157,11 +159,11 @@ async function ItineraryTab({ bookingId, shareToken, baseUrl }: { bookingId: str
   return (
     <div className="space-y-4">
       <Card className="flex flex-wrap items-center justify-between gap-3 p-4">
-        <div className="text-sm text-slate-600">
+        <div className="min-w-0 text-sm text-slate-600">
           El cliente ve el itinerario en su portal. También podés compartirlo con un link público (no requiere cuenta).
-          <div className="mt-1 flex items-center gap-3">
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
             <Link2 className="size-4 text-slate-400" />
-            <code className="text-xs">{shareUrl}</code>
+            <code className="min-w-0 text-xs break-all">{shareUrl}</code>
             <CopyText text={shareUrl} />
             <a href={shareUrl} target="_blank" className="text-xs text-brand-700 hover:underline">
               <ExternalLink className="inline size-3.5" /> Ver
@@ -176,7 +178,7 @@ async function ItineraryTab({ bookingId, shareToken, baseUrl }: { bookingId: str
       {days.length === 0 ? (
         <EmptyState title="Sin itinerario" description="Armalo a mano arrastrando actividades o pedile a la IA una propuesta basada en el perfil de la familia y las últimas novedades." />
       ) : (
-        <ItineraryView days={days} />
+        <ItineraryView days={days} closures={await bookingClosures(bookingId)} />
       )}
     </div>
   );
@@ -184,9 +186,14 @@ async function ItineraryTab({ bookingId, shareToken, baseUrl }: { bookingId: str
 
 async function DocumentsTab({ bookingId, organizationId }: { bookingId: string; organizationId: string }) {
   const [docs, library] = await Promise.all([
-    db.document.findMany({ where: { bookingId }, orderBy: { createdAt: "desc" }, include: { uploadedBy: { select: { name: true } } } }),
+    db.document.findMany({
+      where: { bookingId },
+      orderBy: { createdAt: "desc" },
+      include: { uploadedBy: { select: { name: true } }, bookingItem: { select: { type: true, description: true } } },
+    }),
     db.libraryDocument.findMany({ where: { organizationId }, orderBy: [{ folder: "asc" }, { name: "asc" }] }),
   ]);
+  const reservations = await db.bookingItem.findMany({ where: { bookingId }, orderBy: { position: "asc" }, select: { id: true, description: true } });
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
       <Card>
@@ -207,6 +214,12 @@ async function DocumentsTab({ bookingId, organizationId }: { bookingId: string; 
                     >
                       {d.name}
                     </a>
+                    {d.bookingItem && (
+                      <Link href={`/app/viajes/${bookingId}?tab=reservas`} className="mt-0.5 inline-flex max-w-full items-center gap-1 rounded bg-brand-50 px-1.5 py-px text-[11px] font-medium text-brand-700 hover:underline">
+                        <span className="truncate">Reserva: {d.bookingItem.description}</span>
+                        <span className="shrink-0 font-normal text-brand-600/70">· {ITEM_TYPE_LABEL[d.bookingItem.type]}</span>
+                      </Link>
+                    )}
                     <p className="text-xs text-slate-500">
                       {[d.storageKey ? fileSize(d.size) : "Link", formatDateTime(d.createdAt), d.uploadedBy?.name].filter(Boolean).join(" · ")}
                     </p>
@@ -242,6 +255,11 @@ async function DocumentsTab({ bookingId, organizationId }: { bookingId: string; 
             <Field label="Nombre (opcional)">
               <Input name="name" />
             </Field>
+            {reservations.length > 0 && (
+              <Field label="Reserva (opcional)" hint="Voucher, recibo o confirmación de una reserva">
+                <Select name="bookingItemId" options={reservations.map((r) => ({ value: r.id, label: r.description }))} placeholder="Del viaje en general" />
+              </Field>
+            )}
             <Checkbox name="visibleToClient" label="Visible para el cliente" defaultChecked />
             <SubmitButton pendingText="Subiendo…" className="w-full">
               Agregar

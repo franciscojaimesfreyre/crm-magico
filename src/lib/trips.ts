@@ -43,11 +43,19 @@ export function paymentProgress(item: { price: Num; paidAmount: Num; depositAmou
   };
 }
 
-/** Comisión de una reserva o servicio: el monto fijo si lo tiene, si no el porcentaje (o el por defecto). */
-export function commissionFor(item: { price: Num; commissionRate: Num; commissionFixed: Num }, defaultRate: number) {
+/** Importe sobre el que se calcula la comisión en porcentaje: sin el tax, si está discriminado. */
+export function commissionBase(item: { price: Num; taxAmount?: Num }) {
+  return Math.max(Math.round((toN(item.price) - toN(item.taxAmount)) * 100) / 100, 0);
+}
+
+/**
+ * Comisión de una reserva o servicio: el monto fijo si lo tiene, si no el porcentaje (o el por defecto)
+ * sobre el importe sin tax.
+ */
+export function commissionFor(item: { price: Num; taxAmount?: Num; commissionRate: Num; commissionFixed: Num }, defaultRate: number) {
   if (item.commissionFixed !== null && item.commissionFixed !== undefined) return toN(item.commissionFixed);
   const rate = item.commissionRate === null || item.commissionRate === undefined ? defaultRate : toN(item.commissionRate);
-  return Math.round(toN(item.price) * rate) / 100;
+  return Math.round(commissionBase(item) * rate) / 100;
 }
 
 /** Lee el campo de comisión de un formulario (CommissionInput): porcentaje o monto fijo. */

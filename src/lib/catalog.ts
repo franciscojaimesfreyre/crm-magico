@@ -7,7 +7,7 @@ import { ageOn, toDateInput } from "@/lib/format";
 import { DINING_STYLE_LABEL, itemBrand, priceSigns } from "@/lib/labels";
 import type { CatalogEntry } from "@/generated/prisma/client";
 import type { Destination } from "@/generated/prisma/enums";
-import { normalize, type CheckEntry, type CheckTraveler } from "@/lib/itinerary-checks";
+import { entriesNamedIn, normalize, type CheckEntry, type CheckTraveler, type Closure } from "@/lib/itinerary-checks";
 
 /** Altura mínima en cm (redondeada hacia arriba, para no dejar subir a quien no llega). */
 export const inchesToCm = (inches: number) => Math.ceil(inches * 2.54);
@@ -26,6 +26,33 @@ export function closureLabel(e: Pick<CatalogEntry, "closedFrom" | "closedTo">) {
   if (!e.closedFrom) return "";
   return `cerrada desde ${toDateInput(e.closedFrom)}${e.closedTo ? ` hasta ${toDateInput(e.closedTo)}` : " (sin fecha de reapertura confirmada)"}`;
 }
+
+/**
+ * Cierres que salen de las novedades de cierre o remodelación (globales y de la agencia), por id de
+ * atracción del catálogo: las elegidas en la novedad o, si no se eligieron a mano, las que nombra su título.
+ */
+export async function knowledgeClosures(organizationId: string | null, entries: { id: string; name: string }[]) {
+  const out = new Map<string, Closure[]>();
+  if (entries.length === 0) return out;
+  const items = await db.knowledgeItem.findMany({
+    where: {
+      published: true,
+      category: { in: ["CLOSURE", "REFURBISHMENT"] },
+      OR: [{ organizationId: null }, ...(organizationId ? [{ organizationId }] : [])],
+    },
+    select: { title: true, validFrom: true, validTo: true, closesEntryIds: true, closesManual: true },
+  });
+  for (const k of items) {
+    const ids = k.closesManual ? k.closesEntryIds : entriesNamedIn(k.title, entries).map((e) => e.id);
+    const closure = { from: k.validFrom ? toDateInput(k.validFrom) : null, to: k.validTo ? toDateInput(k.validTo) : null, reason: k.title };
+    for (const id of ids) out.set(id, [...(out.get(id) ?? []), closure]);
+  }
+  return out;
+}
+
+/** Cierre cargado en la atracción del catálogo, en el mismo formato que los de las novedades. */
+const entryClosures = (e: Pick<CatalogEntry, "closedFrom" | "closedTo">): Closure[] =>
+  e.closedFrom ? [{ from: toDateInput(e.closedFrom), to: e.closedTo ? toDateInput(e.closedTo) : null, reason: null }] : [];
 
 const KIND_HEADING = { ATTRACTION: "Atracciones", SHOW: "Shows", RESTAURANT: "Restaurantes", SHOPPING: "Shoppings" } as const;
 
@@ -48,6 +75,8 @@ export function catalogDestinations(trip: { destination: Destination; items: { t
 }
 
 type TripForCatalog = {
+  /** Para sumar los cierres de las novedades de la agencia (las globales van siempre). */
+  organizationId?: string;
   destination: Destination;
   startDate: Date | null;
   endDate: Date | null;
@@ -75,8 +104,13 @@ export async function catalogForTrip(trip: TripForCatalog, attractionNote?: (e: 
 
   const from = trip.startDate ?? new Date();
   const to = trip.endDate ?? from;
-  const open = entries.filter((e) => !closedDuring(e, from, to));
-  const closed = entries.filter((e) => closedDuring(e, from, to));
+  // Cierres de las novedades que se cruzan con el viaje (además de los cargados en el catálogo).
+  const news = await knowledgeClosures(trip.organizationId ?? null, entries);
+  const [fromIso, toIso] = [toDateInput(from), toDateInput(to)];
+  const newsClosure = (e: CatalogEntry) => news.get(e.id)?.find((c) => (!c.from || c.from <= toIso) && (!c.to || c.to >= fromIso));
+  const isClosed = (e: CatalogEntry) => closedDuring(e, from, to) || !!newsClosure(e);
+  const open = entries.filter((e) => !isClosed(e));
+  const closed = entries.filter(isClosed);
 
   const describe = (e: CatalogEntry) => {
     const meta = [
@@ -102,19 +136,26 @@ export async function catalogForTrip(trip: TripForCatalog, attractionNote?: (e: 
     })
     .join("\n\n");
   const closedText = closed.length
-    ? `\n\nCerradas en las fechas del viaje (no incluirlas):\n${closed.map((e) => `- ${e.name} (${e.area}): ${closureLabel(e)}${e.notes ? `. ${e.notes}` : ""}`).join("\n")}`
+    ? `\n\nCerradas en las fechas del viaje (no incluirlas):\n${closed
+        .map((e) => {
+          const c = newsClosure(e);
+          const label = closedDuring(e, from, to) ? closureLabel(e) : `según la novedad «${c!.reason}»`;
+          return `- ${e.name} (${e.area}): ${label}${e.notes ? `. ${e.notes}` : ""}`;
+        })
+        .join("\n")}`
     : "";
 
   return places + closedText;
 }
 
 /** Atracciones y shows del catálogo para la revisión automática del editor de itinerarios. */
-export async function catalogChecks(destinations: Destination[]): Promise<CheckEntry[]> {
+export async function catalogChecks(destinations: Destination[], organizationId: string | null = null): Promise<CheckEntry[]> {
   if (destinations.length === 0) return [];
   const entries = await db.catalogEntry.findMany({
     where: { destination: { in: destinations }, kind: { in: ["ATTRACTION", "SHOW"] } },
     orderBy: [{ area: "asc" }, { name: "asc" }],
   });
+  const news = await knowledgeClosures(organizationId, entries);
   return entries.map((e) => ({
     id: e.id,
     kind: e.kind as CheckEntry["kind"],
@@ -122,10 +163,20 @@ export async function catalogChecks(destinations: Destination[]): Promise<CheckE
     name: e.name,
     minHeightIn: e.minHeightIn,
     mustDo: e.mustDo,
-    closedFrom: e.closedFrom ? toDateInput(e.closedFrom) : null,
-    closedTo: e.closedTo ? toDateInput(e.closedTo) : null,
+    closures: [...entryClosures(e), ...(news.get(e.id) ?? [])],
     notes: e.notes,
   }));
+}
+
+/** Solo las atracciones con algún cierre (para marcarlas en las fichas del itinerario que ve el viajero). */
+export async function closedEntries(destinations: Destination[], organizationId: string | null) {
+  return (await catalogChecks(destinations, organizationId)).filter((e) => e.closures.length > 0);
+}
+
+/** Atracciones con cierres para el itinerario de un viaje (destino y marcas de sus reservas, novedades de su agencia). */
+export async function bookingClosures(bookingId: string) {
+  const b = await db.booking.findUnique({ where: { id: bookingId }, select: { organizationId: true, destination: true, items: { select: { type: true, status: true } } } });
+  return b ? closedEntries(catalogDestinations(b), b.organizationId) : [];
 }
 
 /** Viajeros de un viaje, con la altura y la edad al viajar, para la revisión de alturas. */

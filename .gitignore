@@ -47,3 +47,4 @@ next-env.d.ts
 
 # Capturas de Pixie Dust (material de terceros): solo locales, no se publican
 /docs/referencia/capturas
+/docs/ejemplos-itinerarios

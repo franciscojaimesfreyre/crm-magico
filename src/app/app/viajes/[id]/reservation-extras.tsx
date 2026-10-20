@@ -123,3 +123,122 @@ export function TripDatesGuard({ tripStart, tripEnd }: { tripStart: string | nul
     </span>
   );
 }
+
+/**
+ * Importe de la reserva con el tax discriminado opcional (link debajo del importe). Si hay tax, la
+ * comisión en porcentaje se calcula sobre el importe sin tax. Envía price y taxAmount.
+ */
+export function PriceWithTax({ price, tax, currency }: { price?: string; tax?: string; currency: string }) {
+  const [showTax, setShowTax] = useState(Boolean(tax));
+  const [total, setTotal] = useState(price ?? "");
+  const [taxValue, setTaxValue] = useState(tax ?? "");
+  const t = Number(total.replace(",", "."));
+  const x = Number(taxValue.replace(",", "."));
+  const net = showTax && taxValue && Number.isFinite(t) && Number.isFinite(x) ? Math.round((t - x) * 100) / 100 : null;
+  const fmt = (v: number) => v.toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  return (
+    <>
+      <label className="block">
+        <span className="label">Importe</span>
+        <input type="number" step="0.01" min={0} name="price" value={total} onChange={(e) => setTotal(e.target.value)} required className="field" />
+        {showTax ? (
+          net !== null && (
+            <span className={net < 0 ? "mt-1 block text-xs text-rose-600" : "mt-1 block text-xs text-slate-500"}>
+              {net < 0 ? "El tax no puede superar el importe" : `Sin tax: ${currency} ${fmt(net)}. La comisión en % se calcula sobre este valor.`}
+            </span>
+          )
+        ) : (
+          <button type="button" onClick={() => setShowTax(true)} className="mt-1 text-xs font-medium text-brand-700 hover:underline">
+            Discriminar tax
+          </button>
+        )}
+      </label>
+      {showTax && (
+        <label className="block">
+          <span className="label">Tax incluido en el importe</span>
+          <input type="number" step="0.01" min={0} name="taxAmount" value={taxValue} onChange={(e) => setTaxValue(e.target.value)} className="field" autoFocus={!tax} />
+          <button
+            type="button"
+            onClick={() => {
+              setShowTax(false);
+              setTaxValue("");
+            }}
+            className="mt-1 text-xs font-medium text-slate-500 hover:text-rose-600"
+          >
+            Quitar tax
+          </button>
+        </label>
+      )}
+    </>
+  );
+}
+
+export type TravelerOption = { id: string; firstName: string; lastName: string | null; detail?: string };
+
+/**
+ * Viajeros incluidos en la reserva: los del cliente para marcar y, si falta alguno, se agrega acá
+ * mismo (queda cargado en el cliente y en el viaje). Envía travelerIds y los new* de cada viajero nuevo.
+ */
+export function ReservationTravelers({ travelers, selected, required }: { travelers: TravelerOption[]; selected: string[]; required: boolean }) {
+  const ref = useRef<HTMLFieldSetElement>(null);
+  const [rows, setRows] = useState<number[]>(required && travelers.length === 0 ? [0] : []);
+  const nextRow = useRef(1);
+
+  useEffect(() => {
+    const form = ref.current?.form;
+    if (!form) return;
+    const onReset = () => setRows([]);
+    form.addEventListener("reset", onReset);
+    return () => form.removeEventListener("reset", onReset);
+  }, []);
+
+  return (
+    <fieldset ref={ref}>
+      <legend className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">Viajeros incluidos{required && " *"}</legend>
+      {travelers.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {travelers.map((t) => (
+            <label key={t.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-sm has-checked:border-brand-300 has-checked:bg-brand-50">
+              <input type="checkbox" name="travelerIds" value={t.id} defaultChecked={selected.includes(t.id)} className="size-4 rounded border-slate-300 text-brand-600" />
+              <span className="font-medium text-slate-800">
+                {t.firstName} {t.lastName}
+              </span>
+              {t.detail && <span className="text-xs text-slate-500">{t.detail}</span>}
+            </label>
+          ))}
+        </div>
+      )}
+      {rows.map((row) => (
+        <div key={row} className="mt-3 grid gap-2 rounded-lg border border-dashed border-slate-300 p-3 sm:grid-cols-[1fr_1fr_10rem_7rem_1fr_auto]">
+          <label className="block">
+            <span className="label">Nombre *</span>
+            <input name="newFirstName" required className="field" />
+          </label>
+          <label className="block">
+            <span className="label">Apellido</span>
+            <input name="newLastName" className="field" />
+          </label>
+          <label className="block">
+            <span className="label">Nacimiento</span>
+            <input type="date" name="newBirthDate" className="field" />
+          </label>
+          <label className="block">
+            <span className="label">Altura (cm)</span>
+            <input type="number" min={30} max={250} name="newHeightCm" className="field" />
+          </label>
+          <label className="block">
+            <span className="label">Relación</span>
+            <input name="newRelationship" placeholder="Titular, hijo/a…" className="field" />
+          </label>
+          <button type="button" onClick={() => setRows((r) => r.filter((x) => x !== row))} className="self-end pb-2 text-xs text-slate-500 hover:text-rose-600">
+            Quitar
+          </button>
+        </div>
+      ))}
+      <button type="button" onClick={() => setRows((r) => [...r, nextRow.current++])} className="mt-2 text-xs font-medium text-brand-700 hover:underline">
+        + {travelers.length === 0 && rows.length === 0 ? "Agregar viajero" : "¿Falta alguien? Agregar viajero"}
+      </button>
+      <p className="mt-1 text-xs text-slate-500">Los viajeros nuevos quedan cargados en el cliente y se suman al viaje.</p>
+    </fieldset>
+  );
+}

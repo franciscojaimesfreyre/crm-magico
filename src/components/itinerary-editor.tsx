@@ -16,15 +16,18 @@ import {
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import clsx from "clsx";
-import { AlertTriangle, ArrowDownUp, BookmarkPlus, CalendarPlus, ChevronDown, ChevronUp, Clock, GripVertical, MapPin, Pencil, Plus, RefreshCw, Save, ShieldCheck, Sparkles, Star, Trash2, Wand2, X } from "lucide-react";
+import { AlertTriangle, ArrowDownUp, BookmarkPlus, CalendarPlus, ChevronDown, ChevronUp, Clock, FerrisWheel, GripVertical, MapPin, PartyPopper, Pencil, Plus, RefreshCw, RotateCcw, Save, ShieldCheck, Sparkles, Star, Trash2, Wand2, X } from "lucide-react";
 import { ACTIVITY_TYPES, ACTIVITY_TYPE_COLOR, ACTIVITY_TYPE_LABEL } from "@/lib/labels";
 import { buttonClass } from "@/components/ui";
 import type { ActivityType } from "@/generated/prisma/enums";
-import { checkItinerary, matchEntry, minHeightCm, withMustDos, type CheckEntry, type CheckTraveler, type ItemWarning } from "@/lib/itinerary-checks";
+import { checkItinerary, closedNoteFor, matchEntry, minHeightCm, withMustDos, type CheckEntry, type CheckTraveler, type ItemWarning } from "@/lib/itinerary-checks";
 import { proposeItinerary, proposePlaceGuide, saveItinerary, type ItineraryDayInput, type ItineraryTarget } from "@/app/app/viajes/itinerary-actions";
 import { saveActivityFromItinerary } from "@/app/app/plantillas/actions";
 import { GUIDE_PICK_KINDS, GUIDE_PICK_LABEL, hasGuide, type GuidePick, type GuidePickKind, type PlaceGuide } from "@/lib/place-guide";
 import { PlaceGuideCard } from "@/components/place-guide";
+import { ParkSheetCard } from "@/components/park-sheet";
+import { ParkSheetForm } from "@/components/park-sheet-form";
+import { emptySheet, eventTitle, sheetForPark, sheetFromGuide, sheetNames, type GuideOption, type ParkSheet, type TripEvent } from "@/lib/park-sheet";
 
 // ─── Estado del editor ───────────────────────────────────────────────────────
 
@@ -37,9 +40,14 @@ type ItemState = {
   location: string | null;
   notes: string | null;
   confirmationNumber: string | null;
-  /** Parques y cruceros: atracciones recomendadas y tips (lo ve el viajero). */
+  /** Días de crucero: recomendaciones y tips de la IA (lo ve el viajero). En parques, solo en itinerarios viejos. */
   guide: PlaceGuide | null;
+  /** Parques: la ficha del parque o del evento especial de ese día, copiada del catálogo y editable. */
+  sheet: ParkSheet | null;
 };
+
+/** Solo los días de crucero llevan guía de la IA; los parques usan la ficha del catálogo. */
+const aiGuide = (type: ActivityType) => type === "CRUISE";
 
 /** Estado de la guía de cada actividad mientras la arma la IA. */
 type GuideStatus = { loading?: boolean; error?: string };
@@ -54,7 +62,7 @@ let counter = 0;
 const newKey = (p: string) => `${p}-${Date.now().toString(36)}-${(counter++).toString(36)}`;
 
 function toState(days: ItineraryDayInput[]): DayState[] {
-  return days.map((d) => ({ ...d, key: newKey("d"), items: d.items.map((i) => ({ ...i, guide: i.guide ?? null, key: newKey("i") })) }));
+  return days.map((d) => ({ ...d, key: newKey("d"), items: d.items.map((i) => ({ ...i, guide: i.guide ?? null, sheet: i.sheet ?? null, key: newKey("i") })) }));
 }
 
 function addMinutes(time: string, minutes: number) {
@@ -83,6 +91,7 @@ function mustDoItem(e: CheckEntry): ItemState {
     notes: null,
     confirmationNumber: null,
     guide: null,
+    sheet: null,
   };
 }
 
@@ -126,6 +135,8 @@ export function ItineraryEditor({
   aiEnabled,
   catalog = NONE,
   travelers = NONE,
+  parkGuides = NONE,
+  events = NONE,
 }: {
   target: ItineraryTarget;
   initialDays: ItineraryDayInput[];
@@ -136,6 +147,10 @@ export function ItineraryEditor({
   /** Atracciones y shows del catálogo del destino, para la revisión automática. */
   catalog?: CheckEntry[];
   travelers?: CheckTraveler[];
+  /** Fichas de parques y eventos del catálogo: se copian al sumar un parque. */
+  parkGuides?: GuideOption[];
+  /** Eventos especiales reservados (fiestas…): ese día el parque lleva la ficha del evento. */
+  events?: TripEvent[];
 }) {
   const [days, setDays] = useState<DayState[]>(() => toState(initialDays));
   const [templates, setTemplates] = useState(initialTemplates);
@@ -169,6 +184,51 @@ export function ItineraryEditor({
     setMessage(null);
   }
 
+  /**
+   * Un parque sin ficha toma la del catálogo según su título; si ese día hay un evento reservado en
+   * ese parque, la del evento (con su horario). Lo demás queda como está.
+   */
+  function withSheet(item: ItemState, date: string | null): ItemState {
+    if (item.type !== "PARK" || item.sheet) return item;
+    const found = sheetForPark(item.title, date, parkGuides, events);
+    if (!found) return item;
+    const sheet = sheetFromGuide(found.guide);
+    const timed = !item.startTime && !item.endTime;
+    return {
+      ...item,
+      sheet,
+      title: found.title ?? item.title,
+      startTime: timed ? sheet.openTime : item.startTime,
+      endTime: timed ? sheet.closeTime : item.endTime,
+    };
+  }
+
+  /** Actividad nueva para un evento reservado (o la ficha del evento en el parque que ya estaba ese día). */
+  function placeEvent(day: DayState, guide: GuideOption): DayState {
+    const sheet = sheetFromGuide(guide);
+    const event = { title: eventTitle(guide), sheet, startTime: sheet.openTime, endTime: sheet.closeTime };
+    const park = guide.park ? day.items.findIndex((i) => i.type === "PARK" && (i.sheet?.name === guide.park || sheetForPark(i.title, null, parkGuides, [])?.guide.name === guide.park)) : -1;
+    // El día sin título toma el del evento.
+    const title = day.title?.trim() ? day.title : event.title;
+    if (park >= 0) return { ...day, title, items: day.items.map((i, idx) => (idx === park ? { ...i, ...event } : i)) };
+    const item: ItemState = { key: newKey("i"), type: "PARK", location: guide.park, notes: null, confirmationNumber: null, guide: null, ...event };
+    return { ...day, title, items: [...day.items, item] };
+  }
+
+  /** Eventos reservados de cada día que todavía no figuran en el itinerario. */
+  function pendingEvents(day: DayState) {
+    if (!day.date) return [];
+    return events
+      .filter((e) => e.date === day.date)
+      .map((e) => parkGuides.find((g) => g.id === e.guideId))
+      .filter((g): g is GuideOption => !!g && !day.items.some((i) => i.sheet?.guideId === g.id));
+  }
+
+  /** Fichas para los parques sin ficha y los eventos reservados que falten (después de la IA o al generar los días). */
+  function withSheetsAndEvents(list: DayState[]) {
+    return list.map((d) => pendingEvents(d).reduce(placeEvent, { ...d, items: d.items.map((i) => withSheet(i, d.date)) }));
+  }
+
   const itemIndex = useMemo(() => {
     const map = new Map<string, { day: number; index: number }>();
     days.forEach((d, di) => d.items.forEach((it, ii) => map.set(it.key, { day: di, index: ii })));
@@ -176,7 +236,16 @@ export function ItineraryEditor({
   }, [days]);
 
   // Revisión automática contra el catálogo: alturas, cierres, atracciones que no existen e imperdibles.
-  const checks = useMemo(() => checkItinerary(days, catalog, travelers), [days, catalog, travelers]);
+  const checks = useMemo(
+    () =>
+      checkItinerary(
+        // Lo que recomienda la ficha de cada parque cuenta como incluido (imperdibles).
+        days.map((d) => ({ ...d, items: d.items.map((i) => (i.sheet ? { ...i, guide: { picks: sheetNames(i.sheet).map((name) => ({ name })) } } : i)) })),
+        catalog,
+        travelers,
+      ),
+    [days, catalog, travelers],
+  );
 
   function addMustDo(dayIndex: number, entry: CheckEntry) {
     update((prev) => prev.map((d, di) => (di === dayIndex ? { ...d, items: [...d.items, mustDoItem(entry)] } : d)));
@@ -204,7 +273,7 @@ export function ItineraryEditor({
           },
       );
       const extra = prev.filter((d) => !d.date || !dates.includes(d.date));
-      return [...generated, ...extra];
+      return withSheetsAndEvents([...generated, ...extra]);
     });
   }
 
@@ -254,6 +323,7 @@ export function ItineraryEditor({
       notes: null,
       confirmationNumber: null,
       guide: null,
+      sheet: null,
       ...item,
     };
     update((prev) => prev.map((d) => (d.key === dayKey ? { ...d, items: [...d.items, created] } : d)));
@@ -262,7 +332,11 @@ export function ItineraryEditor({
   }
 
   function patchItem(key: string, patch: Partial<ItemState>) {
-    update((prev) => prev.map((d) => ({ ...d, items: d.items.map((i) => (i.key === key ? { ...i, ...patch } : i)) })));
+    // Al nombrar un parque (o pasar una actividad a parque) se trae su ficha del catálogo.
+    const lookup = ("title" in patch || "type" in patch) && !("sheet" in patch);
+    update((prev) =>
+      prev.map((d) => ({ ...d, items: d.items.map((i) => (i.key === key ? (lookup ? withSheet({ ...i, ...patch }, d.date) : { ...i, ...patch }) : i)) })),
+    );
   }
 
   function removeItem(key: string) {
@@ -275,6 +349,13 @@ export function ItineraryEditor({
     if (id.startsWith("type:")) {
       const type = id.slice(5) as ActivityType;
       return { type, title: ACTIVITY_TYPE_LABEL[type] };
+    }
+    if (id.startsWith("guide:")) {
+      const g = parkGuides.find((x) => x.id === id.slice(6));
+      if (!g) return null;
+      return g.kind === "EVENT"
+        ? { type: "PARK", title: eventTitle(g), location: g.park, sheet: sheetFromGuide(g), startTime: g.openTime, endTime: g.closeTime }
+        : { type: "PARK", title: g.name };
     }
     if (id.startsWith("tpl:")) {
       const t = templates.find((x) => x.id === id.slice(4));
@@ -323,10 +404,15 @@ export function ItineraryEditor({
         notes: null,
         confirmationNumber: null,
         guide: null,
+        sheet: null,
         ...pal,
       };
       update((prev) =>
-        prev.map((d, di) => (di === targetDay ? { ...d, items: [...d.items.slice(0, targetIndex), item, ...d.items.slice(targetIndex)] } : d)),
+        prev.map((d, di) => {
+          if (di !== targetDay) return d;
+          const placed = withSheet(item, d.date);
+          return { ...d, items: [...d.items.slice(0, targetIndex), placed, ...d.items.slice(targetIndex)] };
+        }),
       );
       return;
     }
@@ -364,6 +450,7 @@ export function ItineraryEditor({
         notes: i.notes?.trim() || null,
         confirmationNumber: i.confirmationNumber?.trim() || null,
         guide: hasGuide(i.type) ? cleanGuide(i.guide) : null,
+        sheet: i.type === "PARK" ? i.sheet : null,
       })),
     }));
     startSave(async () => {
@@ -384,7 +471,7 @@ export function ItineraryEditor({
     const res = await proposePlaceGuide(
       target.id,
       {
-        type: item.type as "PARK" | "CRUISE",
+        type: "CRUISE",
         title: item.title,
         location: item.location,
         date: day.date,
@@ -406,14 +493,14 @@ export function ItineraryEditor({
 
   /** Guías para todos los parques y cruceros que todavía no tienen, de a tres a la vez. */
   async function requestGuides(source: DayState[]) {
-    const queue = source.flatMap((d) => d.items.filter((i) => hasGuide(i.type) && !i.guide).map((i) => [d, i] as const));
+    const queue = source.flatMap((d) => d.items.filter((i) => aiGuide(i.type) && !i.guide).map((i) => [d, i] as const));
     const worker = async () => {
       for (let next = queue.shift(); next; next = queue.shift()) await requestGuide(...next);
     };
     await Promise.all([worker(), worker(), worker()]);
   }
 
-  const missingGuides = days.reduce((n, d) => n + d.items.filter((i) => hasGuide(i.type) && !i.guide && !guideStatus[i.key]?.loading).length, 0);
+  const missingGuides = days.reduce((n, d) => n + d.items.filter((i) => aiGuide(i.type) && !i.guide && !guideStatus[i.key]?.loading).length, 0);
 
   function generate() {
     if (days.some((d) => d.items.length > 0) && !window.confirm("La propuesta de la IA va a reemplazar el itinerario actual en el editor (no se guarda hasta que hagas clic en Guardar). ¿Continuar?")) return;
@@ -441,11 +528,14 @@ export function ItineraryEditor({
               notes: withoutMustDoTag(i.notes ?? "") || null,
               confirmationNumber: null,
               guide: i.guide,
+              sheet: null,
             })),
           })),
       );
       // En la versión resumida no se suman atracciones sueltas: los imperdibles quedan en la revisión para agregarlos a mano.
-      const proposed = aiDetail === "detailed" ? withMustDos(state, catalog, mustDoItem) : { days: state, added: [] };
+      // Cada parque toma su ficha del catálogo (y el día de un evento reservado, la del evento).
+      const withSheets = withSheetsAndEvents(state);
+      const proposed = aiDetail === "detailed" ? withMustDos(withSheets, catalog, mustDoItem) : { days: withSheets, added: [] };
       setDays(proposed.days);
       setDirty(true);
       setAiResult({ summary: r.summary, warnings: r.warnings, knowledge: res.knowledgeUsed, added: proposed.added.map((e) => e.name) });
@@ -475,7 +565,7 @@ export function ItineraryEditor({
           )}
           {aiEnabled && missingGuides > 0 && (
             <button type="button" onClick={() => requestGuides(days)} className={buttonClass("secondary", "sm")}>
-              <Sparkles className="size-4 text-fuchsia-600" /> Recomendaciones para {missingGuides === 1 ? "1 parque" : `${missingGuides} parques`}
+              <Sparkles className="size-4 text-fuchsia-600" /> Recomendaciones para {missingGuides === 1 ? "1 día de crucero" : `${missingGuides} días de crucero`}
             </button>
           )}
         </div>
@@ -528,9 +618,9 @@ export function ItineraryEditor({
           <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-lg border border-slate-200 bg-white p-3 text-sm">
             <input type="checkbox" checked={aiGuides} onChange={(e) => setAiGuides(e.target.checked)} className="mt-0.5 rounded border-slate-300" />
             <span>
-              <span className="font-medium text-slate-900">Sumar atracciones recomendadas y tips en cada parque</span>
+              <span className="font-medium text-slate-900">Sumar recomendaciones y tips en los días de crucero</span>
               <span className="block text-xs text-slate-500">
-                También en los días de crucero. Se arman según los viajeros y estas instrucciones, y después podés editarlas o pedirlas parque por parque.
+                Se arman según los viajeros y estas instrucciones. Los parques llevan siempre su ficha del catálogo (y el día de un evento reservado, la del evento).
               </span>
             </span>
           </label>
@@ -624,6 +714,17 @@ export function ItineraryEditor({
               ))}
             </div>
           </div>
+          {parkGuides.length > 0 && (
+            <div>
+              <p className="label">Parques y eventos</p>
+              <div className="flex max-h-72 flex-wrap gap-1.5 overflow-y-auto lg:flex-col">
+                {parkGuides.map((g) => (
+                  <PaletteChip key={g.id} id={`guide:${g.id}`} label={g.kind === "EVENT" ? `Evento: ${g.name}` : g.name} type="PARK" />
+                ))}
+              </div>
+              <p className="mt-1 text-[11px] text-slate-400">Se suman con su ficha: horarios, imperdibles, shows, dónde comer y tips.</p>
+            </div>
+          )}
           <div>
             <div className="mb-1.5 flex items-baseline justify-between gap-2">
               <p className="label mb-0">Actividades guardadas</p>
@@ -661,6 +762,9 @@ export function ItineraryEditor({
               aiEnabled={aiEnabled}
               travelers={travelers}
               catalog={catalog}
+              parkGuides={parkGuides}
+              pendingEvents={pendingEvents(day)}
+              onAddEvent={(g) => update((prev) => prev.map((d) => (d.key === day.key ? placeEvent(d, g) : d)))}
               onGuide={(item) => requestGuide(day, item)}
               onTemplateSaved={(t) => setTemplates((prev) => [...prev, t].sort((a, b) => a.title.localeCompare(b.title)))}
               editing={editing}
@@ -711,6 +815,9 @@ function DayColumn({
   aiEnabled,
   travelers,
   catalog,
+  parkGuides,
+  pendingEvents,
+  onAddEvent,
   onGuide,
   onTemplateSaved,
   editing,
@@ -729,6 +836,9 @@ function DayColumn({
   aiEnabled: boolean;
   travelers: CheckTraveler[];
   catalog: CheckEntry[];
+  parkGuides: GuideOption[];
+  pendingEvents: GuideOption[];
+  onAddEvent: (g: GuideOption) => void;
   onGuide: (item: ItemState) => void;
   onTemplateSaved: (t: EditorTemplate) => void;
   editing: string | null;
@@ -766,6 +876,20 @@ function DayColumn({
         </button>
       </header>
       <div ref={setNodeRef} className="space-y-2 p-3">
+        {pendingEvents.map((g) => (
+          <button
+            key={g.id}
+            type="button"
+            onClick={() => onAddEvent(g)}
+            className="flex w-full items-center gap-2 rounded-lg border border-dashed border-indigo-300 bg-indigo-50/60 px-3 py-2 text-left text-xs text-indigo-800 hover:border-indigo-500"
+          >
+            <PartyPopper className="size-4 shrink-0" />
+            <span>
+              Este día tienen reservado <strong>{g.name}</strong>
+              {g.park && ` en ${g.park}`}. <span className="font-medium underline">Sumarlo con su ficha y sus horarios</span>
+            </span>
+          </button>
+        ))}
         <SortableContext items={day.items.map((i) => i.key)} strategy={verticalListSortingStrategy}>
           {day.items.map((item, ii) => (
             <SortableItem
@@ -776,6 +900,8 @@ function DayColumn({
               aiEnabled={aiEnabled}
               travelers={travelers}
               catalog={catalog}
+              parkGuides={parkGuides}
+              date={day.date}
               onGuide={() => onGuide(item)}
               onTemplateSaved={onTemplateSaved}
               open={editing === item.key}
@@ -810,6 +936,8 @@ function SortableItem({
   aiEnabled,
   travelers,
   catalog,
+  parkGuides,
+  date,
   onGuide,
   onTemplateSaved,
   open,
@@ -823,6 +951,8 @@ function SortableItem({
   aiEnabled: boolean;
   travelers: CheckTraveler[];
   catalog: CheckEntry[];
+  parkGuides: GuideOption[];
+  date: string | null;
   onGuide: () => void;
   onTemplateSaved: (t: EditorTemplate) => void;
   open: boolean;
@@ -897,9 +1027,168 @@ function SortableItem({
           <SaveAsTemplate item={item} onSaved={onTemplateSaved} />
         </div>
       )}
-      {hasGuide(item.type) && (
+      {item.type === "PARK" && <ParkSection item={item} date={date} guides={parkGuides} travelers={travelers} catalog={catalog} onPatch={onPatch} />}
+      {aiGuide(item.type) && (
         <GuideSection item={item} status={guideStatus} aiEnabled={aiEnabled} travelers={travelers} catalog={catalog} onGuide={onGuide} onPatch={onPatch} />
       )}
+    </div>
+  );
+}
+
+/** Opciones de fichas para elegir: parques y eventos, del destino del viaje primero. */
+function GuideSelect({ guides, value, onPick, placeholder }: { guides: GuideOption[]; value?: string; onPick: (g: GuideOption) => void; placeholder: string }) {
+  return (
+    <select
+      className="field w-auto max-w-full text-xs"
+      value={value ?? ""}
+      onChange={(e) => {
+        const g = guides.find((x) => x.id === e.target.value);
+        if (g) onPick(g);
+      }}
+    >
+      <option value="" disabled>
+        {placeholder}
+      </option>
+      {(["PARK", "EVENT"] as const).map((kind) => (
+        <optgroup key={kind} label={kind === "PARK" ? "Parques" : "Eventos especiales"}>
+          {guides
+            .filter((g) => g.kind === kind)
+            .map((g) => (
+              <option key={g.id} value={g.id}>
+                {kind === "EVENT" ? eventTitle(g) : g.name}
+              </option>
+            ))}
+        </optgroup>
+      ))}
+    </select>
+  );
+}
+
+/**
+ * Ficha del parque (o del evento) en el itinerario: se trae del catálogo y el agente la edita entera
+ * para este viaje, la cambia por otra, la restaura o la quita.
+ */
+function ParkSection({
+  item,
+  date,
+  guides,
+  travelers,
+  catalog,
+  onPatch,
+}: {
+  item: ItemState;
+  date: string | null;
+  guides: GuideOption[];
+  travelers: CheckTraveler[];
+  catalog: CheckEntry[];
+  onPatch: (p: Partial<ItemState>) => void;
+}) {
+  const [editingSheet, setEditingSheet] = useState(false);
+  // Cierres del catálogo y de las novedades: el viajero ve esas atracciones tachadas.
+  const closedNote = closedNoteFor(catalog, date);
+  const sheet = item.sheet;
+  const base = sheet?.guideId ? guides.find((g) => g.id === sheet.guideId) : undefined;
+  const use = (g: GuideOption) => {
+    const next = sheetFromGuide(g);
+    onPatch({
+      sheet: next,
+      guide: null,
+      ...(g.kind === "EVENT" ? { title: eventTitle(g), location: g.park } : {}),
+      ...(next.openTime || next.closeTime ? { startTime: next.openTime, endTime: next.closeTime } : {}),
+    });
+  };
+
+  if (!sheet) {
+    return (
+      <div className="space-y-2 px-3 pb-3">
+        {/* Itinerarios viejos: recomendaciones de la IA, hasta que se reemplacen por la ficha. */}
+        {item.guide && <PlaceGuideCard guide={item.guide} onRemovePick={(index) => onPatch({ guide: { ...item.guide!, picks: item.guide!.picks.filter((_, i) => i !== index) } })} />}
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-violet-300 bg-white/70 px-3 py-2 text-xs text-slate-600">
+          <FerrisWheel className="size-4 text-violet-600" />
+          <span>{item.guide ? "Reemplazar por la ficha del catálogo:" : "Sumá la ficha del parque (horarios, imperdibles, shows, dónde comer y tips):"}</span>
+          {guides.length > 0 && <GuideSelect guides={guides} onPick={use} placeholder="Elegí el parque o evento" />}
+          <button
+            type="button"
+            onClick={() => {
+              onPatch({ sheet: emptySheet(item.title), guide: null });
+              setEditingSheet(true);
+            }}
+            className="font-medium text-brand-700 hover:underline"
+          >
+            Armarla a mano
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const isClosed = (s: ParkSheet["sections"][number], name: string) => !["DINING", "SNACKS", "CHARACTERS", "TIPS"].includes(s.kind) && !!closedNote?.(name);
+  const closedCount = sheet.sections.reduce((n, s) => n + s.items.filter((it) => isClosed(s, it.name)).length, 0);
+  const removeClosed = () => onPatch({ sheet: { ...sheet, sections: sheet.sections.map((s) => ({ ...s, items: s.items.filter((it) => !isClosed(s, it.name)) })) } });
+
+  // Quién del grupo no llega a la altura de los imperdibles (lo ve solo el agente).
+  const short = sheet.sections
+    .filter((s) => s.kind === "MUST_DO" || s.kind === "CLASSICS")
+    .flatMap((s) => s.items)
+    .flatMap((it) => {
+      const entry = matchEntry({ type: "RIDE", title: it.name, location: null }, catalog);
+      if (!entry?.minHeightIn) return [];
+      const who = travelers.filter((t) => t.heightCm && t.heightCm < minHeightCm(entry.minHeightIn!));
+      return who.length ? [`${entry.name}: ${who.map((t) => `${t.name} (${t.heightCm} cm)`).join(" y ")} no ${who.length > 1 ? "llegan" : "llega"} a ${minHeightCm(entry.minHeightIn)} cm`] : [];
+    });
+
+  return (
+    <div className="px-3 pb-3">
+      {editingSheet ? (
+        <div className="rounded-xl bg-white p-3 ring-1 ring-brand-200">
+          <ParkSheetForm sheet={sheet} onChange={(next) => onPatch({ sheet: next })} />
+          <div className="mt-3 flex justify-end">
+            <button type="button" onClick={() => setEditingSheet(false)} className={buttonClass("secondary", "sm")}>
+              Listo
+            </button>
+          </div>
+        </div>
+      ) : (
+        <ParkSheetCard sheet={sheet} closedNote={closedNote} />
+      )}
+      {closedCount > 0 && !editingSheet && (
+        <p className="mt-1.5 flex flex-wrap items-center gap-x-2 text-xs text-rose-700">
+          <AlertTriangle className="size-3 shrink-0" />
+          {closedCount === 1 ? "1 atracción de la ficha está cerrada ese día: el cliente la ve tachada." : `${closedCount} atracciones de la ficha están cerradas ese día: el cliente las ve tachadas.`}
+          <button type="button" onClick={removeClosed} className="font-medium underline hover:text-rose-900">
+            {closedCount === 1 ? "Quitarla de la ficha" : "Quitarlas de la ficha"}
+          </button>
+        </p>
+      )}
+      {short.length > 0 && !editingSheet && (
+        <ul className="mt-1.5 space-y-0.5">
+          {short.map((t) => (
+            <li key={t} className="flex items-start gap-1 text-xs text-rose-700">
+              <AlertTriangle className="mt-0.5 size-3 shrink-0" /> {t}: rider switch.
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="mt-1.5 flex flex-wrap items-center justify-end gap-3 text-xs">
+        {!editingSheet && (
+          <button type="button" onClick={() => setEditingSheet(true)} className="inline-flex items-center gap-1 font-medium text-brand-700 hover:underline">
+            <Pencil className="size-3" /> Editar ficha
+          </button>
+        )}
+        {guides.length > 0 && <GuideSelect guides={guides} onPick={(g) => window.confirm(`¿Cambiar por la ficha de ${g.name}? Se pierden los cambios que le hiciste a esta.`) && use(g)} placeholder="Cambiar ficha…" />}
+        {base && (
+          <button
+            type="button"
+            onClick={() => window.confirm("¿Volver a la ficha del catálogo? Se pierden los cambios que le hiciste para este viaje.") && use(base)}
+            className="inline-flex items-center gap-1 text-slate-500 hover:text-brand-700"
+          >
+            <RotateCcw className="size-3" /> Restaurar del catálogo
+          </button>
+        )}
+        <button type="button" onClick={() => onPatch({ sheet: null })} className="inline-flex items-center gap-1 text-slate-400 hover:text-rose-600">
+          <Trash2 className="size-3" /> Quitar ficha
+        </button>
+      </div>
     </div>
   );
 }

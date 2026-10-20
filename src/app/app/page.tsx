@@ -10,6 +10,8 @@ import { addDays, daysBetween, formatDate, formatRange, money, todayUTC, toNumbe
 import { computeKeyDates } from "@/lib/key-dates";
 import { runDateWorkflowsIfDue } from "@/lib/automations";
 import { appUrl } from "@/lib/app-url";
+import { knowledgeHighlights } from "@/lib/knowledge-alerts";
+import { KnowledgeHighlights } from "./knowledge-highlights";
 
 export const metadata = { title: "Inicio" };
 
@@ -30,7 +32,7 @@ export default async function Dashboard() {
   const last30 = addDays(today, -30);
   const currency = user.organization.defaultCurrency;
 
-  const [activeCount, inquiries, quotesSent, tasks, upcoming, sales30, salesYear, commissionToCollect, recentInquiries] = await Promise.all([
+  const [activeCount, inquiries, quotesSent, tasks, upcoming, sales30, salesYear, commissionToCollect, recentInquiries, news] = await Promise.all([
     db.booking.count({ where: { organizationId: orgId, status: { in: ["BOOKED", "PAID_IN_FULL"] } } }),
     db.booking.count({ where: { organizationId: orgId, status: "INQUIRY" } }),
     db.quote.count({ where: { booking: { organizationId: orgId }, status: "SENT" } }),
@@ -73,6 +75,7 @@ export default async function Dashboard() {
       orderBy: { createdAt: "desc" },
       take: 5,
     }),
+    knowledgeHighlights(orgId),
   ]);
 
   // Fechas clave de los próximos 30 días de todos los viajes.
@@ -139,7 +142,9 @@ export default async function Dashboard() {
         <StatCard label="Pipeline" value={`${inquiries} / ${quotesSent} / ${activeCount}`} hint="Consultas / cotizaciones enviadas / viajes reservados" />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <KnowledgeHighlights {...news} />
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader title="Tareas de esta semana" actions={<Link href="/app/tareas" className="text-xs text-brand-700 hover:underline">Ver todas</Link>} />
           <TaskList tasks={tasks} />

@@ -126,6 +126,9 @@ function reservationKeyDates(i: ReservationInput, currency: string): KeyDate[] {
           hint: i.supplier ?? undefined,
         });
         break;
+      case "SPECIAL_EVENT":
+        out.push({ date: start, label: `Evento especial: ${name}`, kind: "park", hint: i.supplier ?? undefined });
+        break;
       case "TRANSFER":
         out.push({ date: start, label: `Traslado: ${name}`, kind: "pickup", hint: i.supplier ?? undefined });
         break;
@@ -145,6 +148,9 @@ function reservationKeyDates(i: ReservationInput, currency: string): KeyDate[] {
   }
   return out;
 }
+
+/** En un mismo día, el comienzo del viaje va primero y el fin del viaje último (después del check-out, etc.). */
+const DAY_ORDER = (k: KeyDate) => (k.kind === "checkin" ? -1 : k.kind === "checkout" ? 1 : 0);
 
 export function computeKeyDates(b: Input): KeyDate[] {
   const out: KeyDate[] = [];
@@ -180,5 +186,5 @@ export function computeKeyDates(b: Input): KeyDate[] {
       seen.add(key);
       return true;
     })
-    .sort((a, b) => a.date.getTime() - b.date.getTime());
+    .sort((a, b) => a.date.getTime() - b.date.getTime() || DAY_ORDER(a) - DAY_ORDER(b));
 }

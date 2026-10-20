@@ -1,6 +1,6 @@
 import Link from "next/link";
 import clsx from "clsx";
-import { Globe, Pin, Trash2 } from "lucide-react";
+import { Ban, Globe, Pin, Trash2 } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { ConfirmButton } from "@/components/form-controls";
@@ -12,6 +12,8 @@ import type { Destination, KnowledgeCategory } from "@/generated/prisma/enums";
 import { deleteKnowledge } from "./actions";
 import { AskBox } from "./ask-box";
 import { KnowledgeImportExport } from "./import-export";
+import { catalogOptions } from "./catalog-options";
+import { entriesNamedIn } from "@/lib/itinerary-checks";
 
 export const metadata = { title: "Novedades e IA" };
 
@@ -34,6 +36,10 @@ export default async function KnowledgePage({
     orderBy: [{ pinned: "desc" }, { updatedAt: "desc" }],
     take: 300,
   });
+  // Qué atracciones del catálogo cierra cada novedad de cierre o remodelación.
+  const catalog = items.some((k) => k.category === "CLOSURE" || k.category === "REFURBISHMENT") ? await catalogOptions() : [];
+  const closes = (k: (typeof items)[number]) =>
+    k.category !== "CLOSURE" && k.category !== "REFURBISHMENT" ? [] : k.closesManual ? catalog.filter((e) => k.closesEntryIds.includes(e.id)) : entriesNamedIn(k.title, catalog);
 
   return (
     <>
@@ -84,6 +90,11 @@ export default async function KnowledgePage({
                 </div>
                 <h3 className="font-semibold text-slate-900">{k.title}</h3>
                 <p className="mt-1 line-clamp-4 flex-1 text-sm whitespace-pre-line text-slate-600">{k.content}</p>
+                {closes(k).length > 0 && (
+                  <p className="mt-2 flex flex-wrap items-center gap-1 text-xs text-rose-700">
+                    <Ban className="size-3.5" /> Marca como cerrada en los itinerarios: {closes(k).map((e) => e.name).join(", ")}
+                  </p>
+                )}
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
                   <span>
                     {k.destinations.length ? k.destinations.map((d) => DESTINATION_LABEL[d]).join(", ") : "Todos los destinos"}

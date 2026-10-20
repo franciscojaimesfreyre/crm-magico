@@ -4,6 +4,7 @@ import { ActionForm, SubmitButton, type ActionState } from "@/components/form-co
 import { Card, CardHeader, Field, Input, Select, Textarea } from "@/components/ui";
 import { BOOKING_STATUSES, DESTINATIONS } from "@/lib/labels";
 import { toDateInput } from "@/lib/format";
+import { DateRangeFields } from "@/components/date-range-fields";
 import type { Booking } from "@/generated/prisma/client";
 
 type Opt = { value: string; label: string };
@@ -51,12 +52,7 @@ export function BookingForm({
           <Field label="Grupo">
             <Select name="groupId" options={groups} defaultValue={booking?.groupId ?? ""} placeholder="Sin grupo" />
           </Field>
-          <Field label="Desde">
-            <Input type="date" name="startDate" defaultValue={toDateInput(booking?.startDate)} />
-          </Field>
-          <Field label="Hasta">
-            <Input type="date" name="endDate" defaultValue={toDateInput(booking?.endDate)} />
-          </Field>
+          <DateRangeFields start={toDateInput(booking?.startDate)} end={toDateInput(booking?.endDate)} />
           <div className="grid grid-cols-2 gap-3">
             <Field label="Adultos">
               <Input type="number" min={0} name="adults" defaultValue={booking?.adults ?? 2} />
@@ -65,9 +61,12 @@ export function BookingForm({
               <Input type="number" min={0} name="children" defaultValue={booking?.children ?? 0} />
             </Field>
           </div>
-          <Field label="Moneda">
-            <Select name="currency" defaultValue={booking?.currency ?? defaultCurrency} options={["USD", "EUR", "ARS", "MXN", "CLP", "COP", "BRL", "UYU"].map((c) => ({ value: c, label: c }))} />
-          </Field>
+          {/* Al crear se usa la moneda por defecto del agente; se puede cambiar después. */}
+          {booking && (
+            <Field label="Moneda">
+              <Select name="currency" defaultValue={booking.currency ?? defaultCurrency} options={["USD", "EUR", "ARS", "MXN", "CLP", "COP", "BRL", "UYU"].map((c) => ({ value: c, label: c }))} />
+            </Field>
+          )}
         </div>
       </Card>
 

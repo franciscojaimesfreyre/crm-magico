@@ -9,7 +9,14 @@ export async function loadBooking(id: string, organizationId: string) {
       organization: { select: { agency: true } },
       group: true,
       travelers: { include: { traveler: true } },
-      items: { orderBy: { position: "asc" }, include: { payments: { orderBy: [{ paidAt: "asc" }, { createdAt: "asc" }] } } },
+      items: {
+        orderBy: { position: "asc" },
+        include: {
+          payments: { orderBy: [{ paidAt: "asc" }, { createdAt: "asc" }] },
+          travelers: { include: { traveler: { select: { firstName: true, lastName: true } } } },
+          documents: { orderBy: { createdAt: "asc" }, select: { id: true, name: true, storageKey: true, url: true } },
+        },
+      },
       flightLegs: true,
       quotes: {
         orderBy: { createdAt: "desc" },

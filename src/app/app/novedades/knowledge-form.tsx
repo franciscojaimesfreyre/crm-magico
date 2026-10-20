@@ -3,15 +3,19 @@ import { Card, Checkbox, Field, Input, Select, Textarea } from "@/components/ui"
 import { DESTINATIONS, KNOWLEDGE_CATEGORIES } from "@/lib/labels";
 import { toDateInput } from "@/lib/format";
 import type { KnowledgeItem } from "@/generated/prisma/client";
+import { ClosesPicker } from "./closes-picker";
 
 export function KnowledgeForm({
   action,
   item,
   canGlobal,
+  catalog,
 }: {
   action: (s: ActionState, f: FormData) => Promise<ActionState>;
   item?: KnowledgeItem;
   canGlobal: boolean;
+  /** Atracciones y shows del catálogo, para elegir cuáles cierra una novedad de cierre. */
+  catalog: { id: string; name: string; area: string }[];
 }) {
   return (
     <ActionForm action={action}>
@@ -36,6 +40,7 @@ export function KnowledgeForm({
             ))}
           </div>
         </div>
+        <ClosesPicker entries={catalog} initialIds={item?.closesEntryIds ?? []} initialManual={item?.closesManual ?? false} />
         <Field label="Vigente desde">
           <Input type="date" name="validFrom" defaultValue={toDateInput(item?.validFrom)} />
         </Field>

@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { confirmUpload, createUploadTarget, duplicateUpload, removeUpload, saveUpload, storageMode } from "@/lib/storage";
+import { createUploadTarget, duplicateUpload, removeUpload, storageMode } from "@/lib/storage";
+import { incomingFile } from "@/lib/incoming-files";
 import { logActivity, notifyClient } from "@/lib/events";
 import type { ActionState } from "@/components/form-controls";
 
@@ -26,31 +27,6 @@ export async function requestUploadUrl(name: string, contentType: string, size: 
   return createUploadTarget(user.organizationId, name, contentType, size);
 }
 
-type Stored = { key: string; size: number; mimeType: string };
-
-/**
- * Archivo que llega con el formulario: o ya subido a R2 por el navegador (uploadKey),
- * o el archivo en sí (modo local). Devuelve null si no vino ninguno.
- */
-async function incomingFile(formData: FormData, organizationId: string): Promise<{ stored: Stored; name: string } | { error: string } | null> {
-  if (formData.get("uploadPending") === "1") return { error: "Esperá a que termine de subir el archivo" };
-  const uploadKey = String(formData.get("uploadKey") ?? "");
-  if (uploadKey) {
-    const stored = await confirmUpload(organizationId, uploadKey);
-    if (!stored) return { error: "No encontramos el archivo subido. Probá subirlo de nuevo." };
-    return { stored, name: String(formData.get("uploadName") ?? "").trim() || "Archivo" };
-  }
-  const file = formData.get("file");
-  if (file instanceof File && file.size > 0) {
-    try {
-      return { stored: await saveUpload(file, organizationId), name: file.name };
-    } catch (e) {
-      return { error: e instanceof Error ? e.message : "No se pudo subir el archivo" };
-    }
-  }
-  return null;
-}
-
 // ─── Documentos de una reserva ───────────────────────────────────────────────
 
 export async function addBookingDocument(bookingId: string, _: ActionState, formData: FormData): Promise<ActionState> {
@@ -60,6 +36,9 @@ export async function addBookingDocument(bookingId: string, _: ActionState, form
   const url = cleanUrl(formData.get("url"));
   const visibleToClient = formData.get("visibleToClient") === "on";
   let name = String(formData.get("name") ?? "").trim();
+  // Reserva del viaje a la que corresponde (opcional).
+  const itemId = String(formData.get("bookingItemId") ?? "");
+  const item = itemId ? await db.bookingItem.findFirst({ where: { id: itemId, bookingId }, select: { id: true } }) : null;
 
   const incoming = await incomingFile(formData, user.organizationId);
   if (incoming && "error" in incoming) return { error: incoming.error };
@@ -76,6 +55,7 @@ export async function addBookingDocument(bookingId: string, _: ActionState, form
     data: {
       organizationId: user.organizationId,
       bookingId,
+      bookingItemId: item?.id,
       clientId: booking.clientId,
       name,
       storageKey: stored?.key,

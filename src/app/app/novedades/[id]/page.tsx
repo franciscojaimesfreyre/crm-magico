@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { PageHeader } from "@/components/ui";
 import { KnowledgeForm } from "../knowledge-form";
+import { catalogOptions } from "../catalog-options";
 import { updateKnowledge } from "../actions";
 
 export const metadata = { title: "Editar novedad" };
@@ -16,7 +17,7 @@ export default async function EditKnowledge({ params }: { params: Promise<{ id: 
   return (
     <div className="max-w-4xl">
       <PageHeader title="Editar novedad" back={{ href: "/app/novedades", label: "Novedades" }} />
-      <KnowledgeForm action={updateKnowledge.bind(null, id)} item={item} canGlobal={user.isPlatformAdmin} />
+      <KnowledgeForm action={updateKnowledge.bind(null, id)} item={item} canGlobal={user.isPlatformAdmin} catalog={await catalogOptions()} />
     </div>
   );
 }

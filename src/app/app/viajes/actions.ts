@@ -7,7 +7,8 @@ import { requireUser } from "@/lib/auth";
 import { ageOn, money, parseDateInput, todayUTC } from "@/lib/format";
 import { commissionFromForm, paymentProgress, suggestedBalanceDue } from "@/lib/trips";
 import { changeBookingStatus, confirmationData, nextBookingCode, recalcBookingTotals } from "@/lib/bookings";
-import { logActivity } from "@/lib/events";
+import { logActivity, notifyClient } from "@/lib/events";
+import { incomingFiles, type StoredFile } from "@/lib/incoming-files";
 import { runEventWorkflows } from "@/lib/automations";
 import { DESTINATION_LABEL, RESERVATION_STATUS_LABEL } from "@/lib/labels";
 import type { ActionState } from "@/components/form-controls";
@@ -40,7 +41,7 @@ function bookingFields(formData: FormData) {
     adults: Math.max(0, Math.round(num(formData, "adults") ?? 2)),
     children: Math.max(0, Math.round(num(formData, "children") ?? 0)),
     groupId: str(formData, "groupId"),
-    currency: str(formData, "currency") ?? "USD",
+    currency: str(formData, "currency"),
     notes: str(formData, "notes"),
     clientNotes: str(formData, "clientNotes"),
   };
@@ -71,6 +72,7 @@ export async function createBooking(_: ActionState, formData: FormData): Promise
       title,
       status,
       ...fields,
+      currency: fields.currency ?? user.organization.defaultCurrency,
       agentId: user.id,
       // Por defecto viajan todos los viajeros cargados del cliente.
       travelers: { create: client.travelers.map((t) => ({ travelerId: t.id })) },
@@ -96,7 +98,7 @@ export async function updateBooking(id: string, _: ActionState, formData: FormDa
   }
   await db.booking.update({
     where: { id },
-    data: { ...fields, title: str(formData, "title") ?? booking.title },
+    data: { ...fields, currency: fields.currency ?? booking.currency, title: str(formData, "title") ?? booking.title },
   });
   const status = str(formData, "status") as BookingStatus | null;
   if (status && status !== booking.status) await changeBookingStatus({ bookingId: id, status, userId: user.id });
@@ -145,6 +147,7 @@ function itemFields(formData: FormData) {
     endDate: parseDateInput(formData.get("endDate")),
     notes: str(formData, "notes"),
     price: num(formData, "price") ?? 0,
+    taxAmount: num(formData, "taxAmount"),
     depositAmount: num(formData, "depositAmount"),
     balanceDue: parseDateInput(formData.get("balanceDue")),
     // Al confirmarla con el proveedor queda registrada la venta (para la planilla de comisiones).
@@ -167,6 +170,96 @@ async function ownItem(itemId: string) {
   return { user, item };
 }
 
+/** Valida lo que llega del formulario de una reserva antes de guardarla. */
+function checkItem(data: ReturnType<typeof itemFields>) {
+  if (!data.description) return "Describí la reserva";
+  if (data.taxAmount !== null && data.taxAmount > data.price) return "El tax no puede superar el importe";
+  if (data.startDate && data.endDate && data.endDate < data.startDate) return "La fecha de fin no puede ser anterior a la de inicio";
+  return null;
+}
+
+type NewTraveler = { firstName: string; lastName: string | null; birthDate: Date | null; heightCm: number | null; relationship: string | null };
+
+/** Viajeros marcados en el formulario de una reserva y los nuevos que se cargaron ahí mismo. */
+async function travelersFromForm(formData: FormData, clientId: string, required: boolean) {
+  const ids = formData.getAll("travelerIds").map(String);
+  const existing = await db.traveler.findMany({ where: { id: { in: ids }, clientId }, select: { id: true } });
+  const all = (key: string) => formData.getAll(key).map((v) => String(v).trim());
+  const lastNames = all("newLastName");
+  const births = all("newBirthDate");
+  const heights = all("newHeightCm");
+  const relationships = all("newRelationship");
+  const fresh: NewTraveler[] = all("newFirstName").map((firstName, i) => {
+    const height = Math.round(Number(heights[i]));
+    return {
+      firstName,
+      lastName: lastNames[i] || null,
+      birthDate: parseDateInput(births[i] ?? null),
+      heightCm: heights[i] && height > 0 ? height : null,
+      relationship: relationships[i] || null,
+    };
+  });
+  if (fresh.some((t) => !t.firstName)) return { error: "Completá el nombre de cada viajero nuevo" };
+  if (required && existing.length + fresh.length === 0) return { error: "Elegí los viajeros incluidos en la reserva (o agregá uno)" };
+  return { existing: existing.map((t) => t.id), fresh };
+}
+
+/**
+ * Guarda los viajeros de la reserva: crea los nuevos en el cliente y suma todos al viaje
+ * (si no estaban), y reemplaza los de la reserva.
+ */
+async function saveItemTravelers(itemId: string, booking: { id: string; clientId: string }, picked: { existing: string[]; fresh: NewTraveler[] }) {
+  const created = await Promise.all(picked.fresh.map((t) => db.traveler.create({ data: { clientId: booking.clientId, ...t }, select: { id: true } })));
+  const ids = [...picked.existing, ...created.map((t) => t.id)];
+  await db.bookingItemTraveler.deleteMany({ where: { bookingItemId: itemId } });
+  await db.bookingItemTraveler.createMany({ data: ids.map((travelerId) => ({ bookingItemId: itemId, travelerId })) });
+  const result = await db.bookingTraveler.createMany({ data: ids.map((travelerId) => ({ bookingId: booking.id, travelerId })), skipDuplicates: true });
+  if (result.count > 0) await syncPassengerCounts(booking.id);
+  return created.length;
+}
+
+/** Adjunta a la reserva los archivos subidos con su formulario (también quedan en Documentos del viaje). */
+async function saveItemDocuments(
+  files: StoredFile[],
+  formData: FormData,
+  ctx: { organizationId: string; userId: string; bookingId: string; clientId: string; itemId: string; description: string },
+) {
+  if (files.length === 0) return;
+  const visibleToClient = formData.get("docsVisibleToClient") === "on";
+  await db.document.createMany({
+    data: files.map((f) => ({
+      organizationId: ctx.organizationId,
+      bookingId: ctx.bookingId,
+      bookingItemId: ctx.itemId,
+      clientId: ctx.clientId,
+      name: f.name,
+      storageKey: f.stored.key,
+      size: f.stored.size,
+      mimeType: f.stored.mimeType,
+      visibleToClient,
+      uploadedById: ctx.userId,
+    })),
+  });
+  const names = files.map((f) => f.name).join(", ");
+  if (visibleToClient) {
+    await notifyClient({
+      organizationId: ctx.organizationId,
+      clientId: ctx.clientId,
+      title: files.length === 1 ? "Hay un documento nuevo en tu viaje" : "Hay documentos nuevos en tu viaje",
+      body: names,
+      link: `/portal/viajes/${ctx.bookingId}?tab=documentos`,
+    });
+  }
+  await logActivity({
+    organizationId: ctx.organizationId,
+    clientId: ctx.clientId,
+    bookingId: ctx.bookingId,
+    userId: ctx.userId,
+    type: "document",
+    description: `${files.length === 1 ? "Documento agregado" : "Documentos agregados"} a ${ctx.description}: ${names}`,
+  });
+}
+
 async function afterItemChange(bookingId: string, userId: string) {
   await recalcBookingTotals(bookingId, userId);
   revalidatePath(`/app/viajes/${bookingId}`);
@@ -174,22 +267,44 @@ async function afterItemChange(bookingId: string, userId: string) {
 
 export async function addBookingItem(bookingId: string, _: ActionState, formData: FormData): Promise<ActionState> {
   const { user, booking } = await ownBooking(bookingId);
-  const data = itemFields(formData);
-  if (!data.description) return { error: "Describí la reserva" };
+  // Una reserva nueva arranca con la comisión pendiente: el cobro se registra después, al editarla.
+  const data = { ...itemFields(formData), commissionStatus: "PENDING" as const, commissionPaidAt: null, commissionPaidAmount: null };
+  const invalid = checkItem(data);
+  if (invalid) return { error: invalid };
+  const travelers = await travelersFromForm(formData, booking.clientId, true);
+  if ("error" in travelers) return { error: travelers.error };
+  const files = await incomingFiles(formData, user.organizationId);
+  if ("error" in files) return { error: files.error };
   data.balanceDue ??= suggestedBalanceDue(data.type, data.startDate ?? booking.startDate);
   const position = await db.bookingItem.count({ where: { bookingId } });
-  await db.bookingItem.create({ data: { bookingId, ...data, position } });
+  const item = await db.bookingItem.create({ data: { bookingId, ...data, position } });
+  const added = await saveItemTravelers(item.id, booking, travelers);
   await logActivity({ organizationId: user.organizationId, clientId: booking.clientId, bookingId, userId: user.id, type: "item", description: `Reserva agregada: ${data.description}` });
+  await saveItemDocuments(files, formData, { organizationId: user.organizationId, userId: user.id, bookingId, clientId: booking.clientId, itemId: item.id, description: data.description });
   await afterItemChange(bookingId, user.id);
-  return { ok: "Reserva agregada" };
+  return { ok: added > 0 ? `Reserva agregada. ${added === 1 ? "El viajero nuevo quedó" : "Los viajeros nuevos quedaron"} en el viaje.` : "Reserva agregada" };
 }
 
 export async function updateBookingItem(itemId: string, _: ActionState, formData: FormData): Promise<ActionState> {
   const { user, item } = await ownItem(itemId);
   const data = itemFields(formData);
-  if (!data.description) return { error: "Describí la reserva" };
+  const invalid = checkItem(data);
+  if (invalid) return { error: invalid };
+  const travelers = await travelersFromForm(formData, item.booking.clientId, false);
+  if ("error" in travelers) return { error: travelers.error };
+  const files = await incomingFiles(formData, user.organizationId);
+  if ("error" in files) return { error: files.error };
   data.balanceDue ??= suggestedBalanceDue(data.type, data.startDate ?? item.booking.startDate);
   await db.bookingItem.update({ where: { id: itemId }, data });
+  await saveItemTravelers(itemId, { id: item.bookingId, clientId: item.booking.clientId }, travelers);
+  await saveItemDocuments(files, formData, {
+    organizationId: user.organizationId,
+    userId: user.id,
+    bookingId: item.bookingId,
+    clientId: item.booking.clientId,
+    itemId,
+    description: data.description,
+  });
   if (item.status !== data.status) {
     await logActivity({
       organizationId: user.organizationId,
@@ -306,17 +421,21 @@ export async function saveTripFlights(bookingId: string, _: ActionState, formDat
 export async function setBookingTravelers(bookingId: string, formData: FormData) {
   const { booking } = await ownBooking(bookingId);
   const ids = formData.getAll("travelerIds").map(String);
-  const valid = await db.traveler.findMany({ where: { id: { in: ids }, clientId: booking.clientId }, select: { id: true, birthDate: true } });
+  const valid = await db.traveler.findMany({ where: { id: { in: ids }, clientId: booking.clientId }, select: { id: true } });
   await db.bookingTraveler.deleteMany({ where: { bookingId } });
   await db.bookingTraveler.createMany({ data: valid.map((t) => ({ bookingId, travelerId: t.id })) });
-  // Actualiza adultos/menores según las edades al viajar (menor = menos de 18).
-  const at = booking.startDate ?? new Date();
-  const withAge = valid.filter((t) => t.birthDate);
-  if (withAge.length === valid.length && valid.length > 0) {
-    const children = withAge.filter((t) => (ageOn(t.birthDate, at) ?? 99) < 18).length;
-    await db.booking.update({ where: { id: bookingId }, data: { adults: valid.length - children, children } });
-  }
+  await syncPassengerCounts(booking.id);
   revalidatePath(`/app/viajes/${bookingId}`);
+}
+
+/** Actualiza adultos/menores según las edades al viajar (menor = menos de 18), si todos tienen fecha de nacimiento. */
+async function syncPassengerCounts(bookingId: string) {
+  const booking = await db.booking.findUniqueOrThrow({ where: { id: bookingId }, include: { travelers: { include: { traveler: { select: { birthDate: true } } } } } });
+  const travelers = booking.travelers.map((t) => t.traveler);
+  if (travelers.length === 0 || travelers.some((t) => !t.birthDate)) return;
+  const at = booking.startDate ?? new Date();
+  const children = travelers.filter((t) => (ageOn(t.birthDate, at) ?? 99) < 18).length;
+  await db.booking.update({ where: { id: bookingId }, data: { adults: travelers.length - children, children } });
 }
 
 // ─── Notas ───────────────────────────────────────────────────────────────────

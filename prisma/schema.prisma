@@ -207,7 +207,8 @@ model Traveler {
   notes              String?
   createdAt          DateTime  @default(now())
 
-  bookings BookingTraveler[]
+  bookings     BookingTraveler[]
+  reservations BookingItemTraveler[]
 }
 
 /// Credenciales del cliente en portales de proveedores (MyDisney, Universal...). Cifradas.
@@ -308,17 +309,21 @@ enum ItemType {
   DISNEY_WORLD_PACKAGE
   DISNEY_WORLD_HOTEL
   DISNEY_WORLD_TICKETS
+  DISNEY_WORLD_EVENT // fiestas de Halloween y Navidad, After Hours, etc.
   DISNEYLAND_PACKAGE
   DISNEYLAND_TICKETS
+  DISNEYLAND_EVENT
   UNIVERSAL_PACKAGE
   UNIVERSAL_HOTEL
   UNIVERSAL_TICKETS
   UNIVERSAL_EXPRESS
+  UNIVERSAL_EVENT // Halloween Horror Nights, Navidad, etc.
   DISNEY_CRUISE
   // Genéricos
   HOTEL
   PACKAGE
   TICKETS
+  SPECIAL_EVENT // ticket de evento especial (genérico)
   CRUISE
   FLIGHT
   CAR
@@ -355,6 +360,7 @@ model BookingItem {
   // Importe y pagos que hace el cliente directamente a este proveedor (solo seguimiento).
   // El cliente puede pagar en cuotas libres (payments); paidAmount y balancePaidAt se calculan de ellos.
   price         Decimal              @default(0) @db.Decimal(12, 2)
+  taxAmount     Decimal?             @db.Decimal(12, 2) // tax incluido en el importe; la comisión en % se calcula sin él
   depositAmount Decimal?             @db.Decimal(12, 2) // depósito necesario para reservar (ej. USD 200 en Disney)
   balanceDue    DateTime?            @db.Date // fecha límite para saldar (ej. 30 días antes de la llegada)
   paidAmount    Decimal              @default(0) @db.Decimal(12, 2) // suma de los pagos
@@ -372,8 +378,20 @@ model BookingItem {
   commissionNotes      String?
 
   statementItems CommissionStatementItem[]
+  travelers      BookingItemTraveler[]
+  documents      Document[]
 
   @@index([bookingId])
+}
+
+/// Viajeros incluidos en una reserva (subconjunto de los del viaje).
+model BookingItemTraveler {
+  bookingItemId String
+  bookingItem   BookingItem @relation(fields: [bookingItemId], references: [id], onDelete: Cascade)
+  travelerId    String
+  traveler      Traveler    @relation(fields: [travelerId], references: [id], onDelete: Cascade)
+
+  @@id([bookingItemId, travelerId])
 }
 
 enum FlightDirection {
@@ -560,6 +578,10 @@ model KnowledgeItem {
   tags           String[]
   validFrom      DateTime?         @db.Date
   validTo        DateTime?         @db.Date
+  // Cierres y remodelaciones: atracciones del catálogo que cierra en su vigencia. Si closesManual es
+  // false se detectan del título (ver entriesNamedIn); si no, valen las elegidas en closesEntryIds.
+  closesEntryIds String[]          @default([])
+  closesManual   Boolean           @default(false)
   sourceUrl      String?
   published      Boolean           @default(true)
   pinned         Boolean           @default(false)
@@ -567,6 +589,38 @@ model KnowledgeItem {
   updatedAt      DateTime          @updatedAt
 
   @@index([organizationId])
+}
+
+// ─── Fichas de parques y eventos especiales ──────────────────────────────────
+// La información estandarizada de cada parque (horarios, imperdibles, leves, shows, personajes, dónde
+// comer, snacks y tips) y de cada evento especial (fiesta de Halloween, de Navidad, After Hours…).
+// La mantiene el equipo de la plataforma; al sumar un parque al itinerario se copia la ficha y el
+// agente la edita para ese viaje (ver lib/park-sheet).
+
+enum ParkGuideKind {
+  PARK
+  EVENT
+}
+
+model ParkGuide {
+  id          String        @id @default(cuid())
+  kind        ParkGuideKind @default(PARK)
+  destination Destination
+  name        String // "Magic Kingdom", "Mickey's Not-So-Scary Halloween Party"
+  park        String? // en los eventos, el parque donde se hace ("Magic Kingdom")
+  aliases     String[] // otros nombres para reconocerla en títulos y reservas ("MK", "Halloween Party")
+  openTime    String? // HH:MM
+  closeTime   String? // HH:MM
+  hoursNote   String? // "Horarios sujetos a cambios: revisar la app el día anterior"
+  arrival     String? // llegada recomendada
+  mainShow    String? // show principal
+  sections    Json // [{ kind, title, items: [{ name, detail, time }], note }]
+  published   Boolean       @default(true)
+  position    Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([destination, kind])
 }
 
 // ─── Catálogo de parques ─────────────────────────────────────────────────────
@@ -674,6 +728,8 @@ model Document {
   organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   bookingId       String?
   booking         Booking?     @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  bookingItemId   String? // reserva del viaje a la que corresponde (voucher, recibo…)
+  bookingItem     BookingItem? @relation(fields: [bookingItemId], references: [id], onDelete: SetNull)
   clientId        String?
   client          Client?      @relation(fields: [clientId], references: [id], onDelete: Cascade)
   name            String

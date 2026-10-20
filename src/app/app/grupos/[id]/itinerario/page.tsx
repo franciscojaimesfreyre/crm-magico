@@ -4,6 +4,8 @@ import { requireUser } from "@/lib/auth";
 import { PageHeader } from "@/components/ui";
 import { ItineraryEditor } from "@/components/itinerary-editor";
 import { parseGuide } from "@/lib/place-guide";
+import { parseSheet } from "@/lib/park-sheet";
+import { guideOptions } from "@/lib/park-guides";
 import { formatRange, toDateInput } from "@/lib/format";
 import { catalogChecks, catalogDestinations } from "@/lib/catalog";
 
@@ -19,7 +21,8 @@ export default async function GroupItineraryPage({ params }: { params: Promise<{
   if (!group) notFound();
   const templates = await db.activityTemplate.findMany({ where: { organizationId: user.organizationId }, orderBy: [{ type: "asc" }, { title: "asc" }] });
   // Sin viajeros propios: se revisan cierres e imperdibles (las alturas, en el itinerario de cada familia).
-  const catalog = group.destination ? await catalogChecks(catalogDestinations({ destination: group.destination, items: [] })) : [];
+  const destinations = group.destination ? catalogDestinations({ destination: group.destination, items: [] }) : [];
+  const [catalog, parkGuides] = await Promise.all([destinations.length ? catalogChecks(destinations, user.organizationId) : [], guideOptions(destinations)]);
   return (
     <>
       <PageHeader back={{ href: `/app/grupos/${id}`, label: group.name }} title="Itinerario del grupo" description={formatRange(group.startDate, group.endDate)} />
@@ -31,6 +34,7 @@ export default async function GroupItineraryPage({ params }: { params: Promise<{
         // La propuesta de la IA se basa en el perfil de una familia: se usa desde cada reserva.
         aiEnabled={false}
         catalog={catalog}
+        parkGuides={parkGuides}
         initialDays={group.days.map((d) => ({
           date: d.date ? toDateInput(d.date) : null,
           title: d.title,
@@ -44,6 +48,7 @@ export default async function GroupItineraryPage({ params }: { params: Promise<{
             notes: i.notes,
             confirmationNumber: i.confirmationNumber,
             guide: parseGuide(i.guide),
+            sheet: parseSheet(i.guide),
           })),
         }))}
       />

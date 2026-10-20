@@ -364,7 +364,8 @@ export async function itineraryPrompt(opts: { bookingId: string; organizationId:
   const parks = guides.filter((g) => g.kind === "PARK").map((g) => `- ${g.name}`).join("\n");
   const events = tripEvents(trip.items, guides).map((e) => {
     const g = guides.find((x) => x.id === e.guideId)!;
-    const hours = g.openTime && g.closeTime ? ` · ${g.openTime} a ${g.closeTime}` : "";
+    const day = g.schedule.find((x) => x.date === e.date) ?? g;
+    const hours = day.openTime && day.closeTime ? ` · ${day.openTime} a ${day.closeTime}` : "";
     return `- ${e.date}: ${eventTitle(g)}${hours}`;
   });
 

@@ -5,15 +5,18 @@ import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { Badge, Card, EmptyState, LinkButton, PageHeader, buttonClass } from "@/components/ui";
 import { DESTINATION_LABEL } from "@/lib/labels";
-import { parseSections } from "@/lib/park-sheet";
+import { parseSchedule, parseSections, todayInOrlando } from "@/lib/park-sheet";
+import { formatDate } from "@/lib/format";
 import { CatalogTabs } from "../tabs";
 import { loadDefaultGuides } from "./actions";
 import { CatalogImportExport } from "../import-export";
+import { HoursImport } from "./hours-import";
 
 export const metadata = { title: "Fichas de parques" };
 
 export default async function ParkGuidesPage() {
   const user = await requireUser();
+  const today = todayInOrlando();
   const guides = await db.parkGuide.findMany({ orderBy: [{ destination: "asc" }, { kind: "asc" }, { position: "asc" }, { name: "asc" }] });
   const byDestination = new Map<string, typeof guides>();
   for (const g of guides) byDestination.set(g.destination, [...(byDestination.get(g.destination) ?? []), g]);
@@ -46,6 +49,18 @@ export default async function ParkGuidesPage() {
         }
       />
       <CatalogTabs active="fichas" />
+      {user.isPlatformAdmin && guides.length > 0 && (
+        <div className="mb-4 flex flex-wrap justify-end gap-2">
+          {(["disney", "universal"] as const).map((source) => (
+            <HoursImport
+              key={source}
+              source={source}
+              today={today}
+              guides={guides.map((g) => ({ id: g.id, kind: g.kind, name: g.name, park: g.park, aliases: g.aliases, destination: g.destination }))}
+            />
+          ))}
+        </div>
+      )}
 
       {guides.length === 0 ? (
         <EmptyState
@@ -90,6 +105,15 @@ export default async function ParkGuidesPage() {
                           <Badge className="bg-slate-100 text-slate-700">
                             {sections.length} secciones · {items} ítems
                           </Badge>
+                          {(() => {
+                            const next = parseSchedule(g.schedule).filter((d) => d.date >= today);
+                            if (next.length === 0) return null;
+                            return (
+                              <Badge className="bg-emerald-50 text-emerald-800">
+                                {g.kind === "EVENT" ? `Próxima: ${formatDate(new Date(`${next[0].date}T00:00:00Z`))}` : `Horarios de ${next.length} ${next.length === 1 ? "día" : "días"}`}
+                              </Badge>
+                            );
+                          })()}
                         </div>
                         <p className="mt-2 line-clamp-2 text-xs text-slate-500">{sections.map((s) => s.title).join(" · ")}</p>
                       </Card>

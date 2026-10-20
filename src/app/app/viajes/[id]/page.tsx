@@ -10,8 +10,8 @@ import { ItineraryView } from "@/components/itinerary-view";
 import { bookingClosures } from "@/lib/catalog";
 import { TaskList } from "@/components/task-list";
 import { TaskForm } from "@/components/task-form";
-import { BOOKING_STATUSES, BOOKING_STATUS_COLOR, BOOKING_STATUS_LABEL, CONTRACT_STATUS_COLOR, CONTRACT_STATUS_LABEL, ITEM_TYPE_LABEL } from "@/lib/labels";
-import { fileSize, formatDateTime, formatRange, toNumber } from "@/lib/format";
+import { BOOKING_STATUSES, BOOKING_STATUS_COLOR, BOOKING_STATUS_LABEL, CONTRACT_STATUS_COLOR, CONTRACT_STATUS_LABEL, ITEM_TYPE_BASE, ITEM_TYPE_LABEL } from "@/lib/labels";
+import { fileSize, formatDateTime, formatRange, toDateInput, toNumber } from "@/lib/format";
 import { loadThread } from "@/lib/messages";
 import { cancelBooking, deleteBooking, setBookingStatusForm } from "../actions";
 import { addBookingDocument, attachFromLibrary, deleteDocument, toggleDocumentVisibility } from "@/app/app/documentos/actions";
@@ -25,6 +25,9 @@ import { appUrl } from "@/lib/app-url";
 import { FileUpload } from "@/components/file-upload";
 import { storageMode } from "@/lib/storage";
 import { tripKnowledgeAlerts } from "@/lib/knowledge-alerts";
+import { eventGuideFor, guideOptions } from "@/lib/park-guides";
+import { eventDateWarning } from "@/lib/park-sheet";
+import type { ItemType } from "@/generated/prisma/enums";
 
 const TABS = [
   { key: "resumen", label: "Resumen" },
@@ -124,7 +127,7 @@ export default async function BookingPage({
         </>
       )}
 
-      {tab === "reservas" && <Items booking={b} defaultRate={defaultRate} />}
+      {tab === "reservas" && <Items booking={b} defaultRate={defaultRate} eventWarnings={await eventWarnings(b.items)} />}
       {tab === "cotizaciones" && <Quotes booking={b} defaultRate={defaultRate} />}
       {tab === "itinerario" && <ItineraryTab bookingId={b.id} shareToken={b.shareToken} baseUrl={baseUrl} />}
       {tab === "documentos" && <DocumentsTab bookingId={b.id} organizationId={user.organizationId} />}
@@ -146,6 +149,20 @@ export default async function BookingPage({
       {tab === "tareas" && <TasksTab bookingId={b.id} organizationId={user.organizationId} />}
       {tab === "actividad" && <ActivityTab bookingId={b.id} />}
     </>
+  );
+}
+
+/** Reservas de eventos especiales en una fecha que no figura entre las cargadas en la ficha del evento. */
+async function eventWarnings(items: { id: string; type: ItemType; status: string; description: string; supplier: string | null; startDate: Date | null }[]) {
+  const events = items.filter((i) => i.status !== "CANCELLED" && i.startDate && ITEM_TYPE_BASE[i.type] === "SPECIAL_EVENT");
+  if (events.length === 0) return {};
+  const guides = await guideOptions();
+  return Object.fromEntries(
+    events.flatMap((i) => {
+      const g = eventGuideFor(i, guides);
+      const warning = g && eventDateWarning(g, toDateInput(i.startDate));
+      return warning ? [[i.id, warning]] : [];
+    }),
   );
 }
 

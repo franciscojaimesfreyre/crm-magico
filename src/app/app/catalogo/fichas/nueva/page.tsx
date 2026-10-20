@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { PageHeader } from "@/components/ui";
-import { SECTION_LABEL, emptySheet, type SectionKind } from "@/lib/park-sheet";
+import { SECTION_LABEL, emptySheet, todayInOrlando, type SectionKind } from "@/lib/park-sheet";
 import { GuideEditor } from "../guide-editor";
 
 export const metadata = { title: "Nueva ficha" };
@@ -22,7 +22,7 @@ export default async function NewParkGuidePage({ searchParams }: { searchParams:
   return (
     <div className="max-w-5xl">
       <PageHeader title={event ? "Nuevo evento especial" : "Nuevo parque"} back={{ href: "/app/catalogo/fichas", label: "Fichas de parques" }} />
-      <GuideEditor id={null} initial={{ sheet, destination: "DISNEY_WORLD", aliases: [], published: true }} />
+      <GuideEditor id={null} today={todayInOrlando()} initial={{ sheet, destination: "DISNEY_WORLD", aliases: [], published: true, schedule: [] }} />
     </div>
   );
 }

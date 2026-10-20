@@ -8,22 +8,27 @@ import { buttonClass } from "@/components/ui";
 import { ParkSheetForm } from "@/components/park-sheet-form";
 import { ParkSheetCard } from "@/components/park-sheet";
 import { DESTINATIONS } from "@/lib/labels";
-import type { ParkSheet } from "@/lib/park-sheet";
+import type { ParkSheet, ScheduleEntry } from "@/lib/park-sheet";
+import { ScheduleEditor } from "./schedule-editor";
 import { deleteParkGuide, saveParkGuide } from "./actions";
 
 /** Alta y edición de una ficha base (solo admins de la plataforma), con vista previa como la ve el viajero. */
 export function GuideEditor({
   id,
   initial,
+  today,
 }: {
   id: string | null;
-  initial: { sheet: ParkSheet; destination: string; aliases: string[]; published: boolean };
+  initial: { sheet: ParkSheet; destination: string; aliases: string[]; published: boolean; schedule: ScheduleEntry[] };
+  /** Hoy en Orlando (YYYY-MM-DD), para los horarios por fecha. */
+  today: string;
 }) {
   const router = useRouter();
   const [sheet, setSheet] = useState(initial.sheet);
   const [destination, setDestination] = useState(initial.destination);
   const [aliases, setAliases] = useState(initial.aliases.join(", "));
   const [published, setPublished] = useState(initial.published);
+  const [schedule, setSchedule] = useState(initial.schedule);
   const [preview, setPreview] = useState(false);
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [pending, start] = useTransition();
@@ -36,6 +41,7 @@ export function GuideEditor({
         aliases: aliases.split(",").map((a) => a.trim()).filter(Boolean),
         published,
         sheet,
+        schedule,
       });
       if ("error" in res && res.error) return setMessage({ tone: "error", text: res.error });
       setMessage({ tone: "ok", text: "Ficha guardada." });
@@ -94,6 +100,8 @@ export function GuideEditor({
           Publicada (la usan los agentes y la IA)
         </label>
       </div>
+
+      <ScheduleEditor kind={sheet.kind} today={today} schedule={schedule} reference={{ openTime: sheet.openTime, closeTime: sheet.closeTime }} onChange={setSchedule} />
 
       <div className="flex items-center gap-1 border-b border-slate-200">
         {[

@@ -3,7 +3,7 @@
 // de la local a producción). Sin dependencias de servidor.
 import { z } from "zod";
 import { CATALOG_KIND_LABEL, DESTINATION_LABEL, DINING_STYLE_LABEL } from "@/lib/labels";
-import { parseSections } from "@/lib/park-sheet";
+import { parseSchedule, parseSections } from "@/lib/park-sheet";
 import type { CatalogKind, Destination, DiningStyle } from "@/generated/prisma/enums";
 
 export const CATALOG_FORMAT = "crm-magico/catalogo";
@@ -57,6 +57,7 @@ export const ParkGuideExportSchema = z.object({
   arrival: text(200),
   mainShow: text(200),
   sections: z.unknown().transform((v) => parseSections(v)),
+  schedule: z.unknown().transform((v) => parseSchedule(v)),
   published: z.boolean().default(true),
   position: z.number().int().default(0),
 });

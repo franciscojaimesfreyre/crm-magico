@@ -39,7 +39,16 @@ const ICON: Partial<Record<ItemType, typeof Package>> = {
 };
 
 /** Las reservas que componen el viaje: cada una con su proveedor, pagos y comisión. */
-export function Items({ booking: b, defaultRate }: { booking: LoadedBooking; defaultRate: number }) {
+export function Items({
+  booking: b,
+  defaultRate,
+  eventWarnings = {},
+}: {
+  booking: LoadedBooking;
+  defaultRate: number;
+  /** Por reserva: el aviso si el evento especial no figura en esa fecha entre las cargadas en su ficha. */
+  eventWarnings?: Record<string, string>;
+}) {
   const directUpload = storageMode() === "r2";
   const tripTravelers = b.travelers.map((t) => t.travelerId);
   const travelerOptions = b.client.travelers.map((t) => {
@@ -89,6 +98,11 @@ export function Items({ booking: b, defaultRate }: { booking: LoadedBooking; def
                 </div>
                 <p className="font-medium text-slate-900">{item.description}</p>
                 <ReservationBasics item={item} />
+                {eventWarnings[item.id] && (
+                  <p className="mt-1.5 flex items-start gap-1.5 rounded-lg bg-amber-50 px-2 py-1.5 text-xs text-amber-800">
+                    <AlertTriangle className="mt-px size-3.5 shrink-0" /> {eventWarnings[item.id]} Revisá la fecha de la reserva.
+                  </p>
+                )}
                 <ReservationPayments item={item} currency={b.currency} />
               </div>
               <div className="ml-14 sm:ml-0 sm:text-right">

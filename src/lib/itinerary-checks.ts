@@ -18,10 +18,16 @@ export type CheckEntry = {
 /** Período en que una atracción está cerrada (fechas YYYY-MM-DD; null = sin límite). */
 export type Closure = { from: string | null; to: string | null; reason: string | null };
 
-/** El cierre que rige en una fecha, si lo hay. */
+/**
+ * El cierre que rige en una fecha, si lo hay. Si hay varios (por ejemplo, el del catálogo sin fecha de
+ * reapertura y el de una novedad que sí la tiene), gana el que tiene fecha de reapertura (la más lejana):
+ * "sin fecha" queda solo cuando ninguno la tiene.
+ */
 export function closureOn(e: Pick<CheckEntry, "closures">, date: string | null) {
   if (!date) return null;
-  return e.closures.find((c) => (!c.from || c.from <= date) && (!c.to || c.to >= date)) ?? null;
+  const active = e.closures.filter((c) => (!c.from || c.from <= date) && (!c.to || c.to >= date));
+  const dated = active.filter((c) => c.to).sort((a, b) => b.to!.localeCompare(a.to!));
+  return dated[0] ?? active[0] ?? null;
 }
 
 const ddmm = (iso: string) => iso.slice(8, 10) + "/" + iso.slice(5, 7) + "/" + iso.slice(0, 4);

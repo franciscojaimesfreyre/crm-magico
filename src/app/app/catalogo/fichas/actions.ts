@@ -5,7 +5,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { DESTINATION_LABEL } from "@/lib/labels";
-import { ParkSheetSchema, SECTION_LABEL, cleanSheet } from "@/lib/park-sheet";
+import { ParkSheetSchema, SECTION_LABEL, cleanSheet, parseSchedule, todayInOrlando } from "@/lib/park-sheet";
 import { DEFAULT_GUIDES } from "@/lib/park-guide-defaults";
 import type { Destination } from "@/generated/prisma/enums";
 
@@ -21,6 +21,7 @@ const GuideInputSchema = z.object({
   aliases: z.array(z.string().trim().min(1).max(100)).max(20),
   published: z.boolean(),
   sheet: ParkSheetSchema,
+  schedule: z.array(z.unknown()).max(400).default([]),
 });
 
 export type GuideInput = z.input<typeof GuideInputSchema>;
@@ -31,6 +32,9 @@ export async function saveParkGuide(id: string | null, input: GuideInput) {
   const parsed = GuideInputSchema.safeParse(input);
   if (!parsed.success) return { error: "La ficha tiene datos inválidos." };
   const { sheet: raw, destination, aliases, published } = parsed.data;
+  // Horarios por fecha: sin días pasados ni filas vacías.
+  const today = todayInOrlando();
+  const schedule = parseSchedule(parsed.data.schedule).filter((d) => d.date >= today && (d.openTime || d.closeTime || d.note.trim()));
   const sheet = cleanSheet(raw);
   if (!sheet.name) return { error: "Poné el nombre del parque o del evento." };
   if (sheet.kind === "EVENT" && !sheet.park?.trim()) return { error: "Indicá en qué parque se hace el evento." };
@@ -46,6 +50,7 @@ export async function saveParkGuide(id: string | null, input: GuideInput) {
     arrival: sheet.arrival || null,
     mainShow: sheet.mainShow || null,
     sections: sheet.sections,
+    schedule,
     published,
   };
   const saved = id ? await db.parkGuide.update({ where: { id }, data }) : await db.parkGuide.create({ data });
@@ -91,4 +96,25 @@ export async function loadDefaultGuides() {
   }
   revalidatePath("/app/catalogo/fichas");
   return { created };
+}
+
+/**
+ * Suma horarios por fecha a varias fichas a la vez (los que se leyeron del calendario de Disney).
+ * Reemplaza los de esas mismas fechas y deja los demás; descarta las fechas pasadas.
+ */
+export async function applyGuideSchedules(updates: { guideId: string; entries: unknown[] }[]) {
+  await requirePlatformAdmin();
+  const today = todayInOrlando();
+  let days = 0;
+  for (const u of updates.slice(0, 50)) {
+    const guide = await db.parkGuide.findUnique({ where: { id: u.guideId }, select: { schedule: true } });
+    if (!guide) continue;
+    const incoming = parseSchedule(u.entries);
+    const dates = new Set(incoming.map((e) => e.date));
+    const schedule = parseSchedule([...parseSchedule(guide.schedule).filter((e) => !dates.has(e.date)), ...incoming]).filter((e) => e.date >= today);
+    await db.parkGuide.update({ where: { id: u.guideId }, data: { schedule } });
+    days += incoming.length;
+  }
+  revalidatePath("/app/catalogo/fichas");
+  return { days };
 }

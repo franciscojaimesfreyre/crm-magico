@@ -100,6 +100,30 @@ export function cleanSheet(sheet: ParkSheet): ParkSheet {
   return { ...sheet, name: sheet.name.trim(), hoursNote: sheet.hoursNote.trim(), arrival: sheet.arrival.trim(), mainShow: sheet.mainShow.trim(), sections };
 }
 
+const ScheduleEntrySchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  openTime: time,
+  closeTime: time,
+  note: z.string().max(200).catch(""),
+});
+
+/** Horario de un parque o evento en una fecha (las fichas base guardan varios: ver ParkGuide.schedule). */
+export type ScheduleEntry = z.infer<typeof ScheduleEntrySchema>;
+
+/** Los horarios por fecha de una ficha base (JSON), ordenados y sin repetir fechas. */
+export function parseSchedule(value: unknown): ScheduleEntry[] {
+  if (!Array.isArray(value)) return [];
+  const byDate = new Map<string, ScheduleEntry>();
+  for (const v of value) {
+    const parsed = ScheduleEntrySchema.safeParse(v);
+    if (parsed.success) byDate.set(parsed.data.date, parsed.data);
+  }
+  return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/** "Hoy" en Orlando (YYYY-MM-DD): los horarios de los parques se cargan con la fecha local. */
+export const todayInOrlando = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
+
 /** Ficha base del catálogo, tal como llega al editor. */
 export type GuideOption = {
   id: string;
@@ -114,19 +138,22 @@ export type GuideOption = {
   arrival: string | null;
   mainShow: string | null;
   sections: SheetSection[];
+  schedule: ScheduleEntry[];
 };
 
-/** Copia de la ficha base para un día del itinerario. */
-export function sheetFromGuide(g: GuideOption): ParkSheet {
+/** Copia de la ficha base para un día del itinerario: con el horario cargado para esa fecha, si lo hay. */
+export function sheetFromGuide(g: GuideOption, date?: string | null): ParkSheet {
+  const day = date ? g.schedule.find((s) => s.date === date) : undefined;
   return {
     v: 2,
     guideId: g.id,
     kind: g.kind,
     name: g.name,
     park: g.park,
-    openTime: g.openTime,
-    closeTime: g.closeTime,
-    hoursNote: g.hoursNote ?? "",
+    openTime: day ? day.openTime : g.openTime,
+    closeTime: day ? day.closeTime : g.closeTime,
+    // El horario del día ya no es "de referencia": queda la nota de ese día (Early Entry, cierre por fiesta…).
+    hoursNote: day ? day.note : (g.hoursNote ?? ""),
     arrival: g.arrival ?? "",
     mainShow: g.mainShow ?? "",
     sections: structuredClone(g.sections),
@@ -184,6 +211,28 @@ export function matchEventGuide(text: string, guides: GuideOption[], destination
     if (s > score) [best, score] = [g, s];
   }
   return best;
+}
+
+/**
+ * Si un evento tiene fechas cargadas y la fecha elegida no es una de ellas: la fecha cargada anterior y
+ * la siguiente más cercanas (para avisar). null si no hay fechas cargadas o si la fecha está.
+ */
+export function eventDateMismatch(g: Pick<GuideOption, "kind" | "schedule">, date: string | null) {
+  if (g.kind !== "EVENT" || !date || g.schedule.length === 0 || g.schedule.some((s) => s.date === date)) return null;
+  const prev = [...g.schedule].reverse().find((s) => s.date < date) ?? null;
+  const next = g.schedule.find((s) => s.date > date) ?? null;
+  return { prev, next };
+}
+
+const dm = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+const hours = (s: ScheduleEntry) => (s.openTime && s.closeTime ? ` (${s.openTime}–${s.closeTime})` : "");
+
+/** "Mickey's Not-So-Scary Halloween Party no figura el 21/10. Fechas cercanas: 20/10 (19:00–00:00) y 23/10 (19:00–00:00)." */
+export function eventDateWarning(g: Pick<GuideOption, "kind" | "schedule" | "name">, date: string | null) {
+  const m = eventDateMismatch(g, date);
+  if (!m) return null;
+  const near = [m.prev, m.next].filter((x): x is ScheduleEntry => !!x).map((x) => `${dm(x.date)}${hours(x)}`);
+  return `${g.name} no figura el ${dm(date!)} entre las fechas cargadas.${near.length ? ` ${near.length > 1 ? "Fechas cercanas" : "Fecha más cercana"}: ${near.join(" y ")}.` : ""}`;
 }
 
 /** Evento especial reservado para un día del viaje (sale de las reservas de tipo evento). */

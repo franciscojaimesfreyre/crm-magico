@@ -615,6 +615,9 @@ model ParkGuide {
   arrival     String? // llegada recomendada
   mainShow    String? // show principal
   sections    Json // [{ kind, title, items: [{ name, detail, time }], note }]
+  /// Horarios por fecha: [{ date, openTime, closeTime, note }]. En parques, hoy y los días siguientes;
+  /// en eventos, las próximas fechas en que se hace. Mandan sobre openTime/closeTime ese día.
+  schedule    Json          @default("[]")
   published   Boolean       @default(true)
   position    Int           @default(0)
   createdAt   DateTime      @default(now())

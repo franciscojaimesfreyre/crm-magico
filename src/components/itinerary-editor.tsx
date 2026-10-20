@@ -27,7 +27,7 @@ import { GUIDE_PICK_KINDS, GUIDE_PICK_LABEL, hasGuide, type GuidePick, type Guid
 import { PlaceGuideCard } from "@/components/place-guide";
 import { ParkSheetCard } from "@/components/park-sheet";
 import { ParkSheetForm } from "@/components/park-sheet-form";
-import { emptySheet, eventTitle, sheetForPark, sheetFromGuide, sheetNames, type GuideOption, type ParkSheet, type TripEvent } from "@/lib/park-sheet";
+import { emptySheet, eventDateWarning, eventTitle, sheetForPark, sheetFromGuide, sheetNames, type GuideOption, type ParkSheet, type TripEvent } from "@/lib/park-sheet";
 
 // ─── Estado del editor ───────────────────────────────────────────────────────
 
@@ -192,7 +192,7 @@ export function ItineraryEditor({
     if (item.type !== "PARK" || item.sheet) return item;
     const found = sheetForPark(item.title, date, parkGuides, events);
     if (!found) return item;
-    const sheet = sheetFromGuide(found.guide);
+    const sheet = sheetFromGuide(found.guide, date);
     const timed = !item.startTime && !item.endTime;
     return {
       ...item,
@@ -205,7 +205,7 @@ export function ItineraryEditor({
 
   /** Actividad nueva para un evento reservado (o la ficha del evento en el parque que ya estaba ese día). */
   function placeEvent(day: DayState, guide: GuideOption): DayState {
-    const sheet = sheetFromGuide(guide);
+    const sheet = sheetFromGuide(guide, day.date);
     const event = { title: eventTitle(guide), sheet, startTime: sheet.openTime, endTime: sheet.closeTime };
     const park = guide.park ? day.items.findIndex((i) => i.type === "PARK" && (i.sheet?.name === guide.park || sheetForPark(i.title, null, parkGuides, [])?.guide.name === guide.park)) : -1;
     // El día sin título toma el del evento.
@@ -291,7 +291,26 @@ export function ItineraryEditor({
   }
 
   function patchDay(key: string, patch: Partial<DayState>) {
-    update((prev) => prev.map((d) => (d.key === key ? { ...d, ...patch } : d)));
+    update((prev) => prev.map((d) => (d.key === key ? retimeDay({ ...d, ...patch }, d.date) : d)));
+  }
+
+  /**
+   * Si cambia la fecha del día, los parques y eventos con ficha del catálogo toman el horario cargado
+   * para la fecha nueva (o el de referencia). La hora de la actividad se ajusta solo si no la cambiaron a mano.
+   */
+  function retimeDay(day: DayState, previous: string | null): DayState {
+    if (day.date === previous) return day;
+    return {
+      ...day,
+      items: day.items.map((i) => {
+        const g = i.sheet?.guideId ? parkGuides.find((x) => x.id === i.sheet!.guideId) : undefined;
+        if (!i.sheet || !g) return i;
+        const fresh = sheetFromGuide(g, day.date);
+        const sheet = { ...i.sheet, openTime: fresh.openTime, closeTime: fresh.closeTime, hoursNote: fresh.hoursNote };
+        const untouched = i.startTime === i.sheet.openTime && i.endTime === i.sheet.closeTime;
+        return { ...i, sheet, ...(untouched ? { startTime: fresh.openTime, endTime: fresh.closeTime } : {}) };
+      }),
+    };
   }
 
   function removeDay(key: string) {
@@ -353,9 +372,8 @@ export function ItineraryEditor({
     if (id.startsWith("guide:")) {
       const g = parkGuides.find((x) => x.id === id.slice(6));
       if (!g) return null;
-      return g.kind === "EVENT"
-        ? { type: "PARK", title: eventTitle(g), location: g.park, sheet: sheetFromGuide(g), startTime: g.openTime, endTime: g.closeTime }
-        : { type: "PARK", title: g.name };
+      // La ficha (con el horario de ese día) se arma al soltarla en el día: ver onDragEnd.
+      return { type: "PARK", title: g.kind === "EVENT" ? eventTitle(g) : g.name, location: g.kind === "EVENT" ? g.park : null };
     }
     if (id.startsWith("tpl:")) {
       const t = templates.find((x) => x.id === id.slice(4));
@@ -410,7 +428,9 @@ export function ItineraryEditor({
       update((prev) =>
         prev.map((d, di) => {
           if (di !== targetDay) return d;
-          const placed = withSheet(item, d.date);
+          const chip = activeId.startsWith("guide:") ? parkGuides.find((g) => g.id === activeId.slice(6)) : undefined;
+          const sheet = chip && sheetFromGuide(chip, d.date);
+          const placed = sheet ? { ...item, sheet, startTime: sheet.openTime, endTime: sheet.closeTime } : withSheet(item, d.date);
           return { ...d, items: [...d.items.slice(0, targetIndex), placed, ...d.items.slice(targetIndex)] };
         }),
       );
@@ -887,6 +907,7 @@ function DayColumn({
             <span>
               Este día tienen reservado <strong>{g.name}</strong>
               {g.park && ` en ${g.park}`}. <span className="font-medium underline">Sumarlo con su ficha y sus horarios</span>
+              {eventDateWarning(g, day.date) && <span className="mt-0.5 block text-amber-800">{eventDateWarning(g, day.date)}</span>}
             </span>
           </button>
         ))}
@@ -1089,7 +1110,7 @@ function ParkSection({
   const sheet = item.sheet;
   const base = sheet?.guideId ? guides.find((g) => g.id === sheet.guideId) : undefined;
   const use = (g: GuideOption) => {
-    const next = sheetFromGuide(g);
+    const next = sheetFromGuide(g, date);
     onPatch({
       sheet: next,
       guide: null,
@@ -1123,6 +1144,7 @@ function ParkSection({
   }
 
   const isClosed = (s: ParkSheet["sections"][number], name: string) => !["DINING", "SNACKS", "CHARACTERS", "TIPS"].includes(s.kind) && !!closedNote?.(name);
+  const eventWarning = base ? eventDateWarning(base, date) : null;
   const closedCount = sheet.sections.reduce((n, s) => n + s.items.filter((it) => isClosed(s, it.name)).length, 0);
   const removeClosed = () => onPatch({ sheet: { ...sheet, sections: sheet.sections.map((s) => ({ ...s, items: s.items.filter((it) => !isClosed(s, it.name)) })) } });
 
@@ -1150,6 +1172,11 @@ function ParkSection({
         </div>
       ) : (
         <ParkSheetCard sheet={sheet} closedNote={closedNote} />
+      )}
+      {eventWarning && (
+        <p className="mt-1.5 flex items-start gap-1.5 rounded-lg bg-amber-50 px-2 py-1.5 text-xs text-amber-800">
+          <AlertTriangle className="mt-px size-3.5 shrink-0" /> {eventWarning} Revisá la fecha de la reserva o del día.
+        </p>
       )}
       {closedCount > 0 && !editingSheet && (
         <p className="mt-1.5 flex flex-wrap items-center gap-x-2 text-xs text-rose-700">

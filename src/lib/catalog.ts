@@ -138,8 +138,10 @@ export async function catalogForTrip(trip: TripForCatalog, attractionNote?: (e: 
   const closedText = closed.length
     ? `\n\nCerradas en las fechas del viaje (no incluirlas):\n${closed
         .map((e) => {
+          // Si la novedad trae fecha de reapertura, manda sobre un cierre del catálogo sin fecha.
           const c = newsClosure(e);
-          const label = closedDuring(e, from, to) ? closureLabel(e) : `según la novedad «${c!.reason}»`;
+          const fromNews = c && (c.to || !closedDuring(e, from, to));
+          const label = fromNews ? `según la novedad «${c.reason}»${c.to ? `, hasta ${c.to}` : ""}` : closureLabel(e);
           return `- ${e.name} (${e.area}): ${label}${e.notes ? `. ${e.notes}` : ""}`;
         })
         .join("\n")}`

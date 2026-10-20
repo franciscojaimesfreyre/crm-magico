@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { toDateInput } from "@/lib/format";
-import { parseSections } from "@/lib/park-sheet";
+import { parseSchedule, parseSections } from "@/lib/park-sheet";
 import { CATALOG_FORMAT, type CatalogEntryExport, type ParkGuideExport } from "@/lib/catalog-io";
 
 /** Descarga en JSON todo el catálogo de parques: lugares (atracciones, shows, restaurantes, shoppings) y fichas. */
@@ -37,6 +37,7 @@ export async function GET() {
     arrival: g.arrival,
     mainShow: g.mainShow,
     sections: parseSections(g.sections),
+    schedule: parseSchedule(g.schedule),
     published: g.published,
     position: g.position,
   }));

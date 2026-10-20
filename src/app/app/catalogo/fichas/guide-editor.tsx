@@ -17,11 +17,14 @@ export function GuideEditor({
   id,
   initial,
   today,
+  apiParks = [],
 }: {
   id: string | null;
-  initial: { sheet: ParkSheet; destination: string; aliases: string[]; published: boolean; schedule: ScheduleEntry[] };
+  initial: { sheet: ParkSheet; destination: string; aliases: string[]; published: boolean; schedule: ScheduleEntry[]; apiId?: string | null };
   /** Hoy en Orlando (YYYY-MM-DD), para los horarios por fecha. */
   today: string;
+  /** Parques de ThemeParks.wiki para vincular la ficha (de donde salen sus horarios). */
+  apiParks?: { id: string; name: string; destination: string }[];
 }) {
   const router = useRouter();
   const [sheet, setSheet] = useState(initial.sheet);
@@ -29,6 +32,7 @@ export function GuideEditor({
   const [aliases, setAliases] = useState(initial.aliases.join(", "));
   const [published, setPublished] = useState(initial.published);
   const [schedule, setSchedule] = useState(initial.schedule);
+  const [apiId, setApiId] = useState(initial.apiId ?? "");
   const [preview, setPreview] = useState(false);
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [pending, start] = useTransition();
@@ -42,6 +46,7 @@ export function GuideEditor({
         published,
         sheet,
         schedule,
+        apiId: apiId || null,
       });
       if ("error" in res && res.error) return setMessage({ tone: "error", text: res.error });
       setMessage({ tone: "ok", text: "Ficha guardada." });
@@ -95,6 +100,25 @@ export function GuideEditor({
             Separados por coma. {event ? "Sirven para reconocer el evento en la descripción de una reserva." : "Sirven para reconocer el parque en el título de una actividad."}
           </span>
         </label>
+        {!event && (apiParks.length > 0 || apiId) && (
+          <label className="block sm:col-span-6">
+            <span className="label">Horarios automáticos</span>
+            <select className="field" value={apiId} onChange={(e) => setApiId(e.target.value)}>
+              <option value="">Sin vincular (horarios solo a mano)</option>
+              {apiId && !apiParks.some((p) => p.id === apiId) && <option value={apiId}>Parque vinculado</option>}
+              {apiParks
+                .filter((p) => p.destination === destination || p.id === apiId)
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+            </select>
+            <span className="mt-1 block text-xs text-slate-400">
+              Parque de ThemeParks.wiki del que se traen los horarios, el Early Entry y los precios de Lightning Lane una vez por día.
+            </span>
+          </label>
+        )}
         <label className="flex items-center gap-2 text-sm text-slate-700 sm:col-span-6">
           <input type="checkbox" checked={published} onChange={(e) => setPublished(e.target.checked)} className="rounded border-slate-300" />
           Publicada (la usan los agentes y la IA)

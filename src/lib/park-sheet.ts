@@ -105,6 +105,14 @@ const ScheduleEntrySchema = z.object({
   openTime: time,
   closeTime: time,
   note: z.string().max(200).catch(""),
+  /** Precios de Lightning Lane de ese día (Multi Pass, Premier Pass y por atracción). Solo Disney. */
+  lightningLane: z
+    .array(z.object({ name: z.string().max(200), price: z.string().max(30), available: z.boolean() }))
+    .max(80)
+    .optional()
+    .catch(undefined),
+  /** El día lo cargó la sincronización con ThemeParks.wiki: se actualiza solo y no se exporta. */
+  synced: z.boolean().optional().catch(undefined),
 });
 
 /** Horario de un parque o evento en una fecha (las fichas base guardan varios: ver ParkGuide.schedule). */

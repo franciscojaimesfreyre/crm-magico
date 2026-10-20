@@ -58,7 +58,8 @@ Usuarios de ejemplo (después de `npm run db:seed`):
 | `UPLOAD_DIR` | Carpeta de archivos subidos cuando no se usa R2 (por defecto `./storage/uploads`) |
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | Archivos en Cloudflare R2. Si están, el navegador sube directo a R2 y las descargas usan links firmados que vencen en minutos |
 | `SMTP_*` | Envío real de emails. Sin SMTP, los emails quedan registrados en *Plantillas de email → Últimos emails* |
-| `CRON_SECRET` | Protege `/api/cron/automatizaciones` |
+| `CRON_SECRET` | Protege `/api/cron/automatizaciones` y `/api/cron/themeparks` |
+| `THEMEPARKS_API_KEY` | Opcional: clave de ThemeParks.wiki. Sin clave funciona igual; con clave el historial de esperas llega a 30 días |
 
 ### Scripts
 
@@ -148,6 +149,15 @@ Las automatizaciones por fecha (días antes del viaje, del pago final, de un cum
 - con un cron diario: `GET /api/cron/automatizaciones` con el header `Authorization: Bearer $CRON_SECRET`.
 
 Cada automatización se ejecuta una sola vez por viaje y por fecha. Los recordatorios de saldo salen por cada reserva con su propio vencimiento (variables `{{reservation}}` y `{{finalPaymentDue}}`; `{{pendingPayments}}` lista todos los saldos pendientes del viaje).
+
+## Horarios y catálogo desde ThemeParks.wiki
+
+Una vez por día se traen de [ThemeParks.wiki](https://www.themeparks.wiki/) (API gratuita, sin clave):
+
+- **Horarios de las fichas de parques**: el mes en curso y los dos siguientes (lo que ya publicó cada parque), con Early Entry o Early Park Admission, horario nocturno extendido y precios de Lightning Lane. Las noches con entrada aparte se cargan en la ficha del evento (fiesta de Halloween, de Navidad, HHN…). Cada ficha se vincula sola con su parque por nombre; se puede cambiar en la ficha (*Horarios automáticos*).
+- **Catálogo**: vincula cada lugar por nombre y parque, carga como cerradas las atracciones en remodelación (Disney las marca; en Universal, las que no funcionaron ni un minuto en los últimos 3 días con el parque abierto) y levanta el cierre cuando reabren. Los cierres cargados a mano no se tocan. También guarda la espera típica de cada atracción, que usa la IA, y lista lo que está en la API y falta en el catálogo.
+
+Corre sola cuando alguien abre el inicio (si pasaron más de 12 horas), con **Actualizar desde ThemeParks.wiki** en el catálogo, o con un cron diario: `GET /api/cron/themeparks` con el header `Authorization: Bearer $CRON_SECRET`. Sus condiciones piden mostrar "Powered by ThemeParks.wiki" donde se ven sus datos y no permiten redistribuirlos: por eso los días y cierres que vienen de la API no salen en el JSON exportado.
 
 ## Estructura
 

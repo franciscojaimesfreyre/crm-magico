@@ -22,9 +22,9 @@ export function closedDuring(e: Pick<CatalogEntry, "closedFrom" | "closedTo">, f
   return e.closedFrom <= to && (!e.closedTo || e.closedTo >= from);
 }
 
-export function closureLabel(e: Pick<CatalogEntry, "closedFrom" | "closedTo">) {
+export function closureLabel(e: Pick<CatalogEntry, "closedFrom" | "closedTo"> & { closedByApi?: boolean }) {
   if (!e.closedFrom) return "";
-  return `cerrada desde ${toDateInput(e.closedFrom)}${e.closedTo ? ` hasta ${toDateInput(e.closedTo)}` : " (sin fecha de reapertura confirmada)"}`;
+  return `cerrada desde ${toDateInput(e.closedFrom)}${e.closedTo ? ` hasta ${toDateInput(e.closedTo)}` : " (sin fecha de reapertura confirmada)"}${e.closedByApi ? " según ThemeParks.wiki" : ""}`;
 }
 
 /**
@@ -51,8 +51,8 @@ export async function knowledgeClosures(organizationId: string | null, entries: 
 }
 
 /** Cierre cargado en la atracción del catálogo, en el mismo formato que los de las novedades. */
-const entryClosures = (e: Pick<CatalogEntry, "closedFrom" | "closedTo">): Closure[] =>
-  e.closedFrom ? [{ from: toDateInput(e.closedFrom), to: e.closedTo ? toDateInput(e.closedTo) : null, reason: null }] : [];
+const entryClosures = (e: Pick<CatalogEntry, "closedFrom" | "closedTo" | "closedByApi">): Closure[] =>
+  e.closedFrom ? [{ from: toDateInput(e.closedFrom), to: e.closedTo ? toDateInput(e.closedTo) : null, reason: e.closedByApi ? "según ThemeParks.wiki" : null }] : [];
 
 const KIND_HEADING = { ATTRACTION: "Atracciones", SHOW: "Shows", RESTAURANT: "Restaurantes", SHOPPING: "Shoppings" } as const;
 
@@ -116,6 +116,7 @@ export async function catalogForTrip(trip: TripForCatalog, attractionNote?: (e: 
     const meta = [
       e.mustDo && "IMPERDIBLE",
       e.kind === "ATTRACTION" && attractionNote?.(e),
+      e.typicalWait && `espera típica ${e.typicalWait} min`,
       e.diningStyle && DINING_STYLE_LABEL[e.diningStyle].toLowerCase(),
       e.priceLevel && priceSigns(e.priceLevel),
       e.notes,

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import clsx from "clsx";
-import { Check, Star, Trash2 } from "lucide-react";
+import { Check, Link2Off, Plus, Star, Trash2 } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { ConfirmButton } from "@/components/form-controls";
@@ -10,7 +10,10 @@ import { closedDuring, closureLabel, heightLabel, inchesToCm } from "@/lib/catal
 import { formatDate, todayUTC } from "@/lib/format";
 import type { Prisma } from "@/generated/prisma/client";
 import type { CatalogKind, Destination } from "@/generated/prisma/enums";
-import { deleteCatalogEntry, markCatalogVerified, toggleCatalogMustDo } from "./actions";
+import { missingFromCatalog } from "@/lib/catalog-sync";
+import { ThemeParksCredit } from "@/components/themeparks";
+import { addCatalogEntryFromApi, deleteCatalogEntry, markCatalogVerified, toggleCatalogMustDo } from "./actions";
+import { ThemeParksSync } from "./themeparks-sync";
 import { CatalogTabs } from "./tabs";
 import { CatalogImportExport } from "./import-export";
 
@@ -34,12 +37,17 @@ export default async function CatalogPage({
   if (f.estado === "sin-revisar") where.verifiedAt = null;
   if (f.estado === "cerradas") where.closedFrom = { not: null };
   if (f.estado === "imperdibles") where.mustDo = true;
+  if (f.estado === "sin-vincular") Object.assign(where, { apiId: null, kind: { not: "SHOPPING" } });
 
-  const [entries, areas, counts] = await Promise.all([
+  const [entries, areas, counts, lastSync, missing] = await Promise.all([
     db.catalogEntry.findMany({ where, orderBy: [{ area: "asc" }, { kind: "asc" }, { name: "asc" }] }),
     db.catalogEntry.findMany({ where: { destination }, distinct: ["area"], select: { area: true }, orderBy: { area: "asc" } }),
     db.catalogEntry.groupBy({ by: ["destination"], _count: true }),
+    db.parkGuide.aggregate({ where: { kind: "PARK" }, _max: { syncedAt: true } }),
+    // Lo que figura en ThemeParks.wiki y no en el catálogo (solo para los administradores; sin conexión, nada).
+    user.isPlatformAdmin ? missingFromCatalog(destination).catch(() => []) : [],
   ]);
+  const synced = entries.some((e) => e.syncedAt);
   const byArea = new Map<string, typeof entries>();
   for (const e of entries) byArea.set(e.area, [...(byArea.get(e.area) ?? []), e]);
   const destinations = DESTINATIONS.filter((d) => counts.some((c) => c.destination === d.value) || d.value === destination).map((d) => ({
@@ -57,6 +65,7 @@ export default async function CatalogPage({
           <div className="flex flex-wrap items-start gap-2">
             <CatalogImportExport canImport={user.isPlatformAdmin} />
             {user.isPlatformAdmin && <LinkButton href="/app/catalogo/nueva">Agregar</LinkButton>}
+            {user.isPlatformAdmin && <ThemeParksSync lastSync={lastSync._max.syncedAt?.toISOString() ?? null} />}
           </div>
         }
       />
@@ -73,6 +82,7 @@ export default async function CatalogPage({
             { value: "sin-revisar", label: "Sin revisar" },
             { value: "cerradas", label: "Con cierre cargado" },
             { value: "imperdibles", label: "Imperdibles" },
+            { value: "sin-vincular", label: "Sin vincular a ThemeParks.wiki" },
           ]}
           placeholder="Todas"
         />
@@ -114,6 +124,9 @@ export default async function CatalogPage({
                           {e.name}
                           {e.mustDo && <span className="ml-2 text-xs font-normal text-amber-700">Imperdible</span>}
                           {e.closedFrom && <span className="ml-2 text-xs font-normal text-rose-600">{closureLabel(e)}</span>}
+                          {user.isPlatformAdmin && e.syncedAt === null && !e.apiId && e.kind !== "SHOPPING" && synced && (
+                            <Link2Off className="ml-2 inline size-3.5 text-slate-300" aria-label="Sin vincular a ThemeParks.wiki" />
+                          )}
                         </p>
                         {e.notes && <p className="text-xs text-slate-500">{e.notes}</p>}
                       </div>
@@ -130,6 +143,7 @@ export default async function CatalogPage({
                           ))}
                         {e.diningStyle && DINING_STYLE_LABEL[e.diningStyle]}
                         {e.priceLevel && <span className="ml-1 font-medium text-emerald-700">{priceSigns(e.priceLevel)}</span>}
+                        {e.typicalWait && <span className="block text-slate-500">Espera típica {e.typicalWait} min</span>}
                       </span>
                       <span className="w-28 text-xs">
                         {e.verifiedAt ? (
@@ -172,7 +186,41 @@ export default async function CatalogPage({
               </ul>
             </Card>
           ))}
+          {synced && <ThemeParksCredit className="block text-right" />}
         </div>
+      )}
+
+      {missing.some((p) => p.entities.length > 0) && (
+        <Card className="mt-6">
+          <div className="border-b border-slate-100 px-5 py-3">
+            <h2 className="font-semibold text-slate-900">En ThemeParks.wiki y no en el catálogo</h2>
+            <p className="text-xs text-slate-500">Atracciones, shows y restaurantes nuevos (o que todavía no se cargaron). Al sumarlos, completá la altura, el tipo de restaurante o el precio.</p>
+          </div>
+          {missing
+            .filter((p) => p.entities.length > 0)
+            .map((p) => (
+              <details key={p.area} className="border-b border-slate-100 px-5 py-2.5 last:border-0">
+                <summary className="cursor-pointer text-sm font-medium text-slate-800 select-none">
+                  {p.area} <span className="font-normal text-slate-500">· {p.entities.length}</span>
+                </summary>
+                <ul className="mt-2 grid gap-x-4 gap-y-1 sm:grid-cols-2">
+                  {p.entities.map((x) => (
+                    <li key={x.id} className="flex items-center justify-between gap-2 text-sm">
+                      <span className="min-w-0 truncate text-slate-700" title={x.name}>
+                        {x.name} <span className="text-xs text-slate-400">{CATALOG_KIND_LABEL[x.entityType as CatalogKind]}</span>
+                      </span>
+                      <form action={addCatalogEntryFromApi.bind(null, { destination, area: p.area, name: x.name, kind: x.entityType as CatalogKind, apiId: x.id })}>
+                        <button className={buttonClass("ghost", "sm")} title="Sumar al catálogo">
+                          <Plus className="size-3.5" />
+                        </button>
+                      </form>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            ))}
+          <ThemeParksCredit className="block px-5 pb-3 text-right" />
+        </Card>
       )}
     </>
   );

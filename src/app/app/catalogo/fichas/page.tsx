@@ -11,6 +11,7 @@ import { CatalogTabs } from "../tabs";
 import { loadDefaultGuides } from "./actions";
 import { CatalogImportExport } from "../import-export";
 import { HoursImport } from "./hours-import";
+import { ThemeParksSync } from "../themeparks-sync";
 
 export const metadata = { title: "Fichas de parques" };
 
@@ -18,6 +19,7 @@ export default async function ParkGuidesPage() {
   const user = await requireUser();
   const today = todayInOrlando();
   const guides = await db.parkGuide.findMany({ orderBy: [{ destination: "asc" }, { kind: "asc" }, { position: "asc" }, { name: "asc" }] });
+  const lastSync = guides.reduce<Date | null>((max, g) => (g.syncedAt && (!max || g.syncedAt > max) ? g.syncedAt : max), null);
   const byDestination = new Map<string, typeof guides>();
   for (const g of guides) byDestination.set(g.destination, [...(byDestination.get(g.destination) ?? []), g]);
 
@@ -50,7 +52,8 @@ export default async function ParkGuidesPage() {
       />
       <CatalogTabs active="fichas" />
       {user.isPlatformAdmin && guides.length > 0 && (
-        <div className="mb-4 flex flex-wrap justify-end gap-2">
+        <div className="mb-4 flex flex-wrap items-start justify-end gap-2">
+          <ThemeParksSync lastSync={lastSync?.toISOString() ?? null} />
           {(["disney", "universal"] as const).map((source) => (
             <HoursImport
               key={source}

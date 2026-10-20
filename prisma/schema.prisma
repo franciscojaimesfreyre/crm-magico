@@ -618,6 +618,10 @@ model ParkGuide {
   /// Horarios por fecha: [{ date, openTime, closeTime, note }]. En parques, hoy y los días siguientes;
   /// en eventos, las próximas fechas en que se hace. Mandan sobre openTime/closeTime ese día.
   schedule    Json          @default("[]")
+  /// Parque en ThemeParks.wiki (id de la API) del que se sincronizan los horarios. Solo en parques.
+  apiId       String?
+  /// Última sincronización de horarios con ThemeParks.wiki.
+  syncedAt    DateTime?
   published   Boolean       @default(true)
   position    Int           @default(0)
   createdAt   DateTime      @default(now())
@@ -661,6 +665,11 @@ model CatalogEntry {
   closedFrom  DateTime?    @db.Date // cerrada (remodelación) desde
   closedTo    DateTime?    @db.Date // hasta (vacío = sin fecha de reapertura confirmada)
   verifiedAt  DateTime? // última vez que un administrador la revisó contra la fuente oficial
+  /// Sincronización diaria con ThemeParks.wiki (lib/catalog-sync.ts).
+  apiId       String? // id de la atracción, show o restaurante en la API
+  closedByApi Boolean      @default(false) // el cierre lo cargó la sincronización: lo levanta sola cuando reabre
+  typicalWait Int? // espera típica en minutos (mediana de los últimos días)
+  syncedAt    DateTime?
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 

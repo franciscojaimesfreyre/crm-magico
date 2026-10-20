@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ClipboardPaste, ExternalLink, X } from "lucide-react";
 import { buttonClass } from "@/components/ui";
-import { dayNote, parseDisneyFiveDay, parseUniversalHours } from "@/lib/park-hours";
+import { dayNote, guessEvent, parseDisneyFiveDay, parseUniversalHours } from "@/lib/park-hours";
 import { matchParkGuide, type GuideOption } from "@/lib/park-sheet";
 import { applyGuideSchedules } from "./actions";
 
@@ -34,13 +34,6 @@ const short = (date: string) => `${date.slice(8, 10)}/${date.slice(5, 7)}`;
 const clock = (t: string | null) => t?.replace(/^0(\d)/, "$1") ?? "…";
 
 type Guide = Pick<GuideOption, "id" | "kind" | "name" | "park" | "aliases" | "destination">;
-
-/** El evento de la ficha que corresponde a una noche con entrada aparte: por parque y temporada (Halloween hasta octubre, Navidad después). */
-function guessEvent(events: Guide[], parkName: string | undefined, date: string) {
-  const here = events.filter((g) => g.park && parkName && g.park.toLowerCase() === parkName.toLowerCase());
-  const season = Number(date.slice(5, 7)) <= 10 ? /halloween|scary/i : /christmas|navidad|merry|jollywood/i;
-  return here.find((g) => season.test([g.name, ...g.aliases].join(" ")))?.id ?? "";
-}
 
 /**
  * Horarios desde las páginas oficiales de Disney o Universal: el admin abre la página, copia el texto y

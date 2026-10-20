@@ -1,7 +1,12 @@
 "use client";
 
-import { CalendarClock, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { CalendarClock, RefreshCw, Trash2 } from "lucide-react";
+import { LightningLanePrices, ThemeParksCredit } from "@/components/themeparks";
 import type { ScheduleEntry } from "@/lib/park-sheet";
+
+/** Filas que se ven antes de "Ver todas" (los parques sincronizados tienen unos 70 días). */
+const VISIBLE_ROWS = 8;
 
 const WEEKDAY = new Intl.DateTimeFormat("es-AR", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
 const pretty = (date: string) => WEEKDAY.format(new Date(`${date}T00:00:00Z`));
@@ -32,6 +37,7 @@ export function ScheduleEditor({
   onChange: (s: ScheduleEntry[]) => void;
 }) {
   const park = kind === "PARK";
+  const [showAll, setShowAll] = useState(false);
   const window = park ? Array.from({ length: 5 }, (_, i) => addDays(today, i)) : [];
   const future = schedule.filter((s) => s.date >= today);
   const rows = [
@@ -49,6 +55,7 @@ export function ScheduleEditor({
     let date = rows.length ? addDays(rows[rows.length - 1].date, 1) : today;
     while (rows.some((r) => r.date === date)) date = addDays(date, 1);
     onChange([...future, { date, openTime: reference.openTime, closeTime: reference.closeTime, note: "" }]);
+    setShowAll(true);
   };
   const fillReference = () =>
     onChange(rows.map((r) => (r.openTime || r.closeTime ? r : { ...r, openTime: reference.openTime, closeTime: reference.closeTime })));
@@ -62,8 +69,9 @@ export function ScheduleEditor({
           </p>
           <p className="text-xs text-slate-500">
             {park
-              ? "Hoy y los 4 días siguientes (hora de Orlando). Cuando un parque se suma al itinerario en una de estas fechas, toma este horario en vez del de referencia."
-              : "Las fechas en que se hace, con su horario. El día del evento en el itinerario toma el horario de esa fecha."}
+              ? "Hoy y los días siguientes (hora del parque). Cuando un parque se suma al itinerario en una de estas fechas, toma este horario en vez del de referencia."
+              : "Las fechas en que se hace, con su horario. El día del evento en el itinerario toma el horario de esa fecha."}{" "}
+            Los días marcados con <RefreshCw className="inline size-3" /> vienen de ThemeParks.wiki y se actualizan solos.
           </p>
         </div>
         {(reference.openTime || reference.closeTime) && rows.some((r) => !r.openTime && !r.closeTime) && (
@@ -73,11 +81,12 @@ export function ScheduleEditor({
         )}
       </div>
       <ul className="mt-3 space-y-1.5">
-        {rows.map((r) => (
+        {(showAll ? rows : rows.slice(0, VISIBLE_ROWS)).map((r) => (
           <li key={r.date} className="grid items-center gap-2 sm:grid-cols-[10rem_8.5rem_8.5rem_minmax(0,1fr)_auto]">
-            {window.includes(r.date) ? (
-              <span className="text-sm font-medium text-slate-700 first-letter:uppercase">
+            {window.includes(r.date) || r.synced ? (
+              <span className="flex items-center gap-1 text-sm font-medium text-slate-700 first-letter:uppercase">
                 {r.date === today ? `Hoy · ${pretty(r.date)}` : pretty(r.date)}
+                {r.synced && <RefreshCw className="size-3 text-slate-400" aria-label="De ThemeParks.wiki" />}
               </span>
             ) : (
               <input type="date" className="field" min={today} value={r.date} onChange={(e) => e.target.value && set(r.date, { date: e.target.value })} />
@@ -88,12 +97,25 @@ export function ScheduleEditor({
             <button type="button" onClick={() => remove(r.date)} className="p-1 text-slate-400 hover:text-rose-600" title={window.includes(r.date) ? "Vaciar" : "Quitar fecha"}>
               <Trash2 className="size-4" />
             </button>
+            {r.lightningLane && (
+              <div className="sm:col-span-5 sm:col-start-1 sm:pl-[10.5rem]">
+                <LightningLanePrices entry={r} />
+              </div>
+            )}
           </li>
         ))}
       </ul>
-      <button type="button" onClick={add} className="mt-2 text-xs font-medium text-brand-700 hover:underline">
-        + {park ? "Agregar otra fecha" : "Agregar fecha"}
-      </button>
+      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+        {rows.length > VISIBLE_ROWS && (
+          <button type="button" onClick={() => setShowAll(!showAll)} className="text-xs font-medium text-brand-700 hover:underline">
+            {showAll ? "Ver menos" : `Ver las ${rows.length} fechas`}
+          </button>
+        )}
+        <button type="button" onClick={add} className="text-xs font-medium text-brand-700 hover:underline">
+          + {park ? "Agregar otra fecha" : "Agregar fecha"}
+        </button>
+        {rows.some((r) => r.synced) && <ThemeParksCredit className="ml-auto" />}
+      </div>
     </div>
   );
 }

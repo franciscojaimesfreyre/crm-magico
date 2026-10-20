@@ -21,8 +21,9 @@ export async function GET() {
     priceLevel: e.priceLevel,
     mustDo: e.mustDo,
     notes: e.notes,
-    closedFrom: e.closedFrom ? toDateInput(e.closedFrom) : null,
-    closedTo: e.closedTo ? toDateInput(e.closedTo) : null,
+    // Los cierres que cargó ThemeParks.wiki no se exportan: se recalculan solos.
+    closedFrom: e.closedFrom && !e.closedByApi ? toDateInput(e.closedFrom) : null,
+    closedTo: e.closedTo && !e.closedByApi ? toDateInput(e.closedTo) : null,
     verifiedAt: e.verifiedAt?.toISOString() ?? null,
   }));
   const exportedGuides: ParkGuideExport[] = guides.map((g) => ({
@@ -37,7 +38,10 @@ export async function GET() {
     arrival: g.arrival,
     mainShow: g.mainShow,
     sections: parseSections(g.sections),
-    schedule: parseSchedule(g.schedule),
+    // Los días de ThemeParks.wiki no se exportan (sus condiciones no permiten redistribuirlos).
+    schedule: parseSchedule(g.schedule)
+      .filter((d) => !d.synced)
+      .map(({ date, openTime, closeTime, note }) => ({ date, openTime, closeTime, note })),
     published: g.published,
     position: g.position,
   }));

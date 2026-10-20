@@ -3,6 +3,8 @@
 // - Walt Disney World: "Calendario de 5 días" (disneyworld.disney.go.com/es-pe/calendars/five-day).
 // - Universal Orlando: "Horarios de los Parques" (universalorlando.com/web/es/us/plan-your-visit/
 //   hours-information/park-hours), que muestra un día a la vez: se pueden pegar varios días seguidos.
+// Es el respaldo de la sincronización automática con ThemeParks.wiki (park-hours-sync.ts), para los
+// días que la API todavía no publica.
 
 export type HoursDay = {
   date: string; // YYYY-MM-DD
@@ -86,6 +88,13 @@ export function dayNote(d: HoursDay) {
   ]
     .filter(Boolean)
     .join(". ");
+}
+
+/** El evento de la ficha que corresponde a una noche con entrada aparte: por parque y temporada (Halloween hasta octubre, Navidad después). */
+export function guessEvent(events: { id: string; name: string; park: string | null; aliases: string[] }[], parkName: string | undefined, date: string) {
+  const here = events.filter((g) => g.park && parkName && g.park.toLowerCase() === parkName.toLowerCase());
+  const season = Number(date.slice(5, 7)) <= 10 ? /halloween|scary/i : /christmas|navidad|merry|jollywood/i;
+  return here.find((g) => season.test([g.name, ...g.aliases].join(" ")))?.id ?? "";
 }
 
 /** "9:00 a.m." → "09:00"; "12:00 a.m." → "00:00". */

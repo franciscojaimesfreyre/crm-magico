@@ -22,6 +22,8 @@ const GuideInputSchema = z.object({
   published: z.boolean(),
   sheet: ParkSheetSchema,
   schedule: z.array(z.unknown()).max(400).default([]),
+  /** Parque en ThemeParks.wiki del que se sincronizan los horarios (solo parques). */
+  apiId: z.string().max(100).nullable().default(null),
 });
 
 export type GuideInput = z.input<typeof GuideInputSchema>;
@@ -51,6 +53,7 @@ export async function saveParkGuide(id: string | null, input: GuideInput) {
     mainShow: sheet.mainShow || null,
     sections: sheet.sections,
     schedule,
+    apiId: sheet.kind === "PARK" ? parsed.data.apiId || null : null,
     published,
   };
   const saved = id ? await db.parkGuide.update({ where: { id }, data }) : await db.parkGuide.create({ data });

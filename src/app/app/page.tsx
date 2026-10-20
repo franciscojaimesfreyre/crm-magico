@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { after } from "next/server";
 import { CalendarClock, Plane, Plus, Share2 } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
@@ -9,6 +10,7 @@ import { BOOKING_STATUS_COLOR, BOOKING_STATUS_LABEL, DESTINATION_LABEL } from "@
 import { addDays, daysBetween, formatDate, formatRange, money, todayUTC, toNumber } from "@/lib/format";
 import { computeKeyDates } from "@/lib/key-dates";
 import { runDateWorkflowsIfDue } from "@/lib/automations";
+import { syncThemeParksIfDue } from "@/lib/themeparks-sync";
 import { appUrl } from "@/lib/app-url";
 import { knowledgeHighlights } from "@/lib/knowledge-alerts";
 import { KnowledgeHighlights } from "./knowledge-highlights";
@@ -24,6 +26,8 @@ export default async function Dashboard() {
   } catch (e) {
     console.error("Error ejecutando automatizaciones", e);
   }
+  // Horarios de los parques y catálogo: después de responder, para no demorar el inicio.
+  after(() => syncThemeParksIfDue().catch((e) => console.error("Error sincronizando con ThemeParks.wiki", e)));
 
   const today = todayUTC();
   const in7 = addDays(today, 7);

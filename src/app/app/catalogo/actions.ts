@@ -7,6 +7,8 @@ import { requireUser } from "@/lib/auth";
 import { parseDateInput } from "@/lib/format";
 import type { ActionState } from "@/components/form-controls";
 import { CATALOG_FORMAT, CatalogEntryExportSchema, CatalogFileSchema, ParkGuideExportSchema } from "@/lib/catalog-io";
+import { parseSchedule } from "@/lib/park-sheet";
+import { syncThemeParks } from "@/lib/themeparks-sync";
 import type { CatalogKind, Destination, DiningStyle } from "@/generated/prisma/enums";
 
 /** El catálogo es de toda la plataforma: solo lo editan sus administradores. */
@@ -69,8 +71,34 @@ export async function updateCatalogEntry(id: string, _: ActionState, formData: F
   const error = invalid(data);
   if (error) return { error };
   if (await duplicated(data, id)) return { error: "Ya existe con ese nombre en ese parque o zona" };
-  await db.catalogEntry.update({ where: { id }, data });
+  // Si el administrador cambia el cierre que cargó ThemeParks.wiki, pasa a ser suyo: la sincronización no lo toca más.
+  const before = await db.catalogEntry.findUniqueOrThrow({ where: { id }, select: { closedFrom: true, closedTo: true, closedByApi: true } });
+  const same = (a: Date | null, b: Date | null) => a?.getTime() === b?.getTime();
+  const closedByApi = before.closedByApi && same(before.closedFrom, data.closedFrom) && same(before.closedTo, data.closedTo);
+  await db.catalogEntry.update({ where: { id }, data: { ...data, closedByApi } });
   redirect(`/app/catalogo?destino=${data.destination}`);
+}
+
+/** Trae ya de ThemeParks.wiki los horarios de las fichas y los cierres del catálogo (además de la sincronización diaria). */
+export async function syncThemeParksNow() {
+  await requirePlatformAdmin();
+  try {
+    const res = await syncThemeParks();
+    revalidatePath("/app/catalogo");
+    revalidatePath("/app/catalogo/fichas");
+    return res;
+  } catch (e) {
+    console.error("Error sincronizando con ThemeParks.wiki", e);
+    return { error: "No pudimos conectarnos con ThemeParks.wiki. Probá de nuevo en un rato." };
+  }
+}
+
+/** Suma al catálogo un lugar que figura en ThemeParks.wiki (después se completa la altura, el precio…). */
+export async function addCatalogEntryFromApi(input: { destination: Destination; area: string; name: string; kind: CatalogKind; apiId: string }) {
+  await requirePlatformAdmin();
+  const key = { destination_area_name: { destination: input.destination, area: input.area, name: input.name } };
+  await db.catalogEntry.upsert({ where: key, create: input, update: { apiId: input.apiId } });
+  revalidatePath("/app/catalogo");
 }
 
 export async function markCatalogVerified(id: string) {
@@ -135,8 +163,10 @@ export async function importCatalog(json: string) {
       continue;
     }
     const g = parsed.data;
-    const existing = await db.parkGuide.findFirst({ where: { name: { equals: g.name, mode: "insensitive" } }, select: { id: true } });
-    if (existing) await db.parkGuide.update({ where: { id: existing.id }, data: g });
+    const existing = await db.parkGuide.findFirst({ where: { name: { equals: g.name, mode: "insensitive" } }, select: { id: true, schedule: true } });
+    // Los días sincronizados con ThemeParks.wiki no vienen en el archivo: se conservan.
+    const synced = existing ? parseSchedule(existing.schedule).filter((d) => d.synced && !g.schedule.some((x) => x.date === d.date)) : [];
+    if (existing) await db.parkGuide.update({ where: { id: existing.id }, data: { ...g, schedule: parseSchedule([...g.schedule, ...synced]) } });
     else await db.parkGuide.create({ data: g });
     r[existing ? "guidesUpdated" : "guidesCreated"]++;
   }

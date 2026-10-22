@@ -2,6 +2,7 @@
 
 import { ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
 import { SECTION_DETAIL_HINT, SECTION_KINDS, SECTION_LABEL, TIMED_SECTIONS, type ParkSheet, type SectionKind, type SheetItem, type SheetSection } from "@/lib/park-sheet";
+import { SelectField } from "@/components/select-field";
 
 function move<T>(list: T[], from: number, to: number) {
   if (to < 0 || to >= list.length) return list;
@@ -11,7 +12,7 @@ function move<T>(list: T[], from: number, to: number) {
   return copy;
 }
 
-const iconButton = "p-1 text-slate-400 hover:text-slate-700 disabled:opacity-30";
+const iconButton = "p-1 text-slate-500 hover:text-slate-700 disabled:opacity-30";
 
 /**
  * Edición completa de una ficha de parque o evento: horarios, llegada, show principal y cada sección
@@ -27,7 +28,7 @@ export function ParkSheetForm({ sheet, onChange }: { sheet: ParkSheet; onChange:
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-2 sm:grid-cols-6">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-6">
         <label className="block sm:col-span-1">
           <span className="label">{event ? "Empieza" : "Abre"}</span>
           <input type="time" className="field" value={sheet.openTime ?? ""} onChange={(e) => set({ openTime: e.target.value || null })} />
@@ -56,13 +57,13 @@ export function ParkSheetForm({ sheet, onChange }: { sheet: ParkSheet; onChange:
         return (
           <fieldset key={si} className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
             <div className="flex flex-wrap items-center gap-2">
-              <select className="field w-auto" value={s.kind} onChange={(e) => setSection(si, { kind: e.target.value as SectionKind })} aria-label="Tipo de sección">
-                {SECTION_KINDS.map((k) => (
-                  <option key={k} value={k}>
-                    {SECTION_LABEL[k]}
-                  </option>
-                ))}
-              </select>
+              <SelectField
+                className="w-52"
+                value={s.kind}
+                onValueChange={(v) => setSection(si, { kind: v as SectionKind })}
+                aria-label="Tipo de sección"
+                options={SECTION_KINDS.map((k) => ({ value: k, label: SECTION_LABEL[k] }))}
+              />
               <input className="field min-w-40 flex-1 font-medium" value={s.title} onChange={(e) => setSection(si, { title: e.target.value })} placeholder="Título de la sección" />
               <span className="flex items-center">
                 <button type="button" className={iconButton} disabled={si === 0} onClick={() => set({ sections: move(sheet.sections, si, si - 1) })} title="Subir sección">
@@ -71,7 +72,7 @@ export function ParkSheetForm({ sheet, onChange }: { sheet: ParkSheet; onChange:
                 <button type="button" className={iconButton} disabled={si === sheet.sections.length - 1} onClick={() => set({ sections: move(sheet.sections, si, si + 1) })} title="Bajar sección">
                   <ChevronDown className="size-4" />
                 </button>
-                <button type="button" className="p-1 text-slate-400 hover:text-rose-600" onClick={() => set({ sections: sheet.sections.filter((_, j) => j !== si) })} title="Quitar sección">
+                <button type="button" className="p-1 text-slate-500 hover:text-rose-600" onClick={() => set({ sections: sheet.sections.filter((_, j) => j !== si) })} title="Quitar sección">
                   <Trash2 className="size-4" />
                 </button>
               </span>
@@ -97,7 +98,7 @@ export function ParkSheetForm({ sheet, onChange }: { sheet: ParkSheet; onChange:
                     <button type="button" className={iconButton} disabled={ii === s.items.length - 1} onClick={() => setSection(si, { items: move(s.items, ii, ii + 1) })} title="Bajar">
                       <ChevronDown className="size-4" />
                     </button>
-                    <button type="button" className="p-1 text-slate-400 hover:text-rose-600" onClick={() => setSection(si, { items: s.items.filter((_, j) => j !== ii) })} title="Quitar">
+                    <button type="button" className="p-1 text-slate-500 hover:text-rose-600" onClick={() => setSection(si, { items: s.items.filter((_, j) => j !== ii) })} title="Quitar">
                       <Trash2 className="size-3.5" />
                     </button>
                   </span>

@@ -8,11 +8,11 @@ export default async function AgencyLayout({ children }: { children: React.React
   const user = await requireAgencyUser();
   return (
     <div className="min-h-screen">
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur print:hidden">
+      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white print:hidden">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-5">
             <Link href="/agencia" className="flex shrink-0 items-center gap-2 font-semibold text-slate-900">
-              <span className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-fuchsia-500 to-brand-600 text-white">
+              <span className="flex size-8 items-center justify-center rounded-lg bg-brand-600 text-white">
                 <Sparkles className="size-4" />
               </span>
               <span className="hidden truncate sm:inline">{user.agency.name}</span>
@@ -30,7 +30,7 @@ export default async function AgencyLayout({ children }: { children: React.React
             <Avatar name={user.name} />
             <span className="hidden text-sm text-slate-700 md:inline">{user.name}</span>
             <form action={logout}>
-              <button className="text-slate-400 hover:text-slate-700" title="Salir">
+              <button className="text-slate-500 hover:text-slate-700" title="Salir">
                 <LogOut className="size-4" />
               </button>
             </form>

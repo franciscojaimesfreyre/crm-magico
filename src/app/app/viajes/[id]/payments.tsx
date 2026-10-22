@@ -6,6 +6,7 @@ import { daysBetween, formatDate, money, toDateInput, todayUTC } from "@/lib/for
 import { paymentProgress } from "@/lib/trips";
 import { addReservationPayment, deleteReservationPayment, payReservationBalance } from "../actions";
 import type { LoadedBooking } from "./data";
+import { DateInput } from "@/components/date-input";
 
 type Item = LoadedBooking["items"][number];
 
@@ -36,7 +37,7 @@ export function ReservationPayments({ item, currency }: { item: Item; currency: 
             <CheckCircle2 className="size-3.5" /> Saldada el {formatDate(item.balancePaidAt)}
           </span>
         ) : item.balanceDue ? (
-          <span className={clsx(dueIn !== null && dueIn <= 14 ? "font-medium text-rose-600" : "text-slate-600")}>
+          <span className={clsx(dueIn !== null && dueIn <= 14 ? "font-medium text-rose-700" : "text-slate-600")}>
             Saldar antes del {formatDate(item.balanceDue)}
             {dueIn !== null && (dueIn < 0 ? " (vencido)" : dueIn === 0 ? " (hoy)" : ` (en ${dueIn} días)`)}
           </span>
@@ -59,7 +60,7 @@ export function ReservationPayments({ item, currency }: { item: Item; currency: 
               <span className="font-medium text-slate-900">{money(pay.amount, currency)}</span>
               <span className="flex-1 truncate text-slate-500">{pay.note}</span>
               <form action={deleteReservationPayment.bind(null, pay.id)}>
-                <button className="rounded p-0.5 text-slate-400 hover:bg-slate-200 hover:text-rose-600" title="Eliminar pago" aria-label="Eliminar pago">
+                <button className="rounded p-0.5 text-slate-500 hover:bg-slate-200 hover:text-rose-600" title="Eliminar pago" aria-label="Eliminar pago">
                   <X className="size-3.5" />
                 </button>
               </form>
@@ -78,7 +79,7 @@ export function ReservationPayments({ item, currency }: { item: Item; currency: 
             </label>
             <label className="w-40">
               <span className="label">Fecha</span>
-              <Input type="date" name="paidAt" defaultValue={toDateInput(today)} />
+              <DateInput name="paidAt" defaultValue={toDateInput(today)} />
             </label>
             <label className="min-w-40 flex-1">
               <span className="label">Nota</span>

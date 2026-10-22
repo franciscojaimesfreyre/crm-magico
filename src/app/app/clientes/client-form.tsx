@@ -22,7 +22,7 @@ export function ClientForm({ action, client, referrers, submitLabel, hiddenField
       ))}
       <Card>
         <CardHeader title="Datos de contacto" />
-        <div className="grid gap-4 p-5 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
           <Field label="Nombre *">
             <Input name="firstName" defaultValue={client?.firstName} required />
           </Field>
@@ -65,7 +65,7 @@ export function ClientForm({ action, client, referrers, submitLabel, hiddenField
           title="Preferencias de viaje"
           description="La IA usa estos datos para proponer itinerarios a medida."
         />
-        <div className="grid gap-4 p-5 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
           <Field label="Ritmo de viaje">
             <Select name="pace" defaultValue={client?.pace ?? ""} options={TRIP_PACES} placeholder="Sin definir" />
           </Field>

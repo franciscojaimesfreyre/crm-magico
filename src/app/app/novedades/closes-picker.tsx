@@ -46,7 +46,7 @@ export function ClosesPicker({ entries, initialIds, initialManual }: { entries: 
       {CLOSING.includes(category) && (
         <div className="rounded-lg border border-rose-200 bg-rose-50/50 p-3">
           <p className="flex items-center gap-1.5 text-sm font-medium text-slate-800">
-            <Ban className="size-4 text-rose-600" /> Atracciones que cierra
+            <Ban className="size-4 text-rose-700" /> Atracciones que cierra
           </p>
           <p className="mt-0.5 text-xs text-slate-500">
             Durante la vigencia de la novedad se ven tachadas como cerradas en las fichas de los itinerarios, la revisión automática las marca y la IA no las propone.
@@ -71,9 +71,9 @@ export function ClosesPicker({ entries, initialIds, initialManual }: { entries: 
             {chosen.length === 0 && <span className="text-xs text-slate-500">{manual ? "Ninguna elegida: no cierra atracciones del catálogo." : "El título no nombra ninguna atracción del catálogo."}</span>}
             {chosen.map((e) => (
               <span key={e.id} className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-xs text-slate-800 ring-1 ring-rose-200">
-                {e.name} <span className="text-slate-400">· {e.area}</span>
+                {e.name} <span className="text-slate-500">· {e.area}</span>
                 {manual && (
-                  <button type="button" onClick={() => setPicked((p) => p.filter((id) => id !== e.id))} className="ml-0.5 text-slate-400 hover:text-rose-600" title="Quitar">
+                  <button type="button" onClick={() => setPicked((p) => p.filter((id) => id !== e.id))} className="ml-0.5 text-slate-500 hover:text-rose-600" title="Quitar">
                     ×
                   </button>
                 )}
@@ -95,7 +95,7 @@ export function ClosesPicker({ entries, initialIds, initialManual }: { entries: 
                         }}
                         className="block w-full px-3 py-1.5 text-left text-sm hover:bg-brand-50"
                       >
-                        {e.name} <span className="text-xs text-slate-400">· {e.area}</span>
+                        {e.name} <span className="text-xs text-slate-500">· {e.area}</span>
                       </button>
                     </li>
                   ))}

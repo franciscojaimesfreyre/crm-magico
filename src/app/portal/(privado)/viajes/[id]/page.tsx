@@ -61,8 +61,8 @@ export default async function PortalTrip({
       <Link href="/portal" className="text-sm text-slate-500 hover:text-slate-800">
         ← Mis viajes
       </Link>
-      <div className="mt-2 mb-4 rounded-3xl bg-gradient-to-br from-brand-800 to-fuchsia-700 p-5 text-white">
-        <p className="text-xs tracking-wide text-white/70 uppercase">{CLIENT_STATUS[b.status]}</p>
+      <div className="mt-2 mb-4 rounded-2xl bg-brand-800 p-5 text-white">
+        <p className="text-xs text-white/70">{CLIENT_STATUS[b.status]}</p>
         <h1 className="text-2xl font-semibold">{b.title}</h1>
         <p className="text-sm text-white/80">
           {DESTINATION_LABEL[b.destination]} · {formatRange(b.startDate, b.endDate)}
@@ -74,7 +74,7 @@ export default async function PortalTrip({
         )}
       </div>
 
-      <div className="mb-4 flex gap-1 overflow-x-auto rounded-full bg-white p-1 shadow-sm ring-1 ring-slate-100">
+      <div className="mb-4 flex gap-1 overflow-x-auto rounded-full bg-white p-1 border border-[var(--border)]">
         {TABS.map((t) => (
           <Link
             key={t.key}
@@ -101,7 +101,7 @@ export default async function PortalTrip({
                 const diff = daysBetween(today, k.date);
                 return (
                   <li key={idx} className="flex items-center justify-between gap-3 text-sm">
-                    <span className={clsx("flex items-center gap-2", diff < 0 ? "text-slate-400" : "text-slate-800")}>
+                    <span className={clsx("flex items-center gap-2", diff < 0 ? "text-slate-500" : "text-slate-800")}>
                       <CalendarClock className="size-4 text-brand-500" /> {k.label}
                     </span>
                     <span className="text-slate-500">{formatDate(k.date)}</span>
@@ -128,7 +128,7 @@ export default async function PortalTrip({
 
           {b.items.some((i) => i.status !== "CANCELLED") && (
             <Section title="Tus reservas">
-              <p className="mb-2 text-xs text-slate-400">Cada reserva se paga directamente a su proveedor con tu tarjeta.</p>
+              <p className="mb-2 text-xs text-slate-500">Cada reserva se paga directamente a su proveedor con tu tarjeta.</p>
               <ul className="divide-y divide-slate-100 text-sm">
                 {b.items
                   .filter((i) => i.status !== "CANCELLED")
@@ -136,7 +136,7 @@ export default async function PortalTrip({
                     <li key={i.id} className="py-2.5">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <span className="text-xs text-slate-400">
+                          <span className="text-xs text-slate-500">
                             {ITEM_TYPE_LABEL[i.type]}
                             {i.supplier && ` · ${i.supplier}`}
                           </span>
@@ -157,14 +157,14 @@ export default async function PortalTrip({
                         return (
                           <p className="mt-1 flex flex-wrap gap-x-3 text-xs">
                             {pay.settled ? (
-                              <span className="text-emerald-600">Pagada en su totalidad</span>
+                              <span className="text-emerald-700">Pagada en su totalidad</span>
                             ) : (
                               <>
                                 <span className="text-slate-600">
                                   Pagaste {money(pay.paid, b.currency)} · resta {money(pay.remaining, b.currency)}
                                 </span>
                                 {i.depositAmount !== null && !pay.depositCovered && (
-                                  <span className="text-amber-600">Depósito para reservar: {money(i.depositAmount, b.currency)}</span>
+                                  <span className="text-amber-700">Depósito para reservar: {money(i.depositAmount, b.currency)}</span>
                                 )}
                                 {i.balanceDue && <span className="text-slate-600">Saldar antes del {formatDate(i.balanceDue)}</span>}
                               </>
@@ -192,7 +192,7 @@ export default async function PortalTrip({
                 return (
                   <li key={t.id}>
                     {t.firstName} {t.lastName}
-                    {age !== null && <span className="text-slate-400"> · {age} años</span>}
+                    {age !== null && <span className="text-slate-500"> · {age} años</span>}
                   </li>
                 );
               })}
@@ -204,9 +204,9 @@ export default async function PortalTrip({
       {tab === "itinerario" && <PortalItinerary bookingId={b.id} groupId={b.groupId} />}
       {tab === "documentos" && <PortalDocuments bookingId={b.id} />}
       {tab === "mensajes" && (
-        <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
+        <div className="overflow-hidden rounded-2xl bg-white border border-[var(--border)]">
           <Chat
-            className="h-[65vh] bg-[#faf8f5]"
+            className="h-[65vh] bg-[var(--ground)]"
             initial={await loadThread(account.clientId, b.id)}
             viewer="CLIENT"
             send={sendClientMessage.bind(null, b.id)}
@@ -221,7 +221,7 @@ export default async function PortalTrip({
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
+    <section className="rounded-2xl bg-white p-4 border border-[var(--border)]">
       <h2 className="mb-2 text-sm font-semibold text-slate-900">{title}</h2>
       {children}
     </section>
@@ -243,23 +243,23 @@ async function PortalItinerary({ bookingId, groupId }: { bookingId: string; grou
     });
   }
   if (days.length === 0) {
-    return <p className="rounded-2xl bg-white p-8 text-center text-sm text-slate-500 shadow-sm">Tu agente todavía está armando el itinerario. ¡Te avisamos cuando esté listo!</p>;
+    return <p className="rounded-2xl bg-white p-8 text-center text-sm text-slate-500">Tu agente todavía está armando el itinerario. ¡Te avisamos cuando esté listo!</p>;
   }
   return <ItineraryView days={days} closures={await bookingClosures(bookingId)} />;
 }
 
 async function PortalDocuments({ bookingId }: { bookingId: string }) {
   const docs = await db.document.findMany({ where: { bookingId, visibleToClient: true }, orderBy: { createdAt: "desc" } });
-  if (docs.length === 0) return <p className="rounded-2xl bg-white p-8 text-center text-sm text-slate-500 shadow-sm">Todavía no hay documentos.</p>;
+  if (docs.length === 0) return <p className="rounded-2xl bg-white p-8 text-center text-sm text-slate-500">Todavía no hay documentos.</p>;
   return (
-    <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
+    <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white border border-[var(--border)]">
       {docs.map((d) => (
         <li key={d.id} className="flex items-center justify-between gap-3 px-4 py-3">
           <div className="flex min-w-0 items-center gap-3">
             <FileText className="size-5 shrink-0 text-brand-500" />
             <div className="min-w-0">
               <p className="truncate text-sm font-medium text-slate-800">{d.name}</p>
-              <p className="text-xs text-slate-400">{[fileSize(d.size), formatDate(d.createdAt)].filter(Boolean).join(" · ")}</p>
+              <p className="text-xs text-slate-500">{[fileSize(d.size), formatDate(d.createdAt)].filter(Boolean).join(" · ")}</p>
             </div>
           </div>
           {d.storageKey ? (

@@ -11,6 +11,7 @@ import { DESTINATIONS } from "@/lib/labels";
 import type { ParkSheet, ScheduleEntry } from "@/lib/park-sheet";
 import { ScheduleEditor } from "./schedule-editor";
 import { deleteParkGuide, saveParkGuide } from "./actions";
+import { SelectField } from "@/components/select-field";
 
 /** Alta y edición de una ficha base (solo admins de la plataforma), con vista previa como la ve el viajero. */
 export function GuideEditor({
@@ -65,27 +66,25 @@ export function GuideEditor({
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-6">
+      <div className="grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-6">
         <label className="block sm:col-span-3">
           <span className="label">{event ? "Nombre del evento *" : "Nombre del parque *"}</span>
           <input className="field" value={sheet.name} onChange={(e) => setSheet({ ...sheet, name: e.target.value })} placeholder={event ? "Ej: Mickey's Not-So-Scary Halloween Party" : "Ej: Magic Kingdom"} />
         </label>
         <label className="block sm:col-span-1">
           <span className="label">Tipo</span>
-          <select className="field" value={sheet.kind} onChange={(e) => setSheet({ ...sheet, kind: e.target.value as ParkSheet["kind"] })}>
-            <option value="PARK">Parque</option>
-            <option value="EVENT">Evento especial</option>
-          </select>
+          <SelectField
+            value={sheet.kind}
+            onValueChange={(v) => setSheet({ ...sheet, kind: v as ParkSheet["kind"] })}
+            options={[
+              { value: "PARK", label: "Parque" },
+              { value: "EVENT", label: "Evento especial" },
+            ]}
+          />
         </label>
         <label className="block sm:col-span-2">
           <span className="label">Destino</span>
-          <select className="field" value={destination} onChange={(e) => setDestination(e.target.value)}>
-            {DESTINATIONS.map((d) => (
-              <option key={d.value} value={d.value}>
-                {d.label}
-              </option>
-            ))}
-          </select>
+          <SelectField value={destination} onValueChange={setDestination} options={DESTINATIONS} />
         </label>
         {event && (
           <label className="block sm:col-span-2">
@@ -96,25 +95,23 @@ export function GuideEditor({
         <label className={clsx("block", event ? "sm:col-span-4" : "sm:col-span-6")}>
           <span className="label">Otros nombres</span>
           <input className="field" value={aliases} onChange={(e) => setAliases(e.target.value)} placeholder={event ? "Ej: Halloween Party, Fiesta de Halloween, MNSSHP" : "Ej: MK, Magic"} />
-          <span className="mt-1 block text-xs text-slate-400">
+          <span className="mt-1 block text-xs text-slate-500">
             Separados por coma. {event ? "Sirven para reconocer el evento en la descripción de una reserva." : "Sirven para reconocer el parque en el título de una actividad."}
           </span>
         </label>
         {!event && (apiParks.length > 0 || apiId) && (
           <label className="block sm:col-span-6">
             <span className="label">Horarios automáticos</span>
-            <select className="field" value={apiId} onChange={(e) => setApiId(e.target.value)}>
-              <option value="">Sin vincular (horarios solo a mano)</option>
-              {apiId && !apiParks.some((p) => p.id === apiId) && <option value={apiId}>Parque vinculado</option>}
-              {apiParks
-                .filter((p) => p.destination === destination || p.id === apiId)
-                .map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-            </select>
-            <span className="mt-1 block text-xs text-slate-400">
+            <SelectField
+              value={apiId}
+              onValueChange={setApiId}
+              placeholder="Sin vincular (horarios solo a mano)"
+              options={[
+                ...(apiId && !apiParks.some((p) => p.id === apiId) ? [{ value: apiId, label: "Parque vinculado" }] : []),
+                ...apiParks.filter((p) => p.destination === destination || p.id === apiId).map((p) => ({ value: p.id, label: p.name })),
+              ]}
+            />
+            <span className="mt-1 block text-xs text-slate-500">
               Parque de ThemeParks.wiki del que se traen los horarios, el Early Entry y los precios de Lightning Lane una vez por día.
             </span>
           </label>
@@ -147,7 +144,7 @@ export function GuideEditor({
       </div>
 
       {preview ? (
-        <div className="rounded-xl border-l-4 border-l-violet-500 bg-violet-50 p-3">
+        <div className="rounded-lg border-l-4 border-l-brand-500 bg-brand-50 p-3">
           <p className="mb-2 text-sm font-medium text-slate-900">{event && sheet.park ? `${sheet.park} · ${sheet.name}` : sheet.name || "Parque"}</p>
           <ParkSheetCard sheet={sheet} />
         </div>
@@ -155,7 +152,7 @@ export function GuideEditor({
         <ParkSheetForm sheet={sheet} onChange={setSheet} />
       )}
 
-      <div className="sticky bottom-0 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50/95 py-3 backdrop-blur">
+      <div className="sticky bottom-0 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-[var(--ground)] py-3">
         <div>
           {id && (
             <button type="button" onClick={remove} disabled={pending} className={buttonClass("ghost", "sm")}>

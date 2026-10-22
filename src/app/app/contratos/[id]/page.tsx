@@ -49,7 +49,7 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
           actions={<PrintButton />}
         />
       </div>
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
         <Card className="p-6 print:border-0 print:shadow-none">
           {signed ? (
             <>

@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { Card, CardHeader, PageHeader, StatCard, Table, Td, buttonClass } from "@/components/ui";
+import { Card, CardHeader, PageHeader, StatCard, StatStrip, Table, Td, buttonClass } from "@/components/ui";
 import { BarList, ColumnChart } from "@/components/charts";
 import { BOOKING_STATUS_LABEL, DESTINATION_LABEL, ITEM_TYPE_LABEL, PIPELINE } from "@/lib/labels";
 import { AT_RISK_MONTHS } from "@/lib/clients";
 import { formatDate, money, toNumber } from "@/lib/format";
 import type { BookingStatus } from "@/generated/prisma/enums";
+import { SelectField } from "@/components/select-field";
 
 export const metadata = { title: "Reportes" };
 
@@ -97,16 +98,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         description={`Ventas concretadas en ${year} (por fecha de venta), en ${currency}.`}
         actions={
           <form className="flex gap-2">
-            <select name="anio" defaultValue={year} className="field w-28">
-              {[year + 1, year, year - 1, year - 2, year - 3].map((y) => (
-                <option key={y}>{y}</option>
-              ))}
-            </select>
-            <select name="moneda" defaultValue={currency} className="field w-24">
-              {[...new Set([currency, ...currencies.map((c) => c.currency)])].map((c) => (
-                <option key={c}>{c}</option>
-              ))}
-            </select>
+            <SelectField name="anio" defaultValue={String(year)} className="w-28" aria-label="Año" options={[year + 1, year, year - 1, year - 2, year - 3].map((y) => ({ value: String(y), label: String(y) }))} />
+            <SelectField name="moneda" defaultValue={currency} className="w-24" aria-label="Moneda" options={[...new Set([currency, ...currencies.map((c) => c.currency)])].map((c) => ({ value: c, label: c }))} />
             <button className={buttonClass("primary")}>Ver</button>
             <Link href="/app/viajes/export" className={buttonClass("secondary")}>
               CSV
@@ -115,15 +108,15 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         }
       />
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <StatStrip className="mb-6">
         <StatCard label="Vendido" value={money(revenue, currency)} hint={`${sold.length} reservas en ${trips} viajes`} />
         <StatCard label="Comisión" value={money(commission, currency)} tone="good" />
         <StatCard label="Promedio por viaje" value={money(trips ? revenue / trips : 0, currency)} />
         <StatCard label="Conversión" value={`${conversion}%`} hint={`${converted} de ${createdActive.length} consultas del año`} />
         <StatCard label="Clientes nuevos" value={clientsNew} />
-      </div>
+      </StatStrip>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card className="lg:col-span-2">
           <CardHeader title="Comisión por mes" description="Pasá el mouse por cada columna para ver el monto." />
           <div className="p-5">

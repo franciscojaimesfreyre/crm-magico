@@ -66,7 +66,7 @@ export function Chat({
   return (
     <div className={clsx("flex flex-col", className)}>
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
-        {messages.length === 0 && <p className="py-8 text-center text-sm text-slate-400">Todavía no hay mensajes en esta conversación.</p>}
+        {messages.length === 0 && <p className="py-8 text-center text-sm text-slate-500">Todavía no hay mensajes en esta conversación.</p>}
         {messages.map((m) => {
           if (m.senderType === "SYSTEM") {
             return (
@@ -80,7 +80,7 @@ export function Chat({
             <div key={m.id} className={clsx("flex", mine ? "justify-end" : "justify-start")}>
               <div className={clsx("max-w-[75%] rounded-2xl px-3.5 py-2 text-sm", mine ? "rounded-br-sm bg-brand-600 text-white" : "rounded-bl-sm bg-white text-slate-800 ring-1 ring-slate-200")}>
                 <p className="whitespace-pre-line">{m.body}</p>
-                <p className={clsx("mt-1 text-[11px]", mine ? "text-white/70" : "text-slate-400")}>
+                <p className={clsx("mt-1 text-[11px]", mine ? "text-white/70" : "text-slate-500")}>
                   {m.senderName} · {m.timeLabel}
                 </p>
               </div>

@@ -70,11 +70,11 @@ export default async function CatalogPage({
         }
       />
       <CatalogTabs active="lugares" />
-      <form className="mb-4 grid gap-2 rounded-xl border border-slate-200 bg-white p-3 sm:grid-cols-7">
-        <Select name="destino" defaultValue={destination} options={destinations} className="sm:col-span-2" />
-        <Select name="tipo" defaultValue={f.tipo ?? ""} options={CATALOG_KINDS} placeholder="Todos los tipos" />
-        <Select name="zona" defaultValue={f.zona ?? ""} options={areas.map((a) => ({ value: a.area, label: a.area }))} placeholder="Todas las zonas" />
-        <input name="q" defaultValue={f.q} placeholder="Buscar…" className="field" />
+      <form className="mb-4 flex flex-wrap items-center gap-2">
+        <Select name="destino" defaultValue={destination} options={destinations} className="w-auto" />
+        <Select name="tipo" defaultValue={f.tipo ?? ""} options={CATALOG_KINDS} placeholder="Todos los tipos" className="w-auto" />
+        <Select name="zona" defaultValue={f.zona ?? ""} options={areas.map((a) => ({ value: a.area, label: a.area }))} placeholder="Todas las zonas" className="w-auto" />
+        <input name="q" defaultValue={f.q} placeholder="Buscar…" className="field min-w-48 flex-1" />
         <Select
           name="estado"
           defaultValue={f.estado ?? ""}
@@ -85,16 +85,15 @@ export default async function CatalogPage({
             { value: "sin-vincular", label: "Sin vincular a ThemeParks.wiki" },
           ]}
           placeholder="Todas"
+          className="w-auto"
         />
-        <div className="flex gap-2">
-          <input name="altura" type="number" min={50} max={250} defaultValue={f.altura} placeholder="Altura cm" title="Mostrá a qué no llega un chico de esta altura" className="field" />
-          <button className={buttonClass("primary")}>Ver</button>
-        </div>
+        <input name="altura" type="number" min={50} max={250} defaultValue={f.altura} placeholder="Altura cm" title="Mostrá a qué no llega un chico de esta altura" className="field w-28" />
+        <button className={buttonClass("secondary")}>Ver</button>
       </form>
       {(user.isPlatformAdmin && pending > 0) || height ? (
         <p className="mb-4 text-sm text-slate-500">
           {height && `Con ${height} cm: las atracciones a las que no llega están marcadas en rojo. `}
-          {user.isPlatformAdmin && pending > 0 && `${pending} sin revisar en esta vista: confirmalos contra la página oficial y marcalos con ✓.`}
+          {user.isPlatformAdmin && pending > 0 && `${pending} sin revisar en esta vista: confirmalos contra la página oficial y marcalos como revisados.`}
         </p>
       ) : null}
 
@@ -117,13 +116,13 @@ export default async function CatalogPage({
                   const closedNow = closedDuring(e, today, today) || (e.closedFrom && e.closedFrom > today);
                   const tooShort = height && e.kind === "ATTRACTION" && e.minHeightIn && height < inchesToCm(e.minHeightIn);
                   return (
-                    <li key={e.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-2.5 text-sm">
-                      <div className="min-w-0 flex-1">
-                        <p className={clsx("font-medium", closedNow ? "text-slate-400" : "text-slate-800")}>
+                    <li key={e.id} className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-5 py-2.5 text-sm">
+                      <div className="min-w-0 basis-full lg:basis-0 lg:flex-1">
+                        <p className={clsx("font-medium", closedNow ? "text-slate-500" : "text-slate-800")}>
                           {e.mustDo && <Star className="mr-1 inline size-3.5 fill-amber-400 text-amber-500" aria-label="Imperdible" />}
                           {e.name}
                           {e.mustDo && <span className="ml-2 text-xs font-normal text-amber-700">Imperdible</span>}
-                          {e.closedFrom && <span className="ml-2 text-xs font-normal text-rose-600">{closureLabel(e)}</span>}
+                          {e.closedFrom && <span className="ml-2 text-xs font-normal text-rose-700">{closureLabel(e)}</span>}
                           {user.isPlatformAdmin && e.syncedAt === null && !e.apiId && e.kind !== "SHOPPING" && synced && (
                             <Link2Off className="ml-2 inline size-3.5 text-slate-300" aria-label="Sin vincular a ThemeParks.wiki" />
                           )}
@@ -134,7 +133,7 @@ export default async function CatalogPage({
                       <span className="w-40 text-xs text-slate-600">
                         {e.kind === "ATTRACTION" &&
                           (e.minHeightIn ? (
-                            <span className={clsx(tooShort && "font-semibold text-rose-600")}>
+                            <span className={clsx(tooShort && "font-semibold text-rose-700")}>
                               {tooShort ? "No llega · " : "Mín. "}
                               {heightLabel(e.minHeightIn)}
                             </span>
@@ -159,7 +158,7 @@ export default async function CatalogPage({
                           {(e.kind === "ATTRACTION" || e.kind === "SHOW") && (
                             <form action={toggleCatalogMustDo.bind(null, e.id)}>
                               <button className={buttonClass("ghost", "sm")} title={e.mustDo ? "Quitar de imperdibles" : "Marcar como imperdible"}>
-                                <Star className={clsx("size-3.5", e.mustDo ? "fill-amber-400 text-amber-500" : "text-slate-400")} />
+                                <Star className={clsx("size-3.5", e.mustDo ? "fill-amber-400 text-amber-500" : "text-slate-500")} />
                               </button>
                             </form>
                           )}
@@ -203,12 +202,13 @@ export default async function CatalogPage({
                 <summary className="cursor-pointer text-sm font-medium text-slate-800 select-none">
                   {p.area} <span className="font-normal text-slate-500">· {p.entities.length}</span>
                 </summary>
-                <ul className="mt-2 grid gap-x-4 gap-y-1 sm:grid-cols-2">
+                <ul className="mt-2 grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-2">
                   {p.entities.map((x) => (
-                    <li key={x.id} className="flex items-center justify-between gap-2 text-sm">
-                      <span className="min-w-0 truncate text-slate-700" title={x.name}>
-                        {x.name} <span className="text-xs text-slate-400">{CATALOG_KIND_LABEL[x.entityType as CatalogKind]}</span>
+                    <li key={x.id} className="flex min-w-0 items-center justify-between gap-2 text-sm">
+                      <span className="min-w-0 flex-1 truncate text-slate-700" title={x.name}>
+                        {x.name}
                       </span>
+                      <span className="shrink-0 text-xs text-slate-500">{CATALOG_KIND_LABEL[x.entityType as CatalogKind]}</span>
                       <form action={addCatalogEntryFromApi.bind(null, { destination, area: p.area, name: x.name, kind: x.entityType as CatalogKind, apiId: x.id })}>
                         <button className={buttonClass("ghost", "sm")} title="Sumar al catálogo">
                           <Plus className="size-3.5" />

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import CountUp from "@/components/CountUp";
 import { CalendarDays, ChevronRight, FileText, MessageCircle, Plus, Sparkles } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireClientAccount } from "@/lib/auth";
@@ -37,7 +38,7 @@ export default async function PortalHome() {
         <Link
           key={q.id}
           href={`/portal/cotizaciones/${q.id}`}
-          className="flex items-center gap-4 rounded-2xl bg-gradient-to-r from-amber-400 to-orange-400 p-4 text-white shadow-sm"
+          className="flex items-center gap-4 rounded-2xl bg-amber-100 p-4 text-amber-950"
         >
           <span className="flex size-11 items-center justify-center rounded-xl bg-white/25">
             <FileText className="size-5" />
@@ -53,7 +54,7 @@ export default async function PortalHome() {
       ))}
 
       {next ? (
-        <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-brand-900 via-brand-700 to-fuchsia-700 p-6 text-white shadow-lg">
+        <section className="overflow-hidden rounded-[18px] bg-[var(--field)] p-6 text-white sm:p-8">
           <p className="text-sm text-white/80">
             {daysLeft !== null && daysLeft > 0 && daysLeft <= 7
               ? `¡Ya casi, ${client.firstName}! Tu viaje empieza muy pronto`
@@ -61,14 +62,16 @@ export default async function PortalHome() {
                 ? `¡Que lo disfrutes, ${client.firstName}!`
                 : `Hola ${client.firstName}, tu próximo viaje`}
           </p>
-          <h1 className="mt-1 text-3xl leading-tight font-semibold">{next.title}</h1>
+          <h1 className="mt-1 text-4xl leading-tight">{next.title}</h1>
           <p className="mt-2 text-white/80">
             {formatRange(next.startDate, next.endDate)} · {next.adults} adultos{next.children ? `, ${next.children} menores` : ""}
             {mainStay(next.items) && ` · ${mainStay(next.items)}`}
           </p>
           {daysLeft !== null && daysLeft > 0 && (
             <p className="mt-6 flex items-baseline gap-3">
-              <span className="text-6xl font-semibold">{daysLeft}</span>
+              <span className="figure text-7xl leading-none sm:text-8xl">
+                <CountUp to={daysLeft} duration={1.4} trigger="load" />
+              </span>
               <span className="text-lg text-white/80">{daysLeft === 1 ? "día para el viaje" : "días para el viaje"}</span>
             </p>
           )}
@@ -82,7 +85,7 @@ export default async function PortalHome() {
           </div>
         </section>
       ) : (
-        <section className="rounded-3xl bg-white p-8 text-center shadow-sm">
+        <section className="rounded-3xl bg-white p-8 text-center">
           <Sparkles className="mx-auto size-8 text-brand-500" />
           <h1 className="mt-3 text-xl font-semibold text-slate-900">¿Empezamos a planear tu próximo viaje?</h1>
           <p className="mt-1 text-sm text-slate-500">Contanos qué tenés en mente y te armamos una cotización a medida.</p>
@@ -99,8 +102,8 @@ export default async function PortalHome() {
         </section>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Link href="/portal/solicitar" className="flex items-center gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100 hover:ring-brand-200">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Link href="/portal/solicitar" className="flex items-center gap-3 rounded-2xl bg-white p-4 border border-[var(--border)] hover:ring-brand-200">
           <span className="flex size-10 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
             <Plus className="size-5" />
           </span>
@@ -109,8 +112,8 @@ export default async function PortalHome() {
             <p className="text-xs text-slate-500">Te preparamos una cotización</p>
           </div>
         </Link>
-        <Link href="/portal/perfil" className="flex items-center gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100 hover:ring-brand-200">
-          <span className="flex size-10 items-center justify-center rounded-xl bg-fuchsia-50 text-fuchsia-700">
+        <Link href="/portal/perfil" className="flex items-center gap-3 rounded-2xl bg-white p-4 border border-[var(--border)] hover:ring-brand-200">
+          <span className="flex size-10 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
             <Sparkles className="size-5" />
           </span>
           <div>
@@ -121,7 +124,7 @@ export default async function PortalHome() {
       </div>
 
       {agent && (
-        <section className="flex items-center gap-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
+        <section className="flex items-center gap-4 rounded-2xl bg-white p-4 border border-[var(--border)]">
           <Avatar name={agent.name} className="size-12 text-base" />
           <div className="flex-1">
             <p className="text-xs text-slate-500">Tu agente de viajes</p>
@@ -146,7 +149,7 @@ export default async function PortalHome() {
 
 function TripList({ trips }: { trips: { id: string; title: string; destination: keyof typeof DESTINATION_LABEL; startDate: Date | null; endDate: Date | null }[] }) {
   return (
-    <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
+    <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white border border-[var(--border)]">
       {trips.map((t) => (
         <li key={t.id}>
           <Link href={`/portal/viajes/${t.id}`} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50">
@@ -156,7 +159,7 @@ function TripList({ trips }: { trips: { id: string; title: string; destination: 
                 {DESTINATION_LABEL[t.destination]} · {formatRange(t.startDate, t.endDate)}
               </p>
             </div>
-            <ChevronRight className="size-4 text-slate-400" />
+            <ChevronRight className="size-4 text-slate-500" />
           </Link>
         </li>
       ))}

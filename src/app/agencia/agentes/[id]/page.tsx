@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation";
 import { requireAgencyUser } from "@/lib/auth";
-import { Badge, Card, EmptyState, PageHeader, StatCard, Table, Td, Th, buttonClass } from "@/components/ui";
+import { Badge, Card, EmptyState, PageHeader, StatCard, StatStrip, Table, Td, Th, buttonClass } from "@/components/ui";
 import { BOOKING_STATUS_COLOR, BOOKING_STATUS_LABEL, COMMISSION_STATUS_COLOR, COMMISSION_STATUS_LABEL, DESTINATION_LABEL, ITEM_TYPE_LABEL } from "@/lib/labels";
 import { formatDate, formatRange, money } from "@/lib/format";
 import { agencyAgent, agencyCurrencies, agencySales, summarize } from "@/lib/agency-panel";
+import { SelectField } from "@/components/select-field";
 
 export const metadata = { title: "Ventas del agente" };
 
@@ -33,34 +34,26 @@ export default async function AgencyAgentPage({
         back={{ href: `/agencia?anio=${year}&moneda=${currency}`, label: "Resumen" }}
         actions={
           <form className="flex gap-2">
-            <select name="anio" defaultValue={year} className="field w-28" aria-label="Año">
-              {[year + 1, year, year - 1, year - 2, year - 3].map((y) => (
-                <option key={y}>{y}</option>
-              ))}
-            </select>
-            <select name="moneda" defaultValue={currency} className="field w-24" aria-label="Moneda">
-              {[...new Set([currency, ...currencies])].map((c) => (
-                <option key={c}>{c}</option>
-              ))}
-            </select>
+            <SelectField name="anio" defaultValue={String(year)} className="w-28" aria-label="Año" options={[year + 1, year, year - 1, year - 2, year - 3].map((y) => ({ value: String(y), label: String(y) }))} />
+            <SelectField name="moneda" defaultValue={currency} className="w-24" aria-label="Moneda" options={[...new Set([currency, ...currencies])].map((c) => ({ value: c, label: c }))} />
             <button className={buttonClass("primary")}>Ver</button>
           </form>
         }
       />
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <StatStrip className="mb-6">
         <StatCard label="Vendido" value={money(t.revenue, currency)} hint={`${t.count} ventas en ${year}`} />
         <StatCard label="Comisiones" value={money(t.commission, currency)} />
         <StatCard label="Ya pagadas" value={money(t.paid, currency)} tone="good" />
         <StatCard label="Por pagar" value={money(t.pending, currency)} tone={t.pending > 0 ? "warn" : "default"} />
-      </div>
+      </StatStrip>
 
       {sales.length === 0 ? (
         <EmptyState title={`Sin ventas en ${year} en ${currency}`} description="Cada reserva que el agente confirma con un proveedor cuenta como una venta." />
       ) : (
         <Card>
           <Table>
-            <thead className="bg-slate-50">
+            <thead>
               <tr>
                 <Th>Viaje</Th>
                 <Th>Reserva</Th>
@@ -92,7 +85,7 @@ export default async function AgencyAgentPage({
                   <Td className="text-right whitespace-nowrap">{money(s.commissionAmount, s.currency)}</Td>
                   <Td>
                     <Badge className={COMMISSION_STATUS_COLOR[s.commissionStatus]}>{COMMISSION_STATUS_LABEL[s.commissionStatus]}</Badge>
-                    {s.commissionPaidAt && <p className="text-[11px] text-slate-400">{formatDate(s.commissionPaidAt)}</p>}
+                    {s.commissionPaidAt && <p className="text-[11px] text-slate-500">{formatDate(s.commissionPaidAt)}</p>}
                   </Td>
                 </tr>
               ))}

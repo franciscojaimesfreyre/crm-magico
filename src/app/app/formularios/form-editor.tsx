@@ -5,6 +5,7 @@ import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { buttonClass } from "@/components/ui";
 import { FIELD_TYPES, type FormField } from "@/lib/forms";
 import { saveForm } from "./actions";
+import { SelectField } from "@/components/select-field";
 
 const MAP_OPTIONS: { value: NonNullable<FormField["mapTo"]> | ""; label: string }[] = [
   { value: "", label: "No guardar en la ficha" },
@@ -43,9 +44,9 @@ export function FormEditor({
     });
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       <div className="space-y-4">
-        <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+        <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
           <input className="field text-base font-semibold" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título" />
           <textarea className="field" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descripción" />
           <label className="flex items-center gap-2 text-sm text-slate-700">
@@ -53,16 +54,10 @@ export function FormEditor({
           </label>
         </div>
         {fields.map((f, i) => (
-          <div key={f.id} className="space-y-2 rounded-xl border border-slate-200 bg-white p-4">
+          <div key={f.id} className="space-y-2 rounded-lg border border-slate-200 bg-white p-4">
             <div className="flex gap-2">
               <input className="field" value={f.label} onChange={(e) => patch(i, { label: e.target.value })} placeholder="Pregunta" />
-              <select className="field w-44" value={f.type} onChange={(e) => patch(i, { type: e.target.value as FormField["type"] })}>
-                {FIELD_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
+              <SelectField className="w-44 shrink-0" value={f.type} onValueChange={(v) => patch(i, { type: v as FormField["type"] })} options={FIELD_TYPES} aria-label="Tipo de pregunta" />
             </div>
             {f.type === "select" && (
               <input
@@ -77,15 +72,9 @@ export function FormEditor({
                 <label className="flex items-center gap-1.5 text-xs text-slate-600">
                   <input type="checkbox" checked={f.required} onChange={(e) => patch(i, { required: e.target.checked })} className="rounded border-slate-300" /> Obligatorio
                 </label>
-                <select className="rounded-md border border-slate-200 px-2 py-1 text-xs" value={f.mapTo ?? ""} onChange={(e) => patch(i, { mapTo: (e.target.value || undefined) as FormField["mapTo"] })}>
-                  {MAP_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
+                <SelectField size="sm" value={f.mapTo ?? ""} onValueChange={(v) => patch(i, { mapTo: (v || undefined) as FormField["mapTo"] })} options={MAP_OPTIONS} aria-label="Guardar en" />
               </div>
-              <div className="flex gap-1 text-slate-400">
+              <div className="flex gap-1 text-slate-500">
                 <button type="button" onClick={() => move(i, -1)} className="hover:text-slate-700" title="Subir">
                   <ArrowUp className="size-4" />
                 </button>
@@ -128,7 +117,7 @@ export function FormEditor({
 
       <div className="lg:sticky lg:top-20 lg:self-start">
         <p className="label">Vista previa</p>
-        <div className="space-y-3 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+        <div className="space-y-3 rounded-2xl bg-white p-6 ring-1 ring-slate-200">
           <h3 className="text-lg font-semibold text-slate-900">{title || "Sin título"}</h3>
           {description && <p className="text-sm text-slate-500">{description}</p>}
           {fields.map((f) => (
@@ -145,9 +134,7 @@ export function FormEditor({
                   {f.type === "textarea" ? (
                     <textarea className="field" rows={2} disabled />
                   ) : f.type === "select" ? (
-                    <select className="field" disabled>
-                      <option>{f.options?.[0] ?? "—"}</option>
-                    </select>
+                    <SelectField disabled placeholder="Elegí una opción" options={(f.options ?? []).map((o) => ({ value: o, label: o }))} />
                   ) : (
                     <input className="field" disabled type={f.type === "phone" ? "tel" : f.type} />
                   )}

@@ -34,7 +34,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       {tab === "negocio" && (
         <Card>
           <CardHeader title="Datos del negocio" description="Se muestran en el portal del cliente, el formulario de cotización y los emails." />
-          <ActionForm action={updateOrganization} className="grid gap-4 p-5 sm:grid-cols-2">
+          <ActionForm action={updateOrganization} className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
             <Field label="Nombre">
               <Input name="name" defaultValue={org.name} required />
             </Field>
@@ -85,7 +85,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         (isPlatformAgency(agency) ? (
           <Card>
             <CardHeader title={agency!.name} description={`Trabajás con esta agencia desde ${formatDate(org.agencyJoinedAt)}. Es la que te paga las comisiones.`} />
-            <dl className="grid gap-4 p-5 text-sm sm:grid-cols-3">
+            <dl className="grid grid-cols-1 gap-4 p-5 text-sm sm:grid-cols-3">
               <div>
                 <dt className="text-xs text-slate-500">Contacto</dt>
                 <dd className="text-slate-800">{agency!.contactName ?? "—"}</dd>
@@ -115,7 +115,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <div className="space-y-4">
             <Card>
               <CardHeader title="La agencia que te paga" description="Sus datos se usan en las planillas de comisiones que le mandás para cobrar." />
-              <ActionForm action={saveMyAgency} className="grid gap-3 p-5 sm:grid-cols-2">
+              <ActionForm action={saveMyAgency} className="grid grid-cols-1 gap-3 p-5 sm:grid-cols-2">
                 <Field label="Nombre">
                   <Input name="name" defaultValue={agency?.name} placeholder="Ej: Agencia Madre Travel" required />
                 </Field>
@@ -156,7 +156,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       {tab === "cuenta" && (
         <Card>
           <CardHeader title="Mi cuenta" description={user.email} />
-          <ActionForm action={updateMyAccount} className="grid gap-4 p-5 sm:grid-cols-2">
+          <ActionForm action={updateMyAccount} className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
             <Field label="Nombre">
               <Input name="name" defaultValue={user.name} required />
             </Field>

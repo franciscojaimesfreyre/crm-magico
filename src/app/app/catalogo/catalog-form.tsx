@@ -5,6 +5,7 @@ import { ActionForm, SubmitButton, type ActionState } from "@/components/form-co
 import { Card, Checkbox, Field, Input, Select, Textarea } from "@/components/ui";
 import { CATALOG_KINDS, DESTINATIONS, DINING_STYLES, PRICE_LEVELS } from "@/lib/labels";
 import type { CatalogKind } from "@/generated/prisma/enums";
+import { DateInput } from "@/components/date-input";
 
 export type CatalogFormValues = {
   kind: CatalogKind;
@@ -38,9 +39,9 @@ export function CatalogForm({
 
   return (
     <ActionForm action={action}>
-      <Card className="grid gap-4 p-5 sm:grid-cols-2">
+      <Card className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
         <Field label="Tipo">
-          <Select name="kind" options={CATALOG_KINDS} value={kind} onChange={(e) => setKind(e.target.value as CatalogKind)} />
+          <Select name="kind" options={CATALOG_KINDS} value={kind} onValueChange={(v) => setKind(v as CatalogKind)} />
         </Field>
         <Field label="Destino *">
           <Select name="destination" options={DESTINATIONS} defaultValue={values?.destination ?? "DISNEY_WORLD"} required />
@@ -75,10 +76,10 @@ export function CatalogForm({
           <Textarea name="notes" rows={2} defaultValue={values?.notes} />
         </Field>
         <Field label="Cerrada desde" hint="Remodelación o cierre temporal">
-          <Input type="date" name="closedFrom" defaultValue={values?.closedFrom} />
+          <DateInput name="closedFrom" defaultValue={values?.closedFrom} />
         </Field>
         <Field label="Reabre" hint="Vacío si no hay fecha confirmada">
-          <Input type="date" name="closedTo" defaultValue={values?.closedTo} />
+          <DateInput name="closedTo" defaultValue={values?.closedTo} />
         </Field>
         {(kind === "ATTRACTION" || kind === "SHOW") && (
           <div className="sm:col-span-2">

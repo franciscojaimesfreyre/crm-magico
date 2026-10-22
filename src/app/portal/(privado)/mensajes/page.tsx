@@ -21,7 +21,7 @@ export default async function PortalMessages() {
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold text-slate-900">Mensajes</h1>
       {trips.length > 0 && (
-        <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
+        <div className="rounded-2xl bg-white p-4 border border-[var(--border)]">
           <p className="mb-2 text-sm font-medium text-slate-700">Conversaciones por viaje</p>
           <ul className="space-y-1">
             {trips.map((t) => (
@@ -35,10 +35,10 @@ export default async function PortalMessages() {
           </ul>
         </div>
       )}
-      <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
+      <div className="overflow-hidden rounded-2xl bg-white border border-[var(--border)]">
         <p className="border-b border-slate-100 px-4 py-3 text-sm font-medium text-slate-700">Consulta general con {agentName}</p>
         <Chat
-          className="h-[55vh] bg-[#faf8f5]"
+          className="h-[55vh] bg-[var(--ground)]"
           initial={await loadThread(account.clientId, null)}
           viewer="CLIENT"
           send={sendClientMessage.bind(null, null)}

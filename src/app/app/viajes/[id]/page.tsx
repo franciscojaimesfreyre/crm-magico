@@ -1,17 +1,18 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ExternalLink, FileText, Link2, Pencil, Trash2, Wand2 } from "lucide-react";
+import { ChevronLeft, ExternalLink, FileText, Link2, Pencil, Trash2, Wand2 } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { ActionForm, ConfirmButton, SubmitButton } from "@/components/form-controls";
-import { Badge, Card, CardHeader, Checkbox, EmptyState, Field, Input, LinkButton, PageHeader, Select, Tabs, buttonClass } from "@/components/ui";
+import { Badge, Card, CardHeader, Checkbox, EmptyState, Field, Input, LinkButton, Select, Tabs, buttonClass } from "@/components/ui";
 import { Chat } from "@/components/chat";
 import { ItineraryView } from "@/components/itinerary-view";
 import { bookingClosures } from "@/lib/catalog";
 import { TaskList } from "@/components/task-list";
 import { TaskForm } from "@/components/task-form";
-import { BOOKING_STATUSES, BOOKING_STATUS_COLOR, BOOKING_STATUS_LABEL, CONTRACT_STATUS_COLOR, CONTRACT_STATUS_LABEL, ITEM_TYPE_BASE, ITEM_TYPE_LABEL } from "@/lib/labels";
-import { fileSize, formatDateTime, formatRange, toDateInput, toNumber } from "@/lib/format";
+import { BOOKING_STATUSES, CONTRACT_STATUS_COLOR, CONTRACT_STATUS_LABEL, ITEM_TYPE_BASE, ITEM_TYPE_LABEL } from "@/lib/labels";
+import { fileSize, formatDateTime, toDateInput, toNumber } from "@/lib/format";
+import { TripHeader } from "./trip-header";
 import { loadThread } from "@/lib/messages";
 import { cancelBooking, deleteBooking, setBookingStatusForm } from "../actions";
 import { addBookingDocument, attachFromLibrary, deleteDocument, toggleDocumentVisibility } from "@/app/app/documentos/actions";
@@ -57,33 +58,21 @@ export default async function BookingPage({
 
   return (
     <>
-      <PageHeader
-        back={{ href: "/app/viajes", label: "Viajes" }}
-        title={
-          <span className="flex flex-wrap items-center gap-2">
-            {b.title}
-            <Badge className={BOOKING_STATUS_COLOR[b.status]}>{BOOKING_STATUS_LABEL[b.status]}</Badge>
-          </span>
-        }
-        description={
-          <>
-            {b.code} ·{" "}
-            <Link href={`/app/clientes/${b.clientId}`} className="text-brand-700 hover:underline">
-              {b.client.firstName} {b.client.lastName}
-            </Link>{" "}
-            · {formatRange(b.startDate, b.endDate)}
-          </>
-        }
+      <Link href="/app/viajes" className="mb-3 inline-flex items-center gap-1 text-sm text-[var(--ink-soft)] hover:text-slate-900">
+        <ChevronLeft className="size-4" /> Viajes
+      </Link>
+      <TripHeader
+        booking={b}
         actions={
           <>
             <form action={setBookingStatusForm.bind(null, b.id)} className="flex items-center gap-2">
-              <Select key={b.status} name="status" defaultValue={b.status} options={BOOKING_STATUSES} className="w-36" />
+              <Select key={b.status} name="status" defaultValue={b.status} options={BOOKING_STATUSES} className="w-40" aria-label="Estado del viaje" />
               <SubmitButton variant="secondary" pendingText="…">
                 Cambiar
               </SubmitButton>
             </form>
-            <LinkButton variant="secondary" href={`/app/viajes/${b.id}/editar`}>
-              <Pencil className="size-4" /> Editar
+            <LinkButton href={`/app/viajes/${b.id}/editar`}>
+              <Pencil className="size-4" /> Editar viaje
             </LinkButton>
           </>
         }
@@ -179,7 +168,7 @@ async function ItineraryTab({ bookingId, shareToken, baseUrl }: { bookingId: str
         <div className="min-w-0 text-sm text-slate-600">
           El cliente ve el itinerario en su portal. También podés compartirlo con un link público (no requiere cuenta).
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-            <Link2 className="size-4 text-slate-400" />
+            <Link2 className="size-4 text-slate-500" />
             <code className="min-w-0 text-xs break-all">{shareUrl}</code>
             <CopyText text={shareUrl} />
             <a href={shareUrl} target="_blank" className="text-xs text-brand-700 hover:underline">
@@ -212,7 +201,7 @@ async function DocumentsTab({ bookingId, organizationId }: { bookingId: string; 
   ]);
   const reservations = await db.bookingItem.findMany({ where: { bookingId }, orderBy: { position: "asc" }, select: { id: true, description: true } });
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_340px]">
       <Card>
         <CardHeader title="Documentos del viaje" description="Confirmaciones, vouchers, guías… Los visibles aparecen en el portal del cliente." />
         {docs.length === 0 ? (
@@ -222,7 +211,7 @@ async function DocumentsTab({ bookingId, organizationId }: { bookingId: string; 
             {docs.map((d) => (
               <li key={d.id} className="flex items-center justify-between gap-3 px-5 py-3">
                 <div className="flex min-w-0 items-center gap-3">
-                  <FileText className="size-5 shrink-0 text-slate-400" />
+                  <FileText className="size-5 shrink-0 text-slate-500" />
                   <div className="min-w-0">
                     <a
                       href={d.storageKey ? `/api/archivos/${d.id}` : (d.url ?? "#")}
@@ -315,7 +304,7 @@ async function TasksTab({ bookingId, organizationId }: { bookingId: string; orga
     db.contract.findMany({ where: { bookingId }, orderBy: { createdAt: "desc" } }),
   ]);
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
       <Card>
         <TaskForm bookingId={bookingId} agents={agents.map((a) => ({ value: a.id, label: a.name }))} />
         <div className="border-t border-slate-100">
@@ -359,7 +348,7 @@ async function ActivityTab({ bookingId }: { bookingId: string }) {
           {activities.map((a) => (
             <li key={a.id} className="flex items-start justify-between gap-4 px-5 py-3 text-sm">
               <span className="text-slate-700">{a.description}</span>
-              <span className="shrink-0 text-xs text-slate-400">
+              <span className="shrink-0 text-xs text-slate-500">
                 {formatDateTime(a.createdAt)}
                 {a.user && ` · ${a.user.name}`}
               </span>

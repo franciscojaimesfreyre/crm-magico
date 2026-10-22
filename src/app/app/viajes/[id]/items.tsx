@@ -2,7 +2,7 @@ import clsx from "clsx";
 import type { ReactNode } from "react";
 import { AlertTriangle, BedDouble, CalendarDays, Car, CheckCircle2, FileText, Hash, Building2, Plane, Plus, Package, PartyPopper, Ship, Shield, Ticket, Trash2, Users, Utensils, Bus, Sparkles, Ban } from "lucide-react";
 import { ConfirmButton } from "@/components/form-controls";
-import { Badge, Card, CardHeader, buttonClass } from "@/components/ui";
+import { Badge, Card, CardHeader, StatCard, StatStrip, buttonClass } from "@/components/ui";
 import {
   COMMISSION_STATUS_COLOR,
   COMMISSION_STATUS_LABEL,
@@ -20,6 +20,7 @@ import { ReservationForm } from "./reservation-form";
 import { ReservationPayments } from "./payments";
 import { TripDatesGuard } from "./reservation-extras";
 import type { LoadedBooking } from "./data";
+import { DateInput } from "@/components/date-input";
 
 type LoadedItem = LoadedBooking["items"][number];
 
@@ -74,13 +75,13 @@ export function Items({
       </p>
 
       {b.items.length > 0 && (
-        <div className="grid gap-3 sm:grid-cols-5">
+        <StatStrip>
           <Total label="Total del viaje" value={money(b.totalPrice, b.currency)} hint={`${active.length} reservas activas`} />
           <Total label="Pagado por el cliente" value={money(paid, b.currency)} hint={`Resta ${money(remaining, b.currency)}`} />
           <Total label="Próximo vencimiento" value={nextDue ? formatDate(nextDue.item.balanceDue) : "—"} hint={nextDue ? `${money(nextDue.remaining, b.currency)} · ${nextDue.item.description}` : "Sin saldos pendientes"} />
           <Total label="Comisión del viaje" value={money(b.commissionAmount, b.currency)} />
           <Total label="Comisión cobrada" value={money(commissionPaid, b.currency)} />
-        </div>
+        </StatStrip>
       )}
 
       {b.items.map((item) => {
@@ -88,12 +89,12 @@ export function Items({
         return (
           <Card key={item.id} className={clsx(item.status === "CANCELLED" && "opacity-60")}>
             <div className="flex flex-wrap items-start gap-4 p-4">
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700">
+              <span className="flex size-6 shrink-0 items-center justify-center text-slate-500">
                 <Icon className="size-5" />
               </span>
               <div className="min-w-0 flex-1 basis-56">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs text-slate-400">{ITEM_TYPE_LABEL[item.type]}</span>
+                  <span className="text-xs text-slate-500">{ITEM_TYPE_LABEL[item.type]}</span>
                   <Badge className={RESERVATION_STATUS_COLOR[item.status]}>{RESERVATION_STATUS_LABEL[item.status]}</Badge>
                 </div>
                 <p className="font-medium text-slate-900">{item.description}</p>
@@ -109,10 +110,10 @@ export function Items({
                 <p className="font-semibold text-slate-900">{money(item.price, b.currency)}</p>
                 {item.taxAmount !== null && toNumber(item.taxAmount) > 0 && <p className="text-[11px] text-slate-500">Incluye tax {money(item.taxAmount, b.currency)}</p>}
                 <p className="text-xs text-emerald-700">
-                  Comisión {money(item.commissionAmount, b.currency)} <span className="text-slate-400">({item.commissionFixed !== null ? "monto fijo" : percent(item.commissionRate ?? defaultRate)})</span>
+                  Comisión {money(item.commissionAmount, b.currency)} <span className="text-slate-500">({item.commissionFixed !== null ? "monto fijo" : percent(item.commissionRate ?? defaultRate)})</span>
                 </p>
                 <Badge className={clsx("mt-1", COMMISSION_STATUS_COLOR[item.commissionStatus])}>{COMMISSION_STATUS_LABEL[item.commissionStatus]}</Badge>
-                {item.saleDate && <p className="text-[11px] text-slate-400">Vendida el {formatDate(item.saleDate)}</p>}
+                {item.saleDate && <p className="text-[11px] text-slate-500">Vendida el {formatDate(item.saleDate)}</p>}
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 px-4 py-2">
@@ -187,10 +188,10 @@ function duration(item: LoadedItem) {
 function ReservationBasics({ item }: { item: LoadedItem }) {
   const missing = [!item.startDate && "las fechas", !item.confirmationNumber && "el n° de confirmación"].filter(Boolean) as string[];
   const flag = item.status === "CONFIRMED" && missing.length > 0;
-  const empty = (text: string) => <span className={flag ? "text-amber-700" : "text-slate-400"}>{text}</span>;
+  const empty = (text: string) => <span className={flag ? "text-amber-700" : "text-slate-500"}>{text}</span>;
   return (
     <div className="mt-2 space-y-1.5">
-      <dl className="grid gap-x-6 gap-y-1.5 text-sm sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
+      <dl className="grid grid-cols-1 gap-x-6 gap-y-1.5 text-sm sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
         <Datum icon={CalendarDays} label="Fechas">
           {item.startDate ? (
             <>
@@ -202,7 +203,7 @@ function ReservationBasics({ item }: { item: LoadedItem }) {
           )}
         </Datum>
         <Datum icon={Building2} label="Proveedor">
-          {item.supplier ?? <span className="text-slate-400">—</span>}
+          {item.supplier ?? <span className="text-slate-500">—</span>}
         </Datum>
         <Datum icon={Hash} label="Confirmación">
           {item.confirmationNumber ? <span className="font-mono">{item.confirmationNumber}</span> : empty(item.status === "PENDING" ? "Sin confirmar" : "Sin número")}
@@ -211,7 +212,7 @@ function ReservationBasics({ item }: { item: LoadedItem }) {
       {item.notes && <p className="text-xs whitespace-pre-line text-slate-600">{item.notes}</p>}
       {item.travelers.length > 0 && (
         <p className="flex items-start gap-1.5 text-xs text-slate-600">
-          <Users className="mt-px size-3.5 shrink-0 text-slate-400" />
+          <Users className="mt-px size-3.5 shrink-0 text-slate-500" />
           {item.travelers.map((t) => [t.traveler.firstName, t.traveler.lastName].filter(Boolean).join(" ")).join(", ")}
         </p>
       )}
@@ -242,7 +243,7 @@ function ReservationBasics({ item }: { item: LoadedItem }) {
 function Datum({ icon: Icon, label, children }: { icon: typeof Package; label: string; children: ReactNode }) {
   return (
     <div className="min-w-0">
-      <dt className="flex items-center gap-1 text-[11px] font-medium tracking-wide text-slate-400 uppercase">
+      <dt className="flex items-center gap-1 text-xs font-medium text-slate-500">
         <Icon className="size-3" /> {label}
       </dt>
       <dd className="text-slate-800">{children}</dd>
@@ -257,7 +258,7 @@ function ConfirmReservation({ item, trip }: { item: LoadedItem; trip: { startDat
       <summary className={clsx(buttonClass("secondary", "sm"), "list-none")}>
         <CheckCircle2 className="size-3.5" /> Confirmar
       </summary>
-      <form action={quickItemAction.bind(null, item.id, "confirm")} className="mt-2 grid gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:grid-cols-4">
+      <form action={quickItemAction.bind(null, item.id, "confirm")} className="mt-2 grid grid-cols-1 gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:grid-cols-4">
         <TripDatesGuard tripStart={toDateInput(trip.startDate) || null} tripEnd={toDateInput(trip.endDate) || null} />
         <label className="block">
           <span className="label">N° de confirmación</span>
@@ -265,11 +266,11 @@ function ConfirmReservation({ item, trip }: { item: LoadedItem; trip: { startDat
         </label>
         <label className="block">
           <span className="label">Desde</span>
-          <input type="date" name="startDate" defaultValue={toDateInput(item.startDate)} className="field" />
+          <DateInput name="startDate" defaultValue={toDateInput(item.startDate)} />
         </label>
         <label className="block">
           <span className="label">Hasta</span>
-          <input type="date" name="endDate" defaultValue={toDateInput(item.endDate)} className="field" />
+          <DateInput name="endDate" defaultValue={toDateInput(item.endDate)} />
         </label>
         <div className="flex items-end">
           <button className={buttonClass("primary", "sm", "w-full")}>
@@ -283,11 +284,5 @@ function ConfirmReservation({ item, trip }: { item: LoadedItem; trip: { startDat
 }
 
 function Total({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <Card className="p-3">
-      <p className="text-[11px] font-medium tracking-wide text-slate-500 uppercase">{label}</p>
-      <p className="text-lg font-semibold text-slate-900">{value}</p>
-      {hint && <p className="text-xs text-slate-500">{hint}</p>}
-    </Card>
-  );
+  return <StatCard label={label} value={value} hint={hint} />;
 }

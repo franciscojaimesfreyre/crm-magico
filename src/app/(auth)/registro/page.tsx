@@ -19,13 +19,13 @@ export default async function SignupPage({ searchParams }: { searchParams: Promi
       <div className="mt-4 mb-6 grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1 text-sm font-medium">
         <Link
           href={sp.agencia ? `/registro?agencia=${encodeURIComponent(sp.agencia)}` : "/registro"}
-          className={clsx("rounded-md px-3 py-1.5 text-center", !isAgency ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800")}
+          className={clsx("rounded-md px-3 py-1.5 text-center", !isAgency ? "bg-white text-slate-900" : "text-slate-500 hover:text-slate-800")}
         >
           Soy agente
         </Link>
         <Link
           href="/registro?tipo=agencia"
-          className={clsx("rounded-md px-3 py-1.5 text-center", isAgency ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800")}
+          className={clsx("rounded-md px-3 py-1.5 text-center", isAgency ? "bg-white text-slate-900" : "text-slate-500 hover:text-slate-800")}
         >
           Soy una agencia
         </Link>

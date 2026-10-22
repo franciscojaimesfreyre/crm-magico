@@ -77,10 +77,10 @@ export default async function FormPage({ params, searchParams }: { params: Promi
                     )
                   }
                 />
-                <dl className="grid gap-3 p-5 text-sm sm:grid-cols-2">
+                <dl className="grid grid-cols-1 gap-3 p-5 text-sm sm:grid-cols-2">
                   {fields.map((f) => (
                     <div key={f.id}>
-                      <dt className="text-xs text-slate-400">{f.label}</dt>
+                      <dt className="text-xs text-slate-500">{f.label}</dt>
                       <dd className="whitespace-pre-line text-slate-800">{data[f.id] === true ? "Sí" : data[f.id] === false ? "No" : String(data[f.id] ?? "—") || "—"}</dd>
                     </div>
                   ))}

@@ -19,7 +19,7 @@ export default async function TemplatesPage() {
   return (
     <>
       <PageHeader title="Plantillas de email" description="Se usan para enviar emails a clientes y en las automatizaciones. Las variables se completan solas." />
-      <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_300px]">
         <div className="space-y-4">
           {templates.map((t) => (
             <Card key={t.id}>
@@ -83,7 +83,7 @@ export default async function TemplatesPage() {
 
 function TemplateForm({ action, template }: { action: (s: ActionState, f: FormData) => Promise<ActionState>; template?: EmailTemplate }) {
   return (
-    <ActionForm action={action} resetOnSuccess={!template} className="grid gap-3 sm:grid-cols-2">
+    <ActionForm action={action} resetOnSuccess={!template} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <Field label="Nombre">
         <Input name="name" defaultValue={template?.name} required />
       </Field>

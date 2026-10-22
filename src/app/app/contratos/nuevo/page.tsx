@@ -1,8 +1,9 @@
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { ActionForm, SubmitButton } from "@/components/form-controls";
-import { Card, EmptyState, Field, Input, LinkButton, PageHeader, Select } from "@/components/ui";
+import { Card, EmptyState, Field, LinkButton, PageHeader, Select } from "@/components/ui";
 import { createContract } from "../actions";
+import { DateInput } from "@/components/date-input";
 
 export const metadata = { title: "Nuevo contrato" };
 
@@ -37,7 +38,7 @@ export default async function NewContract({ searchParams }: { searchParams: Prom
               <Select name="clientId" options={clients.map((c) => ({ value: c.id, label: `${c.lastName}, ${c.firstName}` }))} placeholder="—" />
             </Field>
             <Field label="Vence el (opcional)">
-              <Input type="date" name="expiresAt" />
+              <DateInput name="expiresAt" />
             </Field>
             <SubmitButton>Generar contrato</SubmitButton>
           </ActionForm>

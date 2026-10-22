@@ -4,7 +4,7 @@ import { Pencil, Trash2, Unlink } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { ActionForm, ConfirmButton, SubmitButton } from "@/components/form-controls";
-import { Badge, Card, CardHeader, LinkButton, PageHeader, Select, StatCard, Table, Td, Th, Textarea } from "@/components/ui";
+import { Badge, Card, CardHeader, LinkButton, PageHeader, Select, StatCard, StatStrip, Table, Td, Th, Textarea } from "@/components/ui";
 import { ItineraryView } from "@/components/itinerary-view";
 import { BOOKING_STATUS_COLOR, BOOKING_STATUS_LABEL, DESTINATION_LABEL, GROUP_STATUS_LABEL } from "@/lib/labels";
 import { formatRange, money, toNumber } from "@/lib/format";
@@ -44,32 +44,33 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
     <>
       <PageHeader
         back={{ href: "/app/grupos", label: "Grupos" }}
-        title={
-          <span className="flex items-center gap-2">
-            {group.name} <Badge className="bg-brand-50 text-brand-700">{GROUP_STATUS_LABEL[group.status]}</Badge>
-          </span>
+        title={group.name}
+        description={
+          <>
+            <Badge className="mr-2 align-[1px] bg-[var(--raised)] text-slate-800">{GROUP_STATUS_LABEL[group.status]}</Badge>
+            {`${group.destination ? DESTINATION_LABEL[group.destination] + " · " : ""}${formatRange(group.startDate, group.endDate)}${group.organizer ? ` · Organiza ${group.organizer.firstName} ${group.organizer.lastName}` : ""}`}
+          </>
         }
-        description={`${group.destination ? DESTINATION_LABEL[group.destination] + " · " : ""}${formatRange(group.startDate, group.endDate)}${group.organizer ? ` · Organiza ${group.organizer.firstName} ${group.organizer.lastName}` : ""}`}
         actions={
           <LinkButton href={`/app/grupos/${id}/itinerario`}>
             <Pencil className="size-4" /> Itinerario del grupo
           </LinkButton>
         }
       />
-      <div className="mb-6 grid gap-3 sm:grid-cols-4">
+      <StatStrip className="mb-6">
         <StatCard label="Viajes" value={active.length} />
         <StatCard label="Viajeros" value={guests} />
         <StatCard label="Total vendido" value={money(revenue, currency)} />
         <StatCard label="Pagado por los clientes" value={money(deposits, currency)} tone="good" />
-      </div>
+      </StatStrip>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
         <div className="space-y-6">
           <Card>
             <CardHeader title="Viajes del grupo" description="Cada familia tiene su viaje, con sus reservas, pagos y documentos." />
             {group.bookings.length > 0 && (
               <Table>
-                <thead className="bg-slate-50">
+                <thead>
                   <tr>
                     <Th>Cliente</Th>
                     <Th>Estado</Th>
@@ -85,7 +86,7 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
                         <Link href={`/app/viajes/${b.id}`} className="font-medium text-slate-900 hover:text-brand-700">
                           {b.client.firstName} {b.client.lastName}
                         </Link>
-                        <p className="text-xs text-slate-400">{b.code}</p>
+                        <p className="text-xs text-slate-500">{b.code}</p>
                       </Td>
                       <Td>
                         <Badge className={BOOKING_STATUS_COLOR[b.status]}>{BOOKING_STATUS_LABEL[b.status]}</Badge>
@@ -94,7 +95,7 @@ export default async function GroupPage({ params }: { params: Promise<{ id: stri
                       <Td className="text-right">{money(b.totalPrice, b.currency)}</Td>
                       <Td>
                         <form action={unlinkBooking.bind(null, id, b.id)}>
-                          <button className="text-slate-400 hover:text-rose-600" title="Desvincular del grupo">
+                          <button className="text-slate-500 hover:text-rose-600" title="Desvincular del grupo">
                             <Unlink className="size-4" />
                           </button>
                         </form>

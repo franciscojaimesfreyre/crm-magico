@@ -4,16 +4,18 @@ import { CheckCircle2, KeyRound, Mail, MapPin, Phone, Plus, Trash2 } from "lucid
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { ActionForm, ConfirmButton, SubmitButton } from "@/components/form-controls";
-import { Badge, Card, CardHeader, EmptyState, Field, Input, LinkButton, PageHeader, Select, Tabs } from "@/components/ui";
+import { Amount, Badge, Card, CardHeader, EmptyState, Field, Input, LinkButton, PageHeader, Select, Tabs } from "@/components/ui";
 import {
   BOOKING_STATUS_COLOR,
   BOOKING_STATUS_LABEL,
   BUDGET_LEVEL_LABEL,
   CLIENT_SOURCE_LABEL,
   DESTINATION_LABEL,
+  DESTINATION_TONE,
   TRIP_PACE_LABEL,
 } from "@/lib/labels";
-import { ageOn, formatDate, formatDateTime, formatRange, money } from "@/lib/format";
+import { ageOn, daysBetween, formatDate, formatDateTime, formatRange, money, todayUTC } from "@/lib/format";
+import { TripTicket } from "@/components/trip-ticket";
 import { tierFor } from "@/lib/clients";
 import {
   addSupplierLogin,
@@ -96,9 +98,9 @@ export default async function ClientPage({
       />
 
       {creado && (
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-lg border border-emerald-200 bg-emerald-50 px-5 py-4">
           <div className="flex items-center gap-3">
-            <CheckCircle2 className="size-6 shrink-0 text-emerald-600" />
+            <CheckCircle2 className="size-6 shrink-0 text-emerald-700" />
             <div>
               <p className="font-medium text-emerald-900">Cliente creado</p>
               <p className="text-sm text-emerald-800">
@@ -114,7 +116,7 @@ export default async function ClientPage({
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
         <div className="min-w-0">
           <Tabs
             active={tab}
@@ -134,22 +136,20 @@ export default async function ClientPage({
             ) : (
               <div className="space-y-3">
                 {client.bookings.map((b) => (
-                  <Link key={b.id} href={`/app/viajes/${b.id}`} className="block">
-                    <Card className="flex flex-wrap items-center justify-between gap-3 p-4 hover:border-brand-200">
-                      <div>
-                        <p className="font-medium text-slate-900">
-                          {b.title} <span className="text-xs text-slate-400">{b.code}</span>
-                        </p>
-                        <p className="text-sm text-slate-500">
-                          {DESTINATION_LABEL[b.destination]} · {formatRange(b.startDate, b.endDate)}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm font-medium">{money(b.totalPrice, b.currency)}</span>
-                        <Badge className={BOOKING_STATUS_COLOR[b.status]}>{BOOKING_STATUS_LABEL[b.status]}</Badge>
-                      </div>
-                    </Card>
-                  </Link>
+                  <TripTicket
+                    key={b.id}
+                    href={`/app/viajes/${b.id}`}
+                    code={b.code}
+                    title={b.title}
+                    client={`${client.firstName} ${client.lastName}`}
+                    next={<>Total <strong className="font-semibold text-slate-900 tabular-nums">{money(b.totalPrice, b.currency)}</strong></>}
+                    destination={DESTINATION_LABEL[b.destination]}
+                    tone={DESTINATION_TONE[b.destination]}
+                    dates={formatRange(b.startDate, b.endDate)}
+                    status={{ label: BOOKING_STATUS_LABEL[b.status], className: BOOKING_STATUS_COLOR[b.status] }}
+                    daysToGo={b.startDate ? daysBetween(todayUTC(), b.startDate) : null}
+                    size="sm"
+                  />
                 ))}
               </div>
             ))}
@@ -217,10 +217,10 @@ export default async function ClientPage({
                       <li key={l.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
                         <div>
                           <p className="flex items-center gap-2 font-medium text-slate-900">
-                            <KeyRound className="size-4 text-slate-400" /> {l.supplier}
+                            <KeyRound className="size-4 text-slate-500" /> {l.supplier}
                           </p>
                           <p className="text-sm text-slate-600">{l.username}</p>
-                          {l.notes && <p className="text-xs text-slate-400">{l.notes}</p>}
+                          {l.notes && <p className="text-xs text-slate-500">{l.notes}</p>}
                         </div>
                         <div className="flex items-center gap-3">
                           <RevealPassword loginId={l.id} />
@@ -237,7 +237,7 @@ export default async function ClientPage({
               </Card>
               <Card>
                 <CardHeader title="Guardar acceso" />
-                <ActionForm action={addSupplierLogin.bind(null, id)} resetOnSuccess className="grid gap-3 p-4 sm:grid-cols-2">
+                <ActionForm action={addSupplierLogin.bind(null, id)} resetOnSuccess className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2">
                   <Field label="Proveedor">
                     <Select
                       name="supplier"
@@ -287,7 +287,7 @@ export default async function ClientPage({
                   {client.activities.map((a) => (
                     <li key={a.id} className="flex items-start justify-between gap-4 px-5 py-3 text-sm">
                       <span className="text-slate-700">{a.description}</span>
-                      <span className="shrink-0 text-xs text-slate-400">
+                      <span className="shrink-0 text-xs text-slate-500">
                         {formatDateTime(a.createdAt)}
                         {a.user && ` · ${a.user.name}`}
                       </span>
@@ -303,12 +303,12 @@ export default async function ClientPage({
           <Card className="space-y-2 p-4 text-sm">
             {client.email && (
               <p className="flex items-center gap-2 text-slate-700">
-                <Mail className="size-4 text-slate-400" /> {client.email}
+                <Mail className="size-4 text-slate-500" /> {client.email}
               </p>
             )}
             {client.phone && (
               <p className="flex items-center gap-2 text-slate-700">
-                <Phone className="size-4 text-slate-400" />
+                <Phone className="size-4 text-slate-500" />
                 <a href={`https://wa.me/${client.phone.replace(/\D/g, "")}`} target="_blank" className="hover:text-brand-700">
                   {client.phone}
                 </a>
@@ -316,10 +316,15 @@ export default async function ClientPage({
             )}
             {(client.city || client.country) && (
               <p className="flex items-center gap-2 text-slate-700">
-                <MapPin className="size-4 text-slate-400" /> {[client.city, client.country].filter(Boolean).join(", ")}
+                <MapPin className="size-4 text-slate-500" /> {[client.city, client.country].filter(Boolean).join(", ")}
               </p>
             )}
-            <p className="text-xs text-slate-500">Valor total vendido: {money(lifetime)}</p>
+            <div className="border-t border-[var(--rule)] pt-3">
+              <p className="text-[11px] font-semibold tracking-[0.06em] text-[var(--ink-soft)] uppercase">Total vendido</p>
+              <p className="figure mt-1 text-2xl text-brand-700">
+                <Amount value={money(lifetime)} />
+              </p>
+            </div>
           </Card>
 
           <Card className="p-4">
@@ -361,7 +366,7 @@ export default async function ClientPage({
               {client.preferenceNotes && <Pref label="Notas" value={client.preferenceNotes} />}
             </dl>
             {!client.pace && client.interests.length === 0 && (
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-500">
                 Sin preferencias cargadas.{" "}
                 <Link href={`/app/clientes/${id}/editar`} className="text-brand-700 hover:underline">
                   Completarlas
@@ -419,7 +424,7 @@ export default async function ClientPage({
 function Pref({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-slate-400">{label}</dt>
+      <dt className="text-slate-500">{label}</dt>
       <dd className="text-slate-700">{value}</dd>
     </div>
   );

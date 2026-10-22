@@ -18,7 +18,7 @@ export default async function ActivityTemplatesPage() {
         title="Actividades guardadas"
         description="Aparecen en la paleta del editor de itinerarios para arrastrarlas a cualquier día. Las que creás vos también le sirven de referencia a la IA cuando arma un itinerario: las usa si encajan con el viaje, sin estar obligada."
       />
-      <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_340px]">
         <Card>
           <ul className="divide-y divide-slate-100">
             {items.map((a) => (
@@ -29,7 +29,7 @@ export default async function ActivityTemplatesPage() {
                       <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-slate-900">
                         {a.title}
                         {a.custom ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-fuchsia-100 px-2 py-px text-[11px] font-medium text-fuchsia-800" title="La creaste vos: la IA la tiene en cuenta">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-brand-100 px-2 py-px text-xs font-medium text-brand-800" title="La creaste vos: la IA la tiene en cuenta">
                             <Sparkles className="size-3" /> Tuya · la usa la IA
                           </span>
                         ) : (
@@ -48,7 +48,7 @@ export default async function ActivityTemplatesPage() {
                     </span>
                   </summary>
                   <div className="mt-2 flex flex-wrap items-start gap-2 rounded-lg bg-slate-50 p-3">
-                    <ActionForm action={saveActivityTemplate} className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2">
+                    <ActionForm action={saveActivityTemplate} className="grid grid-cols-1 min-w-0 flex-1 gap-2 sm:grid-cols-2">
                       <input type="hidden" name="id" value={a.id} />
                       <Field label="Título" className="sm:col-span-2">
                         <Input name="title" defaultValue={a.title} required />

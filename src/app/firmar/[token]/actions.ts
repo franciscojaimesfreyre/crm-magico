@@ -26,7 +26,7 @@ export async function signContract(token: string, _: ActionState, formData: Form
   await notifyStaff({
     organizationId: contract.organizationId,
     userId: contract.client.ownerId,
-    title: `✍️ ${contract.client.firstName} ${contract.client.lastName} firmó el contrato`,
+    title: `${contract.client.firstName} ${contract.client.lastName} firmó el contrato`,
     body: contract.title,
     link: `/app/contratos/${contract.id}`,
   });

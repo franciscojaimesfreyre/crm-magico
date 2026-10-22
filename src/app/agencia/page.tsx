@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { Users } from "lucide-react";
 import { requireAgencyUser } from "@/lib/auth";
-import { Card, CardHeader, EmptyState, LinkButton, PageHeader, StatCard, Table, Td, Th, buttonClass } from "@/components/ui";
+import { Card, CardHeader, EmptyState, LinkButton, PageHeader, StatCard, StatStrip, Table, Td, Th, buttonClass } from "@/components/ui";
 import { BarList, ColumnChart } from "@/components/charts";
 import { DESTINATION_LABEL } from "@/lib/labels";
 import { formatDate, money, toNumber } from "@/lib/format";
 import { agencyAgents, agencyCurrencies, agencySales, summarize } from "@/lib/agency-panel";
+import { SelectField } from "@/components/select-field";
 
 export const metadata = { title: "Resumen de la agencia" };
 
@@ -53,33 +54,25 @@ export default async function AgencyDashboard({ searchParams }: { searchParams: 
         description={`Ventas concretadas de tus agentes en ${year} (por fecha de venta), en ${currency}. Solo lectura: cada agente gestiona sus propios datos.`}
         actions={
           <form className="flex gap-2">
-            <select name="anio" defaultValue={year} className="field w-28" aria-label="Año">
-              {[year + 1, year, year - 1, year - 2, year - 3].map((y) => (
-                <option key={y}>{y}</option>
-              ))}
-            </select>
-            <select name="moneda" defaultValue={currency} className="field w-24" aria-label="Moneda">
-              {[...new Set([currency, ...currencies])].map((c) => (
-                <option key={c}>{c}</option>
-              ))}
-            </select>
+            <SelectField name="anio" defaultValue={String(year)} className="w-28" aria-label="Año" options={[year + 1, year, year - 1, year - 2, year - 3].map((y) => ({ value: String(y), label: String(y) }))} />
+            <SelectField name="moneda" defaultValue={currency} className="w-24" aria-label="Moneda" options={[...new Set([currency, ...currencies])].map((c) => ({ value: c, label: c }))} />
             <button className={buttonClass("primary")}>Ver</button>
           </form>
         }
       />
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <StatStrip className="mb-6">
         <StatCard label="Vendido" value={money(total.revenue, currency)} hint={`${total.count} ventas`} />
         <StatCard label="Comisiones" value={money(total.commission, currency)} />
         <StatCard label="Ya pagadas" value={money(total.paid, currency)} tone="good" />
         <StatCard label="Por pagar" value={money(total.pending, currency)} tone={total.pending > 0 ? "warn" : "default"} />
         <StatCard label="Agentes" value={agents.length} hint={`${byAgent.filter((a) => a.count > 0).length} con ventas en ${year}`} />
-      </div>
+      </StatStrip>
 
       <Card className="mb-6">
         <CardHeader title="Por agente" description="Comisiones según lo que cada agente marcó como cobrado." />
         <Table>
-          <thead className="bg-slate-50">
+          <thead>
             <tr>
               <Th>Agente</Th>
               <Th className="text-right">Ventas</Th>
@@ -96,7 +89,7 @@ export default async function AgencyDashboard({ searchParams }: { searchParams: 
                   <Link href={`/agencia/agentes/${agent.id}?anio=${year}&moneda=${currency}`} className="font-medium text-slate-900 hover:text-brand-700">
                     {agent.users[0]?.name ?? agent.name}
                   </Link>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-slate-500">
                     {agent.name} · desde {formatDate(agent.agencyJoinedAt)}
                   </p>
                 </Td>
@@ -111,7 +104,7 @@ export default async function AgencyDashboard({ searchParams }: { searchParams: 
         </Table>
       </Card>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader title="Vendido por mes" />
           <div className="p-5">

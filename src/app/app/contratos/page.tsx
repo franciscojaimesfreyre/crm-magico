@@ -40,7 +40,7 @@ export default async function ContractsPage({ searchParams }: { searchParams: Pr
         ) : (
           <Card>
             <Table>
-              <thead className="bg-slate-50">
+              <thead>
                 <tr>
                   <Th>Cliente</Th>
                   <Th>Contrato</Th>
@@ -57,7 +57,7 @@ export default async function ContractsPage({ searchParams }: { searchParams: Pr
                       <Link href={`/app/contratos/${c.id}`} className="font-medium text-slate-900 hover:text-brand-700">
                         {c.client.firstName} {c.client.lastName}
                       </Link>
-                      {c.booking && <p className="text-xs text-slate-400">{c.booking.code}</p>}
+                      {c.booking && <p className="text-xs text-slate-500">{c.booking.code}</p>}
                     </Td>
                     <Td>{c.title}</Td>
                     <Td>
@@ -73,7 +73,7 @@ export default async function ContractsPage({ searchParams }: { searchParams: Pr
           </Card>
         ))}
       {tab === "plantillas" && (
-        <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_280px]">
           <div className="space-y-4">
             {templates.map((t) => (
               <Card key={t.id}>

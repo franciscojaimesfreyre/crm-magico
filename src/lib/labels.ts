@@ -40,6 +40,30 @@ export const DESTINATION_LABEL: Record<Destination, string> = {
 };
 export const DESTINATIONS = options(DESTINATION_LABEL);
 
+/**
+ * Color de cada destino, para reconocerlo de un vistazo (punto, talón del ticket, etiqueta).
+ * dot: el color pleno; soft: el fondo pálido; ink: el texto sobre el fondo pálido (4.5:1).
+ */
+export const DESTINATION_TONE: Record<Destination, { dot: string; soft: string; ink: string }> = {
+  DISNEY_WORLD: { dot: "bg-sky-500", soft: "bg-sky-50", ink: "text-sky-800" },
+  DISNEYLAND: { dot: "bg-pink-500", soft: "bg-pink-50", ink: "text-pink-800" },
+  DISNEYLAND_PARIS: { dot: "bg-blue-600", soft: "bg-blue-50", ink: "text-blue-800" },
+  UNIVERSAL_ORLANDO: { dot: "bg-emerald-500", soft: "bg-emerald-50", ink: "text-emerald-800" },
+  UNIVERSAL_HOLLYWOOD: { dot: "bg-lime-600", soft: "bg-lime-50", ink: "text-lime-800" },
+  DISNEY_CRUISE: { dot: "bg-cyan-600", soft: "bg-cyan-50", ink: "text-cyan-800" },
+  OTHER_CRUISE: { dot: "bg-cyan-400", soft: "bg-cyan-50", ink: "text-cyan-800" },
+  COMBINED: { dot: "bg-amber-500", soft: "bg-amber-50", ink: "text-amber-800" },
+  OTHER: { dot: "bg-slate-400", soft: "bg-slate-100", ink: "text-slate-700" },
+};
+
+/** Urgencia de algo que vence o pasa en N días: rojo atrasado, ámbar hoy y los próximos 3, turquesa la semana, neutro después. */
+export function urgencyTone(days: number) {
+  if (days < 0) return { soft: "bg-rose-50", ink: "text-rose-700", strong: "bg-rose-600 text-white", label: "Atrasado" };
+  if (days <= 3) return { soft: "bg-amber-50", ink: "text-amber-800", strong: "bg-amber-400 text-amber-950", label: days === 0 ? "Hoy" : days === 1 ? "Mañana" : `en ${days} días` };
+  if (days <= 7) return { soft: "bg-brand-50", ink: "text-brand-700", strong: "bg-brand-600 text-white", label: `en ${days} días` };
+  return { soft: "bg-slate-100", ink: "text-slate-700", strong: "bg-slate-200 text-slate-800", label: `en ${days} días` };
+}
+
 export const BOOKING_STATUS_LABEL: Record<BookingStatus, string> = {
   INQUIRY: "Consulta",
   QUOTED: "Cotizado",
@@ -62,10 +86,10 @@ export const PIPELINE: BookingStatus[] = [
 
 export const BOOKING_STATUS_COLOR: Record<BookingStatus, string> = {
   INQUIRY: "bg-sky-100 text-sky-800",
-  QUOTED: "bg-amber-100 text-amber-800",
-  BOOKED: "bg-violet-100 text-violet-800",
+  QUOTED: "bg-amber-100 text-amber-900",
+  BOOKED: "bg-brand-100 text-brand-800",
   PAID_IN_FULL: "bg-emerald-100 text-emerald-800",
-  TRAVELED: "bg-teal-100 text-teal-800",
+  TRAVELED: "bg-cyan-100 text-cyan-800",
   COMPLETED: "bg-slate-200 text-slate-700",
   CANCELLED: "bg-rose-100 text-rose-800",
 };
@@ -200,18 +224,20 @@ export const ACTIVITY_TYPE_LABEL: Record<ActivityType, string> = {
   CUSTOM: "Otro",
 };
 export const ACTIVITY_TYPES = options(ACTIVITY_TYPE_LABEL);
+// Cuatro familias, no un color por tipo: parques y lo que se hace adentro (marca), comidas y compras
+// (ámbar), descansos (verde), traslados y cruceros (celeste); lo demás, neutro.
 export const ACTIVITY_TYPE_COLOR: Record<ActivityType, string> = {
-  PARK: "border-l-violet-500 bg-violet-50",
-  RIDE: "border-l-rose-500 bg-rose-50",
-  SHOW: "border-l-fuchsia-500 bg-fuchsia-50",
-  DINING: "border-l-amber-500 bg-amber-50",
-  CHARACTER: "border-l-pink-500 bg-pink-50",
-  BREAK: "border-l-emerald-500 bg-emerald-50",
-  TRAVEL: "border-l-sky-500 bg-sky-50",
-  SHOPPING: "border-l-orange-500 bg-orange-50",
-  POOL: "border-l-cyan-500 bg-cyan-50",
-  CRUISE: "border-l-blue-600 bg-blue-50",
-  CUSTOM: "border-l-slate-400 bg-slate-50",
+  PARK: "border-l-brand-500 bg-brand-50",
+  RIDE: "border-l-brand-300 bg-white",
+  SHOW: "border-l-brand-300 bg-white",
+  DINING: "border-l-amber-400 bg-amber-50/60",
+  CHARACTER: "border-l-brand-300 bg-white",
+  BREAK: "border-l-emerald-400 bg-emerald-50/60",
+  TRAVEL: "border-l-sky-400 bg-sky-50/60",
+  SHOPPING: "border-l-amber-400 bg-white",
+  POOL: "border-l-emerald-400 bg-white",
+  CRUISE: "border-l-sky-500 bg-sky-50/60",
+  CUSTOM: "border-l-slate-300 bg-white",
 };
 
 export const KNOWLEDGE_CATEGORY_LABEL: Record<KnowledgeCategory, string> = {
@@ -228,6 +254,21 @@ export const KNOWLEDGE_CATEGORY_LABEL: Record<KnowledgeCategory, string> = {
   PRICING: "Precios",
 };
 export const KNOWLEDGE_CATEGORIES = options(KNOWLEDGE_CATEGORY_LABEL);
+
+/** Color de cada categoría de novedad: lo que cierra en rojo, lo que abre en verde, eventos en violeta, plata en ámbar. */
+export const KNOWLEDGE_CATEGORY_COLOR: Record<KnowledgeCategory, string> = {
+  NEWS: "bg-sky-50 text-sky-800",
+  OPENING: "bg-emerald-50 text-emerald-800",
+  CLOSURE: "bg-rose-50 text-rose-700",
+  REFURBISHMENT: "bg-orange-50 text-orange-800",
+  EVENT: "bg-violet-50 text-violet-800",
+  PROMOTION: "bg-amber-50 text-amber-800",
+  ATTRACTION: "bg-cyan-50 text-cyan-800",
+  DINING: "bg-pink-50 text-pink-800",
+  TIP: "bg-brand-50 text-brand-700",
+  RULE_CHANGE: "bg-slate-100 text-slate-700",
+  PRICING: "bg-amber-50 text-amber-800",
+};
 
 export const TRIP_PACE_LABEL: Record<TripPace, string> = {
   RELAXED: "Relajado",
@@ -252,8 +293,8 @@ export const CATALOG_KIND_LABEL: Record<CatalogKind, string> = {
 };
 export const CATALOG_KINDS = options(CATALOG_KIND_LABEL);
 export const CATALOG_KIND_COLOR: Record<CatalogKind, string> = {
-  ATTRACTION: "bg-rose-50 text-rose-700",
-  SHOW: "bg-violet-50 text-violet-700",
+  ATTRACTION: "bg-brand-100 text-brand-800",
+  SHOW: "bg-slate-100 text-slate-700",
   RESTAURANT: "bg-amber-50 text-amber-800",
   SHOPPING: "bg-sky-50 text-sky-700",
 };

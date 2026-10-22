@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { ConfirmButton } from "@/components/form-controls";
 import { Badge, Card, EmptyState, LinkButton, PageHeader, Select, buttonClass } from "@/components/ui";
-import { DESTINATIONS, DESTINATION_LABEL, KNOWLEDGE_CATEGORIES, KNOWLEDGE_CATEGORY_LABEL } from "@/lib/labels";
+import { DESTINATIONS, DESTINATION_LABEL, KNOWLEDGE_CATEGORIES, KNOWLEDGE_CATEGORY_COLOR, KNOWLEDGE_CATEGORY_LABEL } from "@/lib/labels";
 import { formatDate, todayUTC } from "@/lib/format";
 import type { Prisma } from "@/generated/prisma/client";
 import type { Destination, KnowledgeCategory } from "@/generated/prisma/enums";
@@ -56,7 +56,7 @@ export default async function KnowledgePage({
       <div className="mb-6">
         <AskBox />
       </div>
-      <form className="mb-4 grid gap-2 rounded-xl border border-slate-200 bg-white p-3 sm:grid-cols-5">
+      <form className="mb-4 grid grid-cols-1 gap-2 rounded-lg border border-slate-200 bg-white p-3 sm:grid-cols-5">
         <input name="q" defaultValue={f.q} placeholder="Buscar…" className="field sm:col-span-2" />
         <Select name="destino" defaultValue={f.destino ?? ""} options={DESTINATIONS} placeholder="Todos los destinos" />
         <Select name="categoria" defaultValue={f.categoria ?? ""} options={KNOWLEDGE_CATEGORIES} placeholder="Todas las categorías" />
@@ -69,7 +69,7 @@ export default async function KnowledgePage({
       {items.length === 0 ? (
         <EmptyState title="No hay novedades" description="Cargá la primera: la IA la va a usar al planificar." action={<LinkButton href="/app/novedades/nueva">Nueva novedad</LinkButton>} />
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {items.map((k) => {
             const expired = k.validTo && k.validTo < today;
             const editable = k.organizationId === user.organizationId || (k.organizationId === null && user.isPlatformAdmin);
@@ -77,7 +77,7 @@ export default async function KnowledgePage({
               <Card key={k.id} className={clsx("flex flex-col p-4", (expired || !k.published) && "opacity-60")}>
                 <div className="mb-2 flex flex-wrap items-center gap-1.5">
                   {k.pinned && <Pin className="size-3.5 text-brand-600" />}
-                  <Badge className="bg-brand-50 text-brand-700">{KNOWLEDGE_CATEGORY_LABEL[k.category]}</Badge>
+                  <Badge className={KNOWLEDGE_CATEGORY_COLOR[k.category]}>{KNOWLEDGE_CATEGORY_LABEL[k.category]}</Badge>
                   {k.organizationId === null ? (
                     <Badge className="bg-sky-50 text-sky-700">
                       <Globe className="mr-1 size-3" /> Plataforma

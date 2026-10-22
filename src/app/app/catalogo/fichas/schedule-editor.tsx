@@ -4,6 +4,7 @@ import { useState } from "react";
 import { CalendarClock, RefreshCw, Trash2 } from "lucide-react";
 import { LightningLanePrices, ThemeParksCredit } from "@/components/themeparks";
 import type { ScheduleEntry } from "@/lib/park-sheet";
+import { DateInput } from "@/components/date-input";
 
 /** Filas que se ven antes de "Ver todas" (los parques sincronizados tienen unos 70 días). */
 const VISIBLE_ROWS = 8;
@@ -61,7 +62,7 @@ export function ScheduleEditor({
     onChange(rows.map((r) => (r.openTime || r.closeTime ? r : { ...r, openTime: reference.openTime, closeTime: reference.closeTime })));
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4">
+    <div className="rounded-lg border border-slate-200 bg-white p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-900">
@@ -82,19 +83,19 @@ export function ScheduleEditor({
       </div>
       <ul className="mt-3 space-y-1.5">
         {(showAll ? rows : rows.slice(0, VISIBLE_ROWS)).map((r) => (
-          <li key={r.date} className="grid items-center gap-2 sm:grid-cols-[10rem_8.5rem_8.5rem_minmax(0,1fr)_auto]">
+          <li key={r.date} className="grid grid-cols-1 items-center gap-2 sm:grid-cols-[10rem_8.5rem_8.5rem_minmax(0,1fr)_auto]">
             {window.includes(r.date) || r.synced ? (
               <span className="flex items-center gap-1 text-sm font-medium text-slate-700 first-letter:uppercase">
                 {r.date === today ? `Hoy · ${pretty(r.date)}` : pretty(r.date)}
-                {r.synced && <RefreshCw className="size-3 text-slate-400" aria-label="De ThemeParks.wiki" />}
+                {r.synced && <RefreshCw className="size-3 text-slate-500" aria-label="De ThemeParks.wiki" />}
               </span>
             ) : (
-              <input type="date" className="field" min={today} value={r.date} onChange={(e) => e.target.value && set(r.date, { date: e.target.value })} />
+              <DateInput min={today} value={r.date} onChange={(v) => v && set(r.date, { date: v })} required />
             )}
             <input type="time" className="field" value={r.openTime ?? ""} onChange={(e) => set(r.date, { openTime: e.target.value || null })} aria-label={park ? "Abre" : "Empieza"} title={park ? "Abre" : "Empieza"} />
             <input type="time" className="field" value={r.closeTime ?? ""} onChange={(e) => set(r.date, { closeTime: e.target.value || null })} aria-label={park ? "Cierra" : "Termina"} title={park ? "Cierra" : "Termina"} />
             <input className="field" value={r.note} onChange={(e) => set(r.date, { note: e.target.value })} placeholder={park ? "Nota (ej: Early Entry 8:30, cierra a las 18 por la fiesta)" : "Nota (ej: ingreso desde las 16:00, agotada)"} />
-            <button type="button" onClick={() => remove(r.date)} className="p-1 text-slate-400 hover:text-rose-600" title={window.includes(r.date) ? "Vaciar" : "Quitar fecha"}>
+            <button type="button" onClick={() => remove(r.date)} className="p-1 text-slate-500 hover:text-rose-600" title={window.includes(r.date) ? "Vaciar" : "Quitar fecha"}>
               <Trash2 className="size-4" />
             </button>
             {r.lightningLane && (

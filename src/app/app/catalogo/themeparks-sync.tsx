@@ -45,7 +45,7 @@ export function ThemeParksSync({ lastSync }: { lastSync: string | null }) {
       {message ? (
         <p className={message.tone === "ok" ? "text-xs text-emerald-700" : "text-xs text-rose-700"}>{message.text}</p>
       ) : (
-        <p className="text-xs text-slate-500">{lastSync ? `Última actualización: ${WHEN.format(new Date(lastSync))}` : "Todavía no se actualizó"}</p>
+        <p className="text-xs text-slate-500" suppressHydrationWarning>{lastSync ? `Última actualización: ${WHEN.format(new Date(lastSync))}` : "Todavía no se actualizó"}</p>
       )}
       <ThemeParksCredit />
     </div>

@@ -18,6 +18,7 @@ import {
   updateStatementNotes,
 } from "../../actions";
 import { PrintButton } from "../../widgets";
+import { DateInput } from "@/components/date-input";
 
 export const metadata = { title: "Planilla de comisiones" };
 
@@ -67,21 +68,21 @@ ${user.organization.name}`;
         </p>
       </div>
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-3">
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
         {totals.map((t) => (
           <Card key={t.currency} className="p-4 sm:col-span-3">
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div>
-                <p className="text-xs text-slate-500 uppercase">Comisión total ({t.currency})</p>
+                <p className="text-xs text-slate-500">Comisión total ({t.currency})</p>
                 <p className="text-2xl font-semibold">{money(t.expected, t.currency)}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-500 uppercase">Cobrado</p>
-                <p className="text-2xl font-semibold text-emerald-600">{money(t.received, t.currency)}</p>
+                <p className="text-xs text-slate-500">Cobrado</p>
+                <p className="text-2xl font-semibold text-emerald-700">{money(t.received, t.currency)}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-500 uppercase">Pendiente</p>
-                <p className={clsx("text-2xl font-semibold", t.pending > 0 ? "text-amber-600" : "text-slate-400")}>{money(t.pending, t.currency)}</p>
+                <p className="text-xs text-slate-500">Pendiente</p>
+                <p className={clsx("text-2xl font-semibold", t.pending > 0 ? "text-amber-700" : "text-slate-500")}>{money(t.pending, t.currency)}</p>
               </div>
             </div>
           </Card>
@@ -90,7 +91,7 @@ ${user.organization.name}`;
 
       <Card className="mb-6">
         <Table>
-          <thead className="bg-slate-50">
+          <thead>
             <tr>
               <Th>Venta</Th>
               <Th>Reserva</Th>
@@ -129,10 +130,10 @@ ${user.organization.name}`;
                   <Td className="print:hidden">
                     <ActionForm action={updateStatementItem.bind(null, s.id, r.id)} className="flex flex-wrap items-center gap-2">
                       <label className="flex items-center gap-1.5 text-xs">
-                        <input type="checkbox" name="paid" defaultChecked={paid} className="size-4 rounded border-slate-300 text-emerald-600" />
+                        <input type="checkbox" name="paid" defaultChecked={paid} className="size-4 rounded border-slate-300 text-emerald-700" />
                         Cobrada
                       </label>
-                      <input type="date" name="paidAt" defaultValue={toDateInput(r.commissionPaidAt)} className="field w-36 py-1 text-xs" />
+                      <DateInput name="paidAt" defaultValue={toDateInput(r.commissionPaidAt)} className="w-36" size="sm" />
                       <input
                         type="number"
                         step="0.01"
@@ -162,7 +163,7 @@ ${user.organization.name}`;
         </Table>
       </Card>
 
-      <div className="grid gap-6 lg:grid-cols-2 print:hidden">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 print:hidden">
         <Card>
           <CardHeader title="Enviar a la agencia" description="Se adjunta la planilla en Excel." />
           <ActionForm action={emailStatement.bind(null, s.id)} className="space-y-3 p-5">
@@ -190,7 +191,7 @@ ${user.organization.name}`;
               {s.status !== "PAID" && (
                 <form action={markStatementPaid.bind(null, s.id)} className="flex flex-wrap items-end gap-2">
                   <Field label="Fecha de cobro">
-                    <Input type="date" name="paidAt" />
+                    <DateInput name="paidAt" />
                   </Field>
                   <SubmitButton>Marcar toda la planilla como cobrada</SubmitButton>
                 </form>

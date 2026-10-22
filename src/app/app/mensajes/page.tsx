@@ -88,7 +88,7 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
       {list.length === 0 && !selected ? (
         <EmptyState title="Todavía no hay mensajes" description="Cuando un cliente te escriba desde su portal, o vos le escribas desde un viaje, la conversación aparece acá." />
       ) : (
-        <Card className="grid h-[70vh] overflow-hidden lg:grid-cols-[320px_1fr]">
+        <Card className="grid grid-cols-1 h-[70vh] overflow-hidden lg:grid-cols-[320px_1fr]">
           <ul className="divide-y divide-slate-100 overflow-y-auto border-r border-slate-200">
             {list.map((t) => (
               <li key={t.key}>
@@ -100,11 +100,11 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
                   <div className="min-w-0 flex-1">
                     <p className="flex items-center justify-between gap-2 text-sm font-medium text-slate-900">
                       <span className="truncate">{t.clientName}</span>
-                      {t.unread > 0 && <span className="rounded-full bg-fuchsia-500 px-1.5 text-[11px] text-white">{t.unread}</span>}
+                      {t.unread > 0 && <span className="rounded-full bg-brand-600 px-1.5 text-xs text-white">{t.unread}</span>}
                     </p>
                     <p className="truncate text-xs text-slate-500">{t.bookingTitle ?? "Conversación general"}</p>
-                    <p className={clsx("truncate text-xs", t.unread ? "font-medium text-slate-800" : "text-slate-400")}>{t.lastBody}</p>
-                    <p className="text-[11px] text-slate-400">{formatDateTime(t.lastAt)}</p>
+                    <p className={clsx("truncate text-xs", t.unread ? "font-medium text-slate-800" : "text-slate-500")}>{t.lastBody}</p>
+                    <p className="text-[11px] text-slate-500">{formatDateTime(t.lastAt)}</p>
                   </div>
                 </Link>
               </li>
@@ -132,7 +132,7 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
               />
             </div>
           ) : (
-            <div className="hidden items-center justify-center text-sm text-slate-400 lg:flex">Elegí una conversación</div>
+            <div className="hidden items-center justify-center text-sm text-slate-500 lg:flex">Elegí una conversación</div>
           )}
         </Card>
       )}

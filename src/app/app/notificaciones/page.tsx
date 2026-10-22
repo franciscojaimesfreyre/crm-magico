@@ -47,7 +47,7 @@ export default async function NotificationsPage() {
                 <Link href={n.link ?? "/app"} className={clsx("block px-5 py-3 hover:bg-slate-50", !n.readAt && "bg-brand-50/50")}>
                   <p className={clsx("text-sm", n.readAt ? "text-slate-700" : "font-medium text-slate-900")}>{n.title}</p>
                   {n.body && <p className="truncate text-xs text-slate-500">{n.body}</p>}
-                  <p className="text-[11px] text-slate-400">{formatDateTime(n.createdAt)}</p>
+                  <p className="text-[11px] text-slate-500">{formatDateTime(n.createdAt)}</p>
                 </Link>
               </li>
             ))}

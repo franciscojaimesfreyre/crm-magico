@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { ActionForm, SubmitButton } from "@/components/form-controls";
 import type { FormField } from "@/lib/forms";
 import { submitForm } from "./actions";
+import { SelectField } from "@/components/select-field";
 
 export const metadata = { robots: { index: false } };
 
@@ -12,10 +13,10 @@ export default async function PublicForm({ params }: { params: Promise<{ slug: s
   if (!form) notFound();
   const fields = form.fields as FormField[];
   return (
-    <div className="min-h-screen bg-gradient-to-br from-fuchsia-50 via-white to-sky-50 px-4 py-10">
+    <div className="min-h-screen bg-[var(--ground)] px-4 py-10">
       <div className="mx-auto max-w-xl">
         <p className="mb-2 text-center text-sm text-slate-500">{form.organization.name}</p>
-        <div className="rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-100">
+        <div className="rounded-2xl bg-white p-6 border border-[var(--border)]">
           <h1 className="text-xl font-semibold text-slate-900">{form.title}</h1>
           {form.description && <p className="mt-1 mb-5 text-sm text-slate-500">{form.description}</p>}
           {!form.active ? (
@@ -36,12 +37,7 @@ export default async function PublicForm({ params }: { params: Promise<{ slug: s
                     {f.type === "textarea" ? (
                       <textarea name={f.id} rows={3} required={f.required} className="field" />
                     ) : f.type === "select" ? (
-                      <select name={f.id} required={f.required} className="field" defaultValue="">
-                        <option value="">Elegí una opción</option>
-                        {(f.options ?? []).map((o) => (
-                          <option key={o}>{o}</option>
-                        ))}
-                      </select>
+                      <SelectField name={f.id} required={f.required} placeholder="Elegí una opción" options={(f.options ?? []).map((o) => ({ value: o, label: o }))} />
                     ) : (
                       <input name={f.id} required={f.required} type={f.type === "phone" ? "tel" : f.type} className="field" />
                     )}

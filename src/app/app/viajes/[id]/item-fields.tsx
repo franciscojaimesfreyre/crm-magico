@@ -3,6 +3,7 @@ import { toDateInput } from "@/lib/format";
 import { CommissionInput } from "@/components/commission-input";
 import { ItemTypeSelect } from "@/components/item-type-select";
 import type { ItemType } from "@/generated/prisma/enums";
+import { DateInput } from "@/components/date-input";
 
 type ItemLike = {
   type: ItemType;
@@ -40,10 +41,10 @@ export function ItemFields({
         <Input name="supplier" defaultValue={item?.supplier ?? ""} placeholder="Disney, Universal, Booking…" />
       </Field>
       <Field label="Desde">
-        <Input type="date" name="startDate" defaultValue={toDateInput(item?.startDate)} />
+        <DateInput name="startDate" defaultValue={toDateInput(item?.startDate)} />
       </Field>
       <Field label="Hasta">
-        <Input type="date" name="endDate" defaultValue={toDateInput(item?.endDate)} />
+        <DateInput name="endDate" defaultValue={toDateInput(item?.endDate)} />
       </Field>
       <Field label="Precio">
         <Input type="number" step="0.01" min={0} name="price" defaultValue={item?.price.toString() ?? ""} required />

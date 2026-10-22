@@ -7,6 +7,7 @@ import { MultiFileUpload } from "@/components/file-upload";
 import type { BookingItem } from "@/generated/prisma/client";
 import { PriceWithTax, ReservationTravelers, TripDatesGuard, type TravelerOption } from "./reservation-extras";
 import { ItemTypeSelect } from "@/components/item-type-select";
+import { DateInput } from "@/components/date-input";
 
 const COMMISSION_STATUSES = Object.entries(COMMISSION_STATUS_LABEL).map(([value, label]) => ({ value, label }));
 
@@ -42,8 +43,8 @@ export function ReservationForm({
   return (
     <ActionForm action={action} resetOnSuccess={!item} className="space-y-5">
       <TripDatesGuard tripStart={toDateInput(trip.startDate) || null} tripEnd={toDateInput(trip.endDate) || null} />
-      <fieldset className="grid gap-3 sm:grid-cols-4">
-        <legend className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">Reserva</legend>
+      <fieldset className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+        <legend className="mb-2 text-xs font-semibold text-slate-500">Reserva</legend>
         <Field label="Tipo">
           <ItemTypeSelect defaultValue={item?.type ?? "DISNEY_WORLD_PACKAGE"} />
         </Field>
@@ -60,10 +61,10 @@ export function ReservationForm({
           <Input name="confirmationNumber" defaultValue={item?.confirmationNumber ?? ""} />
         </Field>
         <Field label="Desde">
-          <Input type="date" name="startDate" defaultValue={toDateInput(item?.startDate)} />
+          <DateInput name="startDate" defaultValue={toDateInput(item?.startDate)} />
         </Field>
         <Field label="Hasta">
-          <Input type="date" name="endDate" defaultValue={toDateInput(item?.endDate)} />
+          <DateInput name="endDate" defaultValue={toDateInput(item?.endDate)} />
         </Field>
         <Field label="Detalles" hint="Tipo de habitación, lugar de retiro del auto, equipaje, etc." className="sm:col-span-4">
           <Textarea name="notes" rows={2} defaultValue={item?.notes ?? ""} />
@@ -72,23 +73,23 @@ export function ReservationForm({
 
       <ReservationTravelers travelers={travelers} selected={selectedTravelers} required={!item} />
 
-      <fieldset className="grid gap-3 sm:grid-cols-4">
-        <legend className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">Totales a pagar</legend>
+      <fieldset className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+        <legend className="mb-2 text-xs font-semibold text-slate-500">Totales a pagar</legend>
         <PriceWithTax price={n(item?.price)} tax={n(item?.taxAmount)} currency={currency} />
         <Field label="Depósito para reservar" hint="Ej: 200 en un paquete Disney">
           <Input type="number" step="0.01" min={0} name="depositAmount" defaultValue={n(item?.depositAmount)} />
         </Field>
         <Field label="Saldar antes del" hint="En paquetes, vacío = 30 días antes de la llegada">
-          <Input type="date" name="balanceDue" defaultValue={toDateInput(item?.balanceDue)} />
+          <DateInput name="balanceDue" defaultValue={toDateInput(item?.balanceDue)} />
         </Field>
         <p className="self-end pb-2 text-xs text-slate-500 sm:col-span-4">Los pagos (depósito, cuotas y saldo) se registran en la reserva, una vez guardada.</p>
       </fieldset>
 
-      <fieldset className="grid gap-3 sm:grid-cols-5">
-        <legend className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">Comisión</legend>
+      <fieldset className="grid grid-cols-1 gap-3 sm:grid-cols-5">
+        <legend className="mb-2 text-xs font-semibold text-slate-500">Comisión</legend>
         <CommissionInput rate={item?.commissionRate?.toString()} fixed={item?.commissionFixed?.toString()} defaultRate={defaultRate} currency={currency} />
         <Field label="Fecha de venta" hint="Se completa al confirmar">
-          <Input type="date" name="saleDate" defaultValue={toDateInput(item?.saleDate)} />
+          <DateInput name="saleDate" defaultValue={toDateInput(item?.saleDate)} />
         </Field>
         {item ? (
           <>
@@ -96,7 +97,7 @@ export function ReservationForm({
               <Select name="commissionStatus" options={COMMISSION_STATUSES} defaultValue={item.commissionStatus} />
             </Field>
             <Field label="Cobrada el">
-              <Input type="date" name="commissionPaidAt" defaultValue={toDateInput(item.commissionPaidAt)} />
+              <DateInput name="commissionPaidAt" defaultValue={toDateInput(item.commissionPaidAt)} />
             </Field>
             <Field label="Monto cobrado" hint="Vacío = el esperado">
               <Input type="number" step="0.01" min={0} name="commissionPaidAmount" defaultValue={n(item.commissionPaidAmount)} />
@@ -111,7 +112,7 @@ export function ReservationForm({
       </fieldset>
 
       <fieldset className="space-y-2">
-        <legend className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">{item ? "Agregar documentos" : "Documentos"}</legend>
+        <legend className="mb-2 text-xs font-semibold text-slate-500">{item ? "Agregar documentos" : "Documentos"}</legend>
         <p className="text-xs text-slate-500">Voucher, recibos, confirmaciones… Quedan también en la pestaña Documentos del viaje, asociados a esta reserva.</p>
         <MultiFileUpload direct={directUpload} />
         <Checkbox name="docsVisibleToClient" label="Visibles para el cliente en su portal" defaultChecked />

@@ -4,12 +4,13 @@ import { FileSpreadsheet, History } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { SubmitButton } from "@/components/form-controls";
-import { Alert, Badge, Card, EmptyState, LinkButton, PageHeader, Select, StatCard, Table, Td, Th, buttonClass } from "@/components/ui";
-import { COMMISSION_STATUS_COLOR, COMMISSION_STATUS_LABEL, DESTINATION_LABEL, ITEM_TYPE_LABEL } from "@/lib/labels";
+import { Alert, Badge, Card, EmptyState, LinkButton, PageHeader, Select, StatCard, StatStrip, Table, Td, Th, buttonClass } from "@/components/ui";
+import { COMMISSION_STATUS_COLOR, COMMISSION_STATUS_LABEL, DESTINATION_LABEL, DESTINATION_TONE, ITEM_TYPE_LABEL } from "@/lib/labels";
 import { formatDate, formatRange, money, toNumber } from "@/lib/format";
 import { commissionWhere, type CommissionFilters } from "@/lib/commissions";
 import { createStatement, markCommissionsPaid, markCommissionsPending } from "./actions";
 import { SelectAll } from "./widgets";
+import { DateInput } from "@/components/date-input";
 
 export const metadata = { title: "Comisiones" };
 
@@ -77,7 +78,7 @@ export default async function CommissionsPage({ searchParams }: { searchParams: 
         </div>
       )}
 
-      <form className="mb-6 grid gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
+      <form className="mb-6 grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
         <label className="flex items-center gap-2 text-sm text-slate-700 sm:col-span-2 lg:order-last lg:col-span-4">
           <input type="checkbox" name="realizados" value="1" defaultChecked={f.realizados === "1"} className="size-4 rounded border-slate-300" />
           Solo viajes ya realizados (la mayoría de las agencias paga después del viaje)
@@ -88,11 +89,11 @@ export default async function CommissionsPage({ searchParams }: { searchParams: 
         </label>
         <label>
           <span className="label">Desde</span>
-          <input type="date" name="desde" defaultValue={f.desde} className="field" />
+          <DateInput name="desde" defaultValue={f.desde} />
         </label>
         <label>
           <span className="label">Hasta</span>
-          <input type="date" name="hasta" defaultValue={f.hasta} className="field" />
+          <DateInput name="hasta" defaultValue={f.hasta} />
         </label>
         <label>
           <span className="label">Estado</span>
@@ -110,11 +111,11 @@ export default async function CommissionsPage({ searchParams }: { searchParams: 
       )}
 
       {main && (
-        <div className="mb-6 grid gap-3 sm:grid-cols-3">
+        <StatStrip className="mb-6">
           <StatCard label="Comisión del período" value={money(main[1].commission, main[0])} hint={`${items.length} reservas · vendido ${money(main[1].sales, main[0])}`} />
           <StatCard label="Ya cobrado" value={money(main[1].paid, main[0])} tone="good" />
           <StatCard label="Por cobrar" value={money(main[1].pending, main[0])} tone={main[1].pending > 0 ? "warn" : "default"} />
-        </div>
+        </StatStrip>
       )}
       {totals.size > 1 && (
         <p className="-mt-3 mb-4 text-xs text-slate-500">
@@ -139,7 +140,7 @@ export default async function CommissionsPage({ searchParams }: { searchParams: 
                 <SubmitButton formAction={createStatement} pendingText="Generando…">
                   <FileSpreadsheet className="size-4" /> Generar planilla
                 </SubmitButton>
-                <input type="date" name="paidAt" className="field w-40" title="Fecha de cobro (vacío = hoy)" />
+                <DateInput name="paidAt" className="w-40" title="Fecha de cobro (vacío = hoy)" />
                 <SubmitButton formAction={markCommissionsPaid} variant="secondary" pendingText="…">
                   Marcar cobradas
                 </SubmitButton>
@@ -149,15 +150,14 @@ export default async function CommissionsPage({ searchParams }: { searchParams: 
               </div>
             </div>
             <Table>
-              <thead className="bg-slate-50">
+              <thead>
                 <tr>
                   <Th>
                     <SelectAll defaultChecked={f.estado !== "cobradas"} />
                   </Th>
                   <Th>Cliente / viaje</Th>
                   <Th>Reserva</Th>
-                  <Th>Fecha de venta</Th>
-                  <Th>Viaje</Th>
+                  <Th>Vendida</Th>
                   <Th className="text-right">Importe</Th>
                   <Th className="text-right">Comisión</Th>
                   <Th>Estado</Th>
@@ -173,21 +173,22 @@ export default async function CommissionsPage({ searchParams }: { searchParams: 
                       <Link href={`/app/viajes/${i.bookingId}?tab=reservas`} className="font-medium text-slate-900 hover:text-brand-700">
                         {i.booking.client.firstName} {i.booking.client.lastName}
                       </Link>
-                      <p className="text-xs text-slate-400">
+                      <p className="flex items-center gap-1.5 text-xs whitespace-nowrap text-slate-500">
+                        <span className={clsx("size-2 shrink-0 rounded-full", DESTINATION_TONE[i.booking.destination].dot)} />
                         {i.booking.code} · {DESTINATION_LABEL[i.booking.destination]}
                       </p>
+                      <p className="text-xs whitespace-nowrap text-slate-500">{formatRange(i.booking.startDate, i.booking.endDate)}</p>
                     </Td>
-                    <Td className="max-w-xs">
-                      <p className="text-sm text-slate-800">{i.description}</p>
+                    <Td className="min-w-64">
+                      <p className="text-sm font-medium text-slate-800">{i.description}</p>
                       <p className="text-xs text-slate-500">{[ITEM_TYPE_LABEL[i.type], i.supplier, i.confirmationNumber].filter(Boolean).join(" · ")}</p>
                     </Td>
-                    <Td className="text-xs">{formatDate(i.saleDate)}</Td>
-                    <Td className="text-xs whitespace-nowrap">{formatRange(i.booking.startDate, i.booking.endDate)}</Td>
-                    <Td className="text-right whitespace-nowrap">{money(i.price, i.booking.currency)}</Td>
-                    <Td className="text-right font-medium whitespace-nowrap text-emerald-700">{money(i.commissionAmount, i.booking.currency)}</Td>
-                    <Td>
+                    <Td className="text-xs whitespace-nowrap">{formatDate(i.saleDate)}</Td>
+                    <Td className="text-right whitespace-nowrap tabular-nums">{money(i.price, i.booking.currency)}</Td>
+                    <Td className="text-right font-semibold whitespace-nowrap text-brand-700 tabular-nums">{money(i.commissionAmount, i.booking.currency)}</Td>
+                    <Td className="whitespace-nowrap">
                       <Badge className={COMMISSION_STATUS_COLOR[i.commissionStatus]}>{COMMISSION_STATUS_LABEL[i.commissionStatus]}</Badge>
-                      {i.commissionPaidAt && <p className="text-[11px] text-slate-400">{formatDate(i.commissionPaidAt)}</p>}
+                      {i.commissionPaidAt && <p className="text-[11px] text-slate-500">{formatDate(i.commissionPaidAt)}</p>}
                     </Td>
                   </tr>
                 ))}

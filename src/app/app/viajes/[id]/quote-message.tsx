@@ -30,8 +30,8 @@ export function QuoteMessageEditor({ quoteId, initial }: { quoteId: string; init
         </button>
       </div>
       <textarea name="message" rows={5} className="field" value={text} onChange={(e) => setText(e.target.value)} placeholder="Contale al cliente qué incluye cada opción…" />
-      {error && <p className="mt-1 text-xs text-rose-600">{error}</p>}
-      <p className="mt-1 text-xs text-slate-400">La IA usa las opciones guardadas, el perfil de la familia y las novedades vigentes. Guardá las opciones antes de redactar.</p>
+      {error && <p className="mt-1 text-xs text-rose-700">{error}</p>}
+      <p className="mt-1 text-xs text-slate-500">La IA usa las opciones guardadas, el perfil de la familia y las novedades vigentes. Guardá las opciones antes de redactar.</p>
     </div>
   );
 }

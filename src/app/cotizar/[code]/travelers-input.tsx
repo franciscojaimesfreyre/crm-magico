@@ -20,7 +20,7 @@ export function TravelersInput() {
             <input name="travelerName" placeholder="Nombre y apellido" className="field" />
             <input name="travelerAge" type="number" min={0} max={110} placeholder="Edad" className="field w-24" />
             {rows.length > 1 && (
-              <button type="button" onClick={() => setRows((r) => r.filter((x) => x !== id))} className="text-slate-400 hover:text-rose-600" title="Quitar">
+              <button type="button" onClick={() => setRows((r) => r.filter((x) => x !== id))} className="text-slate-500 hover:text-rose-600" title="Quitar">
                 <X className="size-4" />
               </button>
             )}

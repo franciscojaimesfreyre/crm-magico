@@ -1,6 +1,6 @@
 import Link from "next/link";
 import clsx from "clsx";
-import { Bot, Trash2 } from "lucide-react";
+import { Bot, Check, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui";
 import { ConfirmButton } from "@/components/form-controls";
 import { TASK_PRIORITY_LABEL } from "@/lib/labels";
@@ -21,17 +21,18 @@ export type TaskRow = {
   client?: { id: string; firstName: string; lastName: string } | null;
 };
 
+// Solo la prioridad alta se destaca; el rojo queda para lo atrasado.
 const PRIORITY_COLOR: Record<TaskPriority, string> = {
-  HIGH: "bg-rose-100 text-rose-700",
-  MEDIUM: "bg-amber-100 text-amber-700",
-  LOW: "bg-slate-100 text-slate-600",
+  HIGH: "bg-amber-100 text-amber-900",
+  MEDIUM: "bg-slate-100 text-slate-700",
+  LOW: "bg-slate-50 text-slate-600",
 };
 
 export function TaskList({ tasks, showContext = true }: { tasks: TaskRow[]; showContext?: boolean }) {
   const today = todayUTC();
-  if (tasks.length === 0) return <p className="p-5 text-sm text-slate-500">No hay tareas.</p>;
+  if (tasks.length === 0) return <p className="p-5 text-sm text-[var(--ink-soft)]">No hay tareas pendientes.</p>;
   return (
-    <ul className="divide-y divide-slate-100">
+    <ul className="divide-y divide-[var(--rule)]">
       {tasks.map((t) => {
         const diff = t.dueDate ? daysBetween(today, t.dueDate) : null;
         const overdue = !t.completedAt && diff !== null && diff < 0;
@@ -40,16 +41,16 @@ export function TaskList({ tasks, showContext = true }: { tasks: TaskRow[]; show
             <form action={toggleTask.bind(null, t.id)} className="pt-0.5">
               <button
                 className={clsx(
-                  "flex size-5 items-center justify-center rounded-full border-2",
+                  "t-press flex size-5 items-center justify-center rounded-full border-2",
                   t.completedAt ? "border-emerald-500 bg-emerald-500 text-white" : "border-slate-300 hover:border-brand-500",
                 )}
                 title={t.completedAt ? "Marcar pendiente" : "Completar"}
               >
-                {t.completedAt && "✓"}
+                {t.completedAt && <Check className="t-check size-3" strokeWidth={3} />}
               </button>
             </form>
             <div className="min-w-0 flex-1">
-              <p className={clsx("text-sm", t.completedAt ? "text-slate-400 line-through" : "text-slate-800")}>
+              <p className={clsx("text-sm", t.completedAt ? "text-slate-500 line-through" : "text-slate-800")}>
                 {t.automated && <Bot className="mr-1 inline size-3.5 text-brand-500" aria-label="Creada por una automatización" />}
                 {t.title}
               </p>
@@ -57,7 +58,7 @@ export function TaskList({ tasks, showContext = true }: { tasks: TaskRow[]; show
               <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
                 <Badge className={PRIORITY_COLOR[t.priority]}>{TASK_PRIORITY_LABEL[t.priority]}</Badge>
                 {t.dueDate && (
-                  <span className={clsx(overdue && "font-medium text-rose-600")}>
+                  <span className={clsx("tabular-nums", overdue && "font-medium text-rose-700")}>
                     {overdue ? "Venció" : "Vence"} {formatDate(t.dueDate)}
                     {diff === 0 && !t.completedAt && " (hoy)"}
                   </span>

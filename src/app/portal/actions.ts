@@ -121,7 +121,7 @@ export async function acceptQuote(quoteId: string, _: ActionState, formData: For
   await notifyStaff({
     organizationId: quote.booking.organizationId,
     userId: quote.booking.agentId,
-    title: `🎉 ${account.client.firstName} aceptó la cotización (${option.name})`,
+    title: `${account.client.firstName} aceptó la cotización (${option.name})`,
     body: comment ?? quote.title,
     link: `/app/viajes/${quote.bookingId}?tab=cotizaciones`,
   });

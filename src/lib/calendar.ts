@@ -37,14 +37,14 @@ export async function calendarEvents(organizationId: string, from: Date, to: Dat
       events.push({
         id: `${b.id}-${k.kind}-${k.label}`,
         date: k.date,
-        title: isTrip ? `${k.kind === "checkin" ? "✈️ Sale" : "🏠 Vuelve"}: ${who}` : `${k.label} — ${who}`,
+        title: isTrip ? `${k.kind === "checkin" ? "Sale" : "Vuelve"}: ${who}` : `${k.label} — ${who}`,
         kind: isTrip ? "trip" : "keydate",
         href: `/app/viajes/${b.id}`,
       });
     }
   }
   for (const t of tasks) {
-    events.push({ id: t.id, date: t.dueDate!, title: `☑ ${t.title}`, kind: "task", href: t.bookingId ? `/app/viajes/${t.bookingId}?tab=tareas` : "/app/tareas" });
+    events.push({ id: t.id, date: t.dueDate!, title: `Tarea: ${t.title}`, kind: "task", href: t.bookingId ? `/app/viajes/${t.bookingId}?tab=tareas` : "/app/tareas" });
   }
   return events.sort((a, b) => a.date.getTime() - b.date.getTime());
 }

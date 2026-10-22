@@ -3,6 +3,7 @@ import { Field, Input, Select, Textarea } from "@/components/ui";
 import { DESTINATIONS, GROUP_STATUSES } from "@/lib/labels";
 import { toDateInput } from "@/lib/format";
 import type { Group } from "@/generated/prisma/client";
+import { DateInput } from "@/components/date-input";
 
 export function GroupForm({
   action,
@@ -16,7 +17,7 @@ export function GroupForm({
   submitLabel: string;
 }) {
   return (
-    <ActionForm action={action} className="grid gap-4 sm:grid-cols-2">
+    <ActionForm action={action} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <Field label="Nombre *" className="sm:col-span-2">
         <Input name="name" defaultValue={group?.name} placeholder="Ej: Reunión familiar Pérez — Disney 2027" required />
       </Field>
@@ -27,10 +28,10 @@ export function GroupForm({
         <Select name="status" options={GROUP_STATUSES} defaultValue={group?.status ?? "PLANNING"} />
       </Field>
       <Field label="Desde">
-        <Input type="date" name="startDate" defaultValue={toDateInput(group?.startDate)} />
+        <DateInput name="startDate" defaultValue={toDateInput(group?.startDate)} />
       </Field>
       <Field label="Hasta">
-        <Input type="date" name="endDate" defaultValue={toDateInput(group?.endDate)} />
+        <DateInput name="endDate" defaultValue={toDateInput(group?.endDate)} />
       </Field>
       <Field label="Organizador" className="sm:col-span-2">
         <Select name="organizerId" options={clients} defaultValue={group?.organizerId ?? ""} placeholder="Sin organizador" />

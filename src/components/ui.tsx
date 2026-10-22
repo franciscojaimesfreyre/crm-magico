@@ -1,27 +1,33 @@
 import Link from "next/link";
 import clsx from "clsx";
+import { cn } from "@/lib/utils";
 import type { ComponentProps, ReactNode } from "react";
+import { ChevronLeft } from "lucide-react";
+import { SelectField } from "@/components/select-field";
 
 // Componentes de presentación sin estado: se pueden usar en server y client components.
 
 type Variant = "primary" | "secondary" | "ghost" | "danger" | "magic";
 
+// Botones en píldora: el principal en el turquesa de la marca; el secundario blanco con borde; el resto, texto. Las
+// acciones de IA ("magic") van en el turquesa pálido de los datos, nunca con degradado.
 const VARIANTS: Record<Variant, string> = {
-  primary: "bg-brand-600 text-white hover:bg-brand-700 shadow-sm",
-  secondary: "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 shadow-xs",
-  ghost: "text-slate-600 hover:bg-slate-100",
+  primary: "bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-800",
+  secondary: "bg-white text-slate-800 border border-[var(--control)] hover:bg-[var(--raised)] active:bg-[var(--border)]",
+  ghost: "text-slate-700 hover:bg-[var(--raised)] active:bg-[var(--border)]",
   danger: "bg-white text-rose-700 border border-rose-200 hover:bg-rose-50",
-  magic: "bg-gradient-to-r from-fuchsia-600 to-brand-600 text-white hover:opacity-95 shadow-sm",
+  magic: "bg-data-50 text-data-700 hover:bg-data-100 active:bg-data-100",
 };
 
 const SIZES = {
-  sm: "px-2.5 py-1.5 text-xs",
-  md: "px-3.5 py-2 text-sm",
+  sm: "h-8 px-3 text-[13px]",
+  md: "h-10 px-4.5 text-sm",
 };
 
 export function buttonClass(variant: Variant = "primary", size: keyof typeof SIZES = "md", className?: string) {
-  return clsx(
-    "inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+  // cn (tailwind-merge): las clases que se pasan ganan sobre las de la variante.
+  return cn(
+    "t-press inline-flex items-center justify-center gap-1.5 rounded-full font-semibold whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60",
     VARIANTS[variant],
     SIZES[size],
     className,
@@ -47,7 +53,7 @@ export function LinkButton({
 }
 
 export function Card({ className, ...props }: ComponentProps<"div">) {
-  return <div className={clsx("rounded-xl border border-slate-200 bg-white shadow-xs", className)} {...props} />;
+  return <div className={clsx("rounded-2xl border border-[var(--border)] bg-white shadow-[var(--card-shadow)]", className)} {...props} />;
 }
 
 export function CardHeader({
@@ -62,10 +68,10 @@ export function CardHeader({
   className?: string;
 }) {
   return (
-    <div className={clsx("flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-5 py-4", className)}>
-      <div>
-        <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
-        {description && <p className="mt-0.5 text-xs text-slate-500">{description}</p>}
+    <div className={clsx("flex flex-wrap items-start justify-between gap-3 border-b border-[var(--rule)] px-5 py-4", className)}>
+      <div className="min-w-0">
+        <h2 className="text-base font-bold text-slate-900">{title}</h2>
+        {description && <p className="mt-0.5 text-[13px] text-[var(--ink-soft)]">{description}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
@@ -86,14 +92,14 @@ export function PageHeader({
   return (
     <div className="mb-6">
       {back && (
-        <Link href={back.href} className="mb-2 inline-block text-sm text-slate-500 hover:text-slate-800">
-          ← {back.label}
+        <Link href={back.href} className="mb-2 inline-flex items-center gap-1 text-sm text-[var(--ink-soft)] hover:text-slate-900">
+          <ChevronLeft className="size-4" /> {back.label}
         </Link>
       )}
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{title}</h1>
-          {description && <p className="mt-1 text-sm text-slate-500">{description}</p>}
+        <div className="min-w-0">
+          <h1 className="text-[28px] leading-[1.15] text-slate-900">{title}</h1>
+          {description && <div className="mt-2 max-w-3xl text-[15px] text-[var(--ink-soft)]">{description}</div>}
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       </div>
@@ -103,12 +109,25 @@ export function PageHeader({
 
 export function Badge({ className, children }: { className?: string; children: ReactNode }) {
   return (
-    <span className={clsx("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap", className ?? "bg-slate-100 text-slate-700")}>
+    <span className={clsx("inline-flex flex-none items-center rounded-full px-2.5 py-0.5 font-sans text-xs font-semibold tracking-normal whitespace-nowrap", className ?? "bg-[var(--raised)] text-slate-700")}>
       {children}
     </span>
   );
 }
 
+/** Un monto con los decimales en gris ("US$ 8.825,00" → los ",00" más claros), como en la referencia. */
+export function Amount({ value }: { value: string }) {
+  const m = value.match(/^(.*?)([.,]\d{1,2})$/);
+  if (!m) return <>{value}</>;
+  return (
+    <>
+      {m[1]}
+      <span className="figure-dec">{m[2]}</span>
+    </>
+  );
+}
+
+/** Una cifra con su etiqueta: una tarjeta propia, etiqueta en mayúsculas chicas, valor en bold. */
 export function StatCard({
   label,
   value,
@@ -118,31 +137,53 @@ export function StatCard({
   label: string;
   value: ReactNode;
   hint?: ReactNode;
-  tone?: "default" | "good" | "warn";
+  tone?: "default" | "good" | "warn" | "bad" | "info";
 }) {
   return (
-    <Card className="p-4">
-      <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">{label}</p>
+    <Card className="min-w-0 p-5">
+      <p className="text-[11px] font-semibold tracking-[0.06em] text-[var(--ink-soft)] uppercase">{label}</p>
       <p
         className={clsx(
-          "mt-1.5 text-2xl font-semibold",
-          tone === "good" && "text-emerald-600",
-          tone === "warn" && "text-amber-600",
+          "figure mt-2 text-[21px] leading-tight sm:text-[26px] xl:text-[30px]",
+          tone === "good" && "text-data-700",
+          tone === "warn" && "text-amber-800",
+          tone === "bad" && "text-rose-700",
+          tone === "info" && "text-sky-800",
           tone === "default" && "text-slate-900",
         )}
       >
-        {value}
+        {typeof value === "string" ? <Amount value={value} /> : value}
       </p>
-      {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
+      {hint && <div className="mt-2 text-xs text-[var(--ink-soft)]">{hint}</div>}
     </Card>
+  );
+}
+
+/** Fila de StatCards: tarjetas separadas, todas del mismo ancho; en el teléfono, de a dos. */
+export function StatStrip({ children, className }: { children: ReactNode; className?: string }) {
+  const count = Array.isArray(children) ? children.filter(Boolean).length : 1;
+  return (
+    <div
+      className={clsx(
+        "grid grid-cols-2 gap-4",
+        count === 3 && "sm:grid-cols-3",
+        count === 4 && "lg:grid-cols-4",
+        // Con cinco cifras las tarjetas son angostas: el número baja un tamaño para que entre entero.
+        count >= 5 && "sm:grid-cols-3 xl:grid-cols-5 xl:[&_.figure]:text-[24px]",
+        count % 2 === 1 && "max-sm:[&>*:last-child]:col-span-2",
+        className,
+      )}
+    >
+      {children}
+    </div>
   );
 }
 
 export function EmptyState({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
-      <p className="text-sm font-medium text-slate-800">{title}</p>
-      {description && <p className="mt-1 max-w-md text-sm text-slate-500">{description}</p>}
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--control)] bg-white px-6 py-12 text-center">
+      <p className="text-base font-semibold text-slate-900">{title}</p>
+      {description && <p className="mt-1 max-w-md text-sm text-[var(--ink-soft)]">{description}</p>}
       {action && <div className="mt-4">{action}</div>}
     </div>
   );
@@ -163,7 +204,7 @@ export function Field({
     <label className={clsx("block", className)}>
       <span className="label">{label}</span>
       {children}
-      {hint && <span className="mt-1 block text-xs text-slate-400">{hint}</span>}
+      {hint && <span className="mt-1 block text-xs text-[var(--ink-soft)]">{hint}</span>}
     </label>
   );
 }
@@ -176,49 +217,20 @@ export function Textarea({ className, ...props }: ComponentProps<"textarea">) {
   return <textarea className={clsx("field", className)} rows={3} {...props} />;
 }
 
-export function Select({
-  options,
-  placeholder,
-  className,
-  ...props
-}: ComponentProps<"select"> & { options: { value: string; label: string }[]; placeholder?: string }) {
-  return (
-    <select className={clsx("field", className)} {...props}>
-      {placeholder !== undefined && <option value="">{placeholder}</option>}
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </select>
-  );
+/** Select de la app: el menú propio (ver SelectField), con la misma interfaz de opciones de siempre. */
+export function Select(props: Omit<ComponentProps<typeof SelectField>, "groups"> & { options: { value: string; label: string }[] }) {
+  return <SelectField {...props} />;
 }
 
-/** Select con grupos de opciones (optgroup). */
-export function GroupedSelect({
-  groups,
-  className,
-  ...props
-}: ComponentProps<"select"> & { groups: { label: string; options: { value: string; label: string }[] }[] }) {
-  return (
-    <select className={clsx("field", className)} {...props}>
-      {groups.map((g) => (
-        <optgroup key={g.label} label={g.label}>
-          {g.options.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </optgroup>
-      ))}
-    </select>
-  );
+/** Select con grupos de opciones. */
+export function GroupedSelect(props: Omit<ComponentProps<typeof SelectField>, "options"> & { groups: { label: string; options: { value: string; label: string }[] }[] }) {
+  return <SelectField {...props} />;
 }
 
 export function Checkbox({ label, ...props }: ComponentProps<"input"> & { label: string }) {
   return (
     <label className="inline-flex items-center gap-2 text-sm text-slate-700">
-      <input type="checkbox" className="size-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500" {...props} />
+      <input type="checkbox" className="size-4 rounded border-[var(--control)] accent-brand-600" {...props} />
       {label}
     </label>
   );
@@ -227,14 +239,14 @@ export function Checkbox({ label, ...props }: ComponentProps<"input"> & { label:
 export function Table({ children }: { children: ReactNode }) {
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-slate-200 text-sm">{children}</table>
+      <table className="min-w-full divide-y divide-[var(--rule)] text-sm">{children}</table>
     </div>
   );
 }
 
 export function Th({ children, className }: { children?: ReactNode; className?: string }) {
   return (
-    <th className={clsx("px-4 py-2.5 text-left text-xs font-medium tracking-wide whitespace-nowrap text-slate-500 uppercase", className)}>
+    <th className={clsx("px-4 py-2.5 text-left text-xs font-normal whitespace-nowrap text-[var(--ink-soft)]", className)}>
       {children}
     </th>
   );
@@ -248,6 +260,25 @@ export function Td({ children, className, colSpan }: { children?: ReactNode; cla
   );
 }
 
+/**
+ * Tintes de identidad para las personas: cada nombre tiene siempre el mismo (pálido, con la tinta del
+ * mismo tono). Es identidad, no dato: no se usa en gráficos ni en estados.
+ */
+const PERSON_TINTS = [
+  "bg-[#fbe7f0] text-[#6b1d3e]", // frambuesa
+  "bg-[#e3f1ec] text-[#1f4d3d]", // salvia
+  "bg-[#fdeedd] text-[#7a3d0c]", // durazno
+  "bg-[#e4eef8] text-[#1e3e63]", // celeste
+  "bg-[#f1ecdf] text-[#584a24]", // arena
+  "bg-[#e9f2df] text-[#3a5220]", // pistacho
+];
+
+export function personTint(name: string) {
+  let h = 0;
+  for (const ch of name.toLowerCase()) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return PERSON_TINTS[h % PERSON_TINTS.length];
+}
+
 export function Avatar({ name, className }: { name: string; className?: string }) {
   const initials = name
     .split(/\s+/)
@@ -256,7 +287,7 @@ export function Avatar({ name, className }: { name: string; className?: string }
     .map((w) => w[0]?.toUpperCase())
     .join("");
   return (
-    <span className={clsx("inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700", className)}>
+    <span className={clsx("inline-flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold", personTint(name), className)} aria-hidden>
       {initials}
     </span>
   );
@@ -264,19 +295,19 @@ export function Avatar({ name, className }: { name: string; className?: string }
 
 export function Tabs({ tabs, active }: { tabs: { href: string; label: string; key: string; count?: number }[]; active: string }) {
   return (
-    <div className="mb-6 flex gap-1 overflow-x-auto border-b border-slate-200">
+    <div className="mb-6 flex gap-1 overflow-x-auto border-b border-[var(--border)]">
       {tabs.map((t) => (
         <Link
           key={t.key}
           href={t.href}
           className={clsx(
-            "-mb-px border-b-2 px-3 py-2 text-sm font-medium whitespace-nowrap",
-            t.key === active ? "border-brand-600 text-brand-700" : "border-transparent text-slate-500 hover:text-slate-800",
+            "-mb-px border-b-2 px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors",
+            t.key === active ? "border-slate-900 text-slate-900" : "border-transparent text-[var(--ink-soft)] hover:text-slate-900",
           )}
         >
           {t.label}
           {t.count !== undefined && t.count > 0 && (
-            <span className="ml-1.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600">{t.count}</span>
+            <span className="ml-1.5 rounded-full bg-[var(--raised)] px-1.5 py-0.5 text-xs text-slate-700 tabular-nums">{t.count}</span>
           )}
         </Link>
       ))}
@@ -288,7 +319,7 @@ export function Alert({ tone = "info", children }: { tone?: "info" | "error" | "
   return (
     <div
       className={clsx(
-        "rounded-lg border px-3 py-2 text-sm",
+        "rounded-md border px-3 py-2 text-sm",
         tone === "info" && "border-sky-200 bg-sky-50 text-sky-800",
         tone === "error" && "border-rose-200 bg-rose-50 text-rose-800",
         tone === "success" && "border-emerald-200 bg-emerald-50 text-emerald-800",

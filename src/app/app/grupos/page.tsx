@@ -38,7 +38,7 @@ export default async function GroupsPage({ searchParams }: { searchParams: Promi
       {groups.length === 0 ? (
         <EmptyState title="No hay grupos" action={<LinkButton href="/app/grupos/nuevo">Crear grupo</LinkButton>} />
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {groups.map((g) => {
             const active = g.bookings.filter((b) => b.status !== "CANCELLED");
             const guests = active.reduce((s, b) => s + b.adults + b.children, 0);
@@ -50,19 +50,19 @@ export default async function GroupsPage({ searchParams }: { searchParams: Promi
                   <Badge className="mt-1 bg-brand-50 text-brand-700">{GROUP_STATUS_LABEL[g.status]}</Badge>
                   <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
                     <div>
-                      <dt className="text-xs text-slate-400">Viaje</dt>
+                      <dt className="text-xs text-slate-500">Viaje</dt>
                       <dd>{formatRange(g.startDate, g.endDate)}</dd>
                     </div>
                     <div>
-                      <dt className="text-xs text-slate-400">Destino</dt>
+                      <dt className="text-xs text-slate-500">Destino</dt>
                       <dd>{g.destination ? DESTINATION_LABEL[g.destination] : "—"}</dd>
                     </div>
                     <div>
-                      <dt className="text-xs text-slate-400">Organizador</dt>
+                      <dt className="text-xs text-slate-500">Organizador</dt>
                       <dd>{g.organizer ? `${g.organizer.firstName} ${g.organizer.lastName}` : "—"}</dd>
                     </div>
                     <div>
-                      <dt className="text-xs text-slate-400">Viajes / viajeros</dt>
+                      <dt className="text-xs text-slate-500">Viajes / viajeros</dt>
                       <dd>
                         {active.length} / {guests}
                       </dd>

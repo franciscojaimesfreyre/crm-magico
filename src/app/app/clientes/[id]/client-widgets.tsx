@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Eye, EyeOff, Copy } from "lucide-react";
 import { revealSupplierPassword } from "../actions";
+import { SelectField } from "@/components/select-field";
 
 export function RevealPassword({ loginId }: { loginId: string }) {
   const [value, setValue] = useState<string | null>(null);
@@ -12,7 +13,7 @@ export function RevealPassword({ loginId }: { loginId: string }) {
       <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">{value ?? "••••••••"}</code>
       <button
         type="button"
-        className="text-slate-400 hover:text-slate-700"
+        className="text-slate-500 hover:text-slate-700"
         title={value ? "Ocultar" : "Mostrar (queda registrado)"}
         disabled={pending}
         onClick={() => {
@@ -23,7 +24,7 @@ export function RevealPassword({ loginId }: { loginId: string }) {
         {value ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
       </button>
       {value && (
-        <button type="button" className="text-slate-400 hover:text-slate-700" title="Copiar" onClick={() => navigator.clipboard.writeText(value)}>
+        <button type="button" className="text-slate-500 hover:text-slate-700" title="Copiar" onClick={() => navigator.clipboard.writeText(value)}>
           <Copy className="size-4" />
         </button>
       )}
@@ -59,24 +60,17 @@ export function TemplatePicker({ templates }: { templates: Template[] }) {
     <div className="space-y-3">
       <label className="block">
         <span className="label">Plantilla</span>
-        <select
-          className="field"
-          defaultValue=""
-          onChange={(e) => {
-            const t = templates.find((x) => x.id === e.target.value);
+        <SelectField
+          placeholder="Escribir desde cero"
+          onValueChange={(v) => {
+            const t = templates.find((x) => x.id === v);
             if (t) {
               setSubject(t.subject);
               setBody(t.body);
             }
           }}
-        >
-          <option value="">Escribir desde cero</option>
-          {templates.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}
-            </option>
-          ))}
-        </select>
+          options={templates.map((t) => ({ value: t.id, label: t.name }))}
+        />
       </label>
       <label className="block">
         <span className="label">Asunto</span>
@@ -86,7 +80,7 @@ export function TemplatePicker({ templates }: { templates: Template[] }) {
         <span className="label">Mensaje</span>
         <textarea name="body" className="field font-mono text-xs" rows={10} value={body} onChange={(e) => setBody(e.target.value)} required />
       </label>
-      <p className="text-xs text-slate-400">Las variables como {"{{clientName}}"} o {"{{tripDates}}"} se completan solas al enviar.</p>
+      <p className="text-xs text-slate-500">Las variables como {"{{clientName}}"} o {"{{tripDates}}"} se completan solas al enviar.</p>
     </div>
   );
 }

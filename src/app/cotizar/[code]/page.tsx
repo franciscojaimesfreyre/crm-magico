@@ -7,6 +7,7 @@ import { Field, Input, Select, Textarea } from "@/components/ui";
 import { DESTINATIONS } from "@/lib/labels";
 import { submitLead } from "./actions";
 import { TravelersInput } from "./travelers-input";
+import { DateInput } from "@/components/date-input";
 
 type Props = { params: Promise<{ code: string }> };
 
@@ -24,7 +25,7 @@ export default async function QuoteRequestPage({ params }: Props) {
   const org = await db.organization.findUnique({ where: { marketingCode: code } });
   if (!org) notFound();
   return (
-    <div className="min-h-screen bg-gradient-to-br from-fuchsia-50 via-white to-sky-50 px-4 py-10">
+    <div className="min-h-screen bg-[var(--ground)] px-4 py-10">
       <div className="mx-auto max-w-xl">
         <header className="mb-6 text-center">
           {org.logoUrl ? (
@@ -38,7 +39,7 @@ export default async function QuoteRequestPage({ params }: Props) {
           <h1 className="text-2xl font-semibold text-slate-900">{org.name}</h1>
           {org.tagline && <p className="mt-1 text-slate-600">{org.tagline}</p>}
         </header>
-        <div className="rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-100">
+        <div className="rounded-2xl bg-white p-6 border border-[var(--border)]">
           <h2 className="text-lg font-semibold text-slate-900">Pedí tu cotización sin cargo</h2>
           <p className="mb-5 text-sm text-slate-500">Contanos un poco de tu viaje soñado y te contactamos con una propuesta a medida.</p>
           <ActionForm action={submitLead.bind(null, code)} resetOnSuccess className="space-y-4">
@@ -62,10 +63,10 @@ export default async function QuoteRequestPage({ params }: Props) {
             </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Desde (opcional)">
-                <Input type="date" name="startDate" />
+                <DateInput name="startDate" />
               </Field>
               <Field label="Hasta (opcional)">
-                <Input type="date" name="endDate" />
+                <DateInput name="endDate" />
               </Field>
             </div>
             <TravelersInput />

@@ -18,6 +18,7 @@ import { ItemFields } from "./item-fields";
 import { QuoteMessageEditor } from "./quote-message";
 import type { LoadedBooking } from "./data";
 import { commissionFor } from "@/lib/trips";
+import { DateInput } from "@/components/date-input";
 
 export function Quotes({ booking: b, defaultRate }: { booking: LoadedBooking; defaultRate: number }) {
   const newQuote = (
@@ -74,12 +75,12 @@ export function Quotes({ booking: b, defaultRate }: { booking: LoadedBooking; de
             </div>
 
             {editable && (
-              <ActionForm action={updateQuote.bind(null, q.id)} className="grid gap-3 border-b border-slate-100 p-5 sm:grid-cols-3">
+              <ActionForm action={updateQuote.bind(null, q.id)} className="grid grid-cols-1 gap-3 border-b border-slate-100 p-5 sm:grid-cols-3">
                 <Field label="Título" className="sm:col-span-2">
                   <Input name="title" defaultValue={q.title} />
                 </Field>
                 <Field label="Válida hasta">
-                  <Input type="date" name="validUntil" defaultValue={toDateInput(q.validUntil)} />
+                  <DateInput name="validUntil" defaultValue={toDateInput(q.validUntil)} />
                 </Field>
                 <div className="sm:col-span-3">
                   <QuoteMessageEditor quoteId={q.id} initial={q.message ?? ""} />
@@ -93,17 +94,17 @@ export function Quotes({ booking: b, defaultRate }: { booking: LoadedBooking; de
             )}
             {!editable && q.message && <p className="border-b border-slate-100 p-5 text-sm whitespace-pre-line text-slate-700">{q.message}</p>}
 
-            <div className="grid gap-4 p-5 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 p-5 lg:grid-cols-2">
               {q.options.map((o) => {
                 const total = o.items.reduce((s, i) => s + toNumber(i.price), 0);
                 const commission = o.items.reduce((s, i) => s + commissionFor(i, defaultRate), 0);
                 const accepted = q.acceptedOptionId === o.id;
                 return (
-                  <div key={o.id} className={clsx("rounded-xl border p-4", accepted ? "border-emerald-300 bg-emerald-50" : "border-slate-200")}>
+                  <div key={o.id} className={clsx("rounded-lg border p-4", accepted ? "border-emerald-300 bg-emerald-50" : "border-slate-200")}>
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <p className="flex items-center gap-1.5 font-semibold text-slate-900">
-                          {accepted && <CheckCircle2 className="size-4 text-emerald-600" />}
+                          {accepted && <CheckCircle2 className="size-4 text-emerald-700" />}
                           {o.name}
                         </p>
                         {o.description && <p className="text-xs text-slate-500">{o.description}</p>}
@@ -117,7 +118,7 @@ export function Quotes({ booking: b, defaultRate }: { booking: LoadedBooking; de
                       {o.items.map((i) => (
                         <li key={i.id} className="flex items-center justify-between gap-2 py-2">
                           <div>
-                            <span className="text-xs text-slate-400">{ITEM_TYPE_LABEL[i.type]}</span>
+                            <span className="text-xs text-slate-500">{ITEM_TYPE_LABEL[i.type]}</span>
                             <p className="text-slate-800">{i.description}</p>
                             <p className="text-xs text-slate-500">
                               {[i.supplier, i.startDate && formatRange(i.startDate, i.endDate)].filter(Boolean).join(" · ")}
@@ -139,7 +140,7 @@ export function Quotes({ booking: b, defaultRate }: { booking: LoadedBooking; de
                     {editable && (
                       <details className="mt-3">
                         <summary className="cursor-pointer text-xs font-medium text-brand-700">+ Agregar servicio a esta opción</summary>
-                        <ActionForm action={addQuoteItem.bind(null, o.id)} resetOnSuccess className="mt-3 grid gap-3 sm:grid-cols-2">
+                        <ActionForm action={addQuoteItem.bind(null, o.id)} resetOnSuccess className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                           <ItemFields defaultRate={defaultRate} currency={b.currency} withConfirmation={false} />
                           <div className="flex items-end">
                             <SubmitButton size="sm">Agregar</SubmitButton>
@@ -156,7 +157,7 @@ export function Quotes({ booking: b, defaultRate }: { booking: LoadedBooking; de
                 );
               })}
               {editable && (
-                <div className="rounded-xl border border-dashed border-slate-300 p-4">
+                <div className="rounded-lg border border-dashed border-slate-300 p-4">
                   <p className="mb-2 text-sm font-medium text-slate-700">Agregar otra opción</p>
                   <ActionForm action={addQuoteOption.bind(null, q.id)} resetOnSuccess className="space-y-2">
                     <Input name="name" placeholder="Ej: Opción Deluxe" required />

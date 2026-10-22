@@ -1,8 +1,8 @@
 import Link from "next/link";
 import clsx from "clsx";
-import { AlertTriangle, CalendarRange, Newspaper, Pin } from "lucide-react";
-import { Badge, Card, CardHeader } from "@/components/ui";
-import { DESTINATION_LABEL, KNOWLEDGE_CATEGORY_LABEL } from "@/lib/labels";
+import { AlertTriangle, CalendarRange, Pin } from "lucide-react";
+import { Badge, Card } from "@/components/ui";
+import { DESTINATION_LABEL, KNOWLEDGE_CATEGORY_COLOR, KNOWLEDGE_CATEGORY_LABEL } from "@/lib/labels";
 import { daysBetween, formatDate, todayUTC } from "@/lib/format";
 import { isWarning } from "@/lib/knowledge-alerts";
 import type { KnowledgeItem } from "@/generated/prisma/client";
@@ -11,32 +11,28 @@ import type { KnowledgeItem } from "@/generated/prisma/client";
 export function KnowledgeHighlights({ current, upcoming, total }: { current: KnowledgeItem[]; upcoming: KnowledgeItem[]; total: number }) {
   if (current.length + upcoming.length === 0) return null;
   return (
-    <Card className="mb-6">
-      <CardHeader
-        title={
-          <span className="flex items-center gap-2">
-            <Newspaper className="size-4 text-brand-600" /> Novedades
-          </span>
-        }
-        description="Lo vigente y lo que se viene en los parques. La IA también lo tiene en cuenta."
-        actions={
-          <Link href="/app/novedades" className="text-xs font-medium text-brand-700 hover:underline">
-            Ver todas ({total}) →
-          </Link>
-        }
-      />
-      <div className="grid divide-y divide-slate-100 md:grid-cols-2 md:divide-x md:divide-y-0">
+    <section>
+      <div className="mb-3 flex items-end justify-between gap-3">
+        <div>
+          <h2 className="text-base text-slate-900">Novedades de los parques</h2>
+          <p className="text-sm text-[var(--ink-soft)]">Lo vigente y lo que se viene. La IA también lo tiene en cuenta.</p>
+        </div>
+        <Link href="/app/novedades" className="shrink-0 text-sm font-medium text-brand-700 hover:underline">
+          Ver todas ({total})
+        </Link>
+      </div>
+      <Card className="grid grid-cols-1 divide-y divide-[var(--rule)] md:grid-cols-2 md:divide-x md:divide-y-0">
         <Column title="Vigentes" items={current} empty="Nada vigente por ahora." />
         <Column title="Próximamente" items={upcoming} empty="Nada anunciado para los próximos meses." />
-      </div>
-    </Card>
+      </Card>
+    </section>
   );
 }
 
 function Column({ title, items, empty }: { title: string; items: KnowledgeItem[]; empty: string }) {
   return (
     <div className="min-w-0">
-      <p className="px-5 pt-3 text-[11px] font-semibold tracking-wide text-slate-400 uppercase">{title}</p>
+      <p className="px-5 pt-3 text-xs font-semibold text-slate-500">{title}</p>
       {items.length === 0 ? (
         <p className="px-5 py-3 text-sm text-slate-500">{empty}</p>
       ) : (
@@ -56,7 +52,7 @@ function Column({ title, items, empty }: { title: string; items: KnowledgeItem[]
                       <span className="line-clamp-2">{k.title}</span>
                     </span>
                     <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500">
-                      <Badge className="bg-slate-100 text-slate-700">{KNOWLEDGE_CATEGORY_LABEL[k.category]}</Badge>
+                      <Badge className={KNOWLEDGE_CATEGORY_COLOR[k.category]}>{KNOWLEDGE_CATEGORY_LABEL[k.category]}</Badge>
                       <When item={k} />
                       {k.destinations.length > 0 && <span className="truncate">{k.destinations.map((d) => DESTINATION_LABEL[d]).join(", ")}</span>}
                     </span>

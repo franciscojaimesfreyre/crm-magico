@@ -7,7 +7,7 @@ export function CatalogTabs({ active }: { active: "lugares" | "fichas" }) {
       active={active}
       tabs={[
         { key: "lugares", label: "Atracciones y lugares", href: "/app/catalogo" },
-        { key: "fichas", label: "Fichas de parques y eventos", href: "/app/catalogo/fichas" },
+        { key: "fichas", label: "Fichas de parques", href: "/app/catalogo/fichas" },
       ]}
     />
   );

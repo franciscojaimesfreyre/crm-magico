@@ -4,7 +4,7 @@
 
 type Datum = { label: string; value: number; display: string };
 
-const BAR = "#7c3aed"; // brand-600, validado contra la superficie clara
+const BAR = "#0e7c70"; // brand-600 (verde de la marca), validado contra la superficie clara
 
 function niceMax(max: number) {
   if (max <= 0) return 1;
@@ -23,7 +23,7 @@ export function ColumnChart({ data, title, height = 200 }: { data: Datum[]; titl
   return (
     <figure>
       <div className="flex gap-2">
-        <div className="flex flex-col justify-between pb-6 text-right text-[11px] text-slate-400 tabular-nums" style={{ height }}>
+        <div className="flex flex-col justify-between pb-6 text-right text-[11px] text-slate-500 tabular-nums" style={{ height }}>
           {ticks.map((t) => (
             <span key={t}>{compact.format(t).toLowerCase()}</span>
           ))}
@@ -93,7 +93,7 @@ export function BarList({ data, title }: { data: Datum[]; title: string }) {
 function DataTable({ data }: { data: Datum[] }) {
   return (
     <details className="mt-3 text-xs">
-      <summary className="cursor-pointer text-slate-400 hover:text-slate-600">Ver datos</summary>
+      <summary className="cursor-pointer text-slate-500 hover:text-slate-600">Ver datos</summary>
       <table className="mt-2 w-full">
         <tbody className="divide-y divide-slate-100">
           {data.map((d) => (

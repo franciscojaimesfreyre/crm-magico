@@ -12,7 +12,7 @@ const KIND_ICON: Record<GuidePickKind, LucideIcon> = {
 
 const KIND_TONE: Record<GuidePickKind, string> = {
   RIDE: "bg-rose-100 text-rose-700",
-  SHOW: "bg-fuchsia-100 text-fuchsia-700",
+  SHOW: "bg-brand-50 text-brand-700",
   DINING: "bg-amber-100 text-amber-700",
   EXPERIENCE: "bg-sky-100 text-sky-700",
 };
@@ -36,13 +36,13 @@ export function PlaceGuideCard({
   pickNotes?: (string | null)[];
 }) {
   return (
-    <div className="rounded-xl bg-white/90 p-3 ring-1 ring-slate-200/70">
+    <div className="rounded-lg bg-white/90 p-3 ring-1 ring-slate-200/70">
       {guide.picks.length > 0 && (
         <>
-          <p className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-brand-700 uppercase">
+          <p className="flex items-center gap-1.5 text-xs font-semibold text-brand-700">
             <Sparkles className="size-3.5" /> {cruise ? "Para disfrutar a bordo" : "Lo que les recomendamos"}
           </p>
-          <ul className="mt-2 grid gap-2 sm:grid-cols-2">
+          <ul className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
             {guide.picks.map((p, i) => {
               const Icon = KIND_ICON[p.kind];
               return (
@@ -85,7 +85,7 @@ export function PlaceGuideCard({
       )}
       {guide.tips.length > 0 && (
         <div className={clsx("rounded-lg bg-amber-50/80 p-2.5", guide.picks.length > 0 && "mt-3")}>
-          <p className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-amber-800 uppercase">
+          <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-800">
             <Lightbulb className="size-3.5" /> Tips
           </p>
           <ul className="mt-1.5 space-y-1">

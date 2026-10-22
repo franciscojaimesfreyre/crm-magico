@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Plane } from "lucide-react";
 import { buttonClass } from "@/components/ui";
+import { DateInput } from "@/components/date-input";
 
 export type FlightLegValues = { date: string; time: string; airline: string; flightNumber: string };
 
@@ -20,7 +21,7 @@ function LegRow({ prefix, title, values }: { prefix: string; title: string; valu
       <div className="grid grid-cols-2 gap-3">
         <label className="block">
           <span className="label">Fecha</span>
-          <input type="date" name={`${prefix}Date`} defaultValue={values?.date} className="field" />
+          <DateInput name={`${prefix}Date`} defaultValue={values?.date} />
         </label>
         <label className="block">
           <span className="label">Hora</span>
@@ -89,7 +90,7 @@ export function TripDatesGuard({ tripStart, tripEnd }: { tripStart: string | nul
       >
         <div className="p-5">
           <div className="flex items-start gap-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
               <AlertTriangle className="size-5" />
             </span>
             <div>
@@ -143,7 +144,7 @@ export function PriceWithTax({ price, tax, currency }: { price?: string; tax?: s
         <input type="number" step="0.01" min={0} name="price" value={total} onChange={(e) => setTotal(e.target.value)} required className="field" />
         {showTax ? (
           net !== null && (
-            <span className={net < 0 ? "mt-1 block text-xs text-rose-600" : "mt-1 block text-xs text-slate-500"}>
+            <span className={net < 0 ? "mt-1 block text-xs text-rose-700" : "mt-1 block text-xs text-slate-500"}>
               {net < 0 ? "El tax no puede superar el importe" : `Sin tax: ${currency} ${fmt(net)}. La comisión en % se calcula sobre este valor.`}
             </span>
           )
@@ -194,7 +195,7 @@ export function ReservationTravelers({ travelers, selected, required }: { travel
 
   return (
     <fieldset ref={ref}>
-      <legend className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">Viajeros incluidos{required && " *"}</legend>
+      <legend className="mb-2 text-xs font-semibold text-slate-500">Viajeros incluidos{required && " *"}</legend>
       {travelers.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {travelers.map((t) => (
@@ -209,7 +210,7 @@ export function ReservationTravelers({ travelers, selected, required }: { travel
         </div>
       )}
       {rows.map((row) => (
-        <div key={row} className="mt-3 grid gap-2 rounded-lg border border-dashed border-slate-300 p-3 sm:grid-cols-[1fr_1fr_10rem_7rem_1fr_auto]">
+        <div key={row} className="mt-3 grid grid-cols-1 gap-2 rounded-lg border border-dashed border-slate-300 p-3 sm:grid-cols-[1fr_1fr_10rem_7rem_1fr_auto]">
           <label className="block">
             <span className="label">Nombre *</span>
             <input name="newFirstName" required className="field" />
@@ -220,7 +221,7 @@ export function ReservationTravelers({ travelers, selected, required }: { travel
           </label>
           <label className="block">
             <span className="label">Nacimiento</span>
-            <input type="date" name="newBirthDate" className="field" />
+            <DateInput name="newBirthDate" />
           </label>
           <label className="block">
             <span className="label">Altura (cm)</span>

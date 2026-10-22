@@ -66,7 +66,7 @@ export default async function AgencySettingsPage() {
 
       <Card>
         <CardHeader title="Datos de la agencia" description="Tus agentes los ven en su cuenta y salen en las planillas de comisiones que te mandan." />
-        <ActionForm action={updateAgency} className="grid gap-4 p-5 sm:grid-cols-2">
+        <ActionForm action={updateAgency} className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
           <Field label="Nombre">
             <Input name="name" defaultValue={agency.name} required />
           </Field>
@@ -90,7 +90,7 @@ export default async function AgencySettingsPage() {
 
       <Card>
         <CardHeader title="Mi cuenta" description={user.email} />
-        <ActionForm action={updateAgencyAccount} className="grid gap-4 p-5 sm:grid-cols-2">
+        <ActionForm action={updateAgencyAccount} className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
           <Field label="Nombre">
             <Input name="name" defaultValue={user.name} required />
           </Field>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Moon } from "lucide-react";
+import { DateInput } from "@/components/date-input";
 
 /** Noches entre dos fechas "YYYY-MM-DD" (null si falta alguna o el fin es anterior). */
 function nightsBetween(start: string, end: string) {
@@ -20,17 +21,17 @@ export function DateRangeFields({ start, end }: { start?: string; end?: string }
     <>
       <label className="block">
         <span className="label">Desde</span>
-        <input type="date" name="startDate" value={from} onChange={(e) => setFrom(e.target.value)} className="field" />
+        <DateInput name="startDate" value={from} onChange={setFrom} />
       </label>
       <label className="block">
         <span className="label">Hasta</span>
-        <input type="date" name="endDate" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} className="field" />
+        <DateInput name="endDate" value={to} min={from || undefined} onChange={setTo} />
         {nights !== null && (
           <span className="mt-1 flex items-center gap-1 text-xs font-medium text-brand-700">
             <Moon className="size-3.5" /> {nights === 0 ? "Mismo día (sin noches)" : `${nights} ${nights === 1 ? "noche" : "noches"}`}
           </span>
         )}
-        {backwards && <span className="mt-1 block text-xs text-rose-600">La fecha de fin es anterior a la de inicio</span>}
+        {backwards && <span className="mt-1 block text-xs text-rose-700">La fecha de fin es anterior a la de inicio</span>}
       </label>
     </>
   );

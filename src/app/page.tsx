@@ -13,7 +13,7 @@ const FEATURES = [
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-brand-900 via-brand-700 to-fuchsia-600 text-white">
+    <div className="min-h-screen bg-brand-800 text-white">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
         <div className="flex items-center gap-2 text-lg font-semibold">
           <Sparkles className="size-5" /> CRM Mágico
@@ -39,10 +39,10 @@ export default function Home() {
             Crear cuenta gratis
           </Link>
         </div>
-        <div className="mt-20 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-20 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((f) => (
-            <div key={f.title} className="rounded-2xl bg-white/10 p-6 backdrop-blur">
-              <f.icon className="size-6 text-fuchsia-200" />
+            <div key={f.title} className="rounded-2xl bg-white/10 p-6">
+              <f.icon className="size-6 text-brand-200" />
               <h3 className="mt-3 font-semibold">{f.title}</h3>
               <p className="mt-1 text-sm text-white/75">{f.text}</p>
             </div>

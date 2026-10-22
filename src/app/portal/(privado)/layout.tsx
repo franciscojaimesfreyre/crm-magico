@@ -12,34 +12,35 @@ export default async function PortalLayout({ children }: { children: React.React
     db.message.count({ where: { clientId: account.clientId, senderType: { not: "CLIENT" }, readByClientAt: null } }),
   ]);
   return (
-    <div className="min-h-screen bg-[#faf8f5]">
-      <header className="sticky top-0 z-20 text-white shadow-sm" style={{ backgroundColor: "#0f172a" }}>
+    <div className="min-h-screen bg-[var(--ground)]">
+      {/* Barra clara con la marca de la agencia (su logo o su inicial en su color). */}
+      <header className="sticky top-0 z-20 bg-[var(--ground)]">
         <div className="mx-auto flex h-16 max-w-3xl items-center justify-between px-4">
-          <Link href="/portal" className="flex items-center gap-2 font-semibold">
+          <Link href="/portal" className="flex min-w-0 items-center gap-2.5 font-semibold text-slate-900">
             {org.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={org.logoUrl} alt={org.name} className="h-8 w-auto" />
             ) : (
-              <span className="flex size-8 items-center justify-center rounded-lg text-sm" style={{ backgroundColor: org.primaryColor }}>
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg text-sm text-white" style={{ backgroundColor: org.primaryColor }}>
                 {org.name[0]}
               </span>
             )}
             <span className="truncate">{org.name}</span>
           </Link>
-          <nav className="flex items-center gap-4">
-            <Link href="/portal/mensajes" className="relative text-white/80 hover:text-white" title="Mensajes">
+          <nav className="flex items-center gap-1">
+            <Link href="/portal/mensajes" className="relative grid size-10 place-items-center rounded-md text-slate-600 hover:bg-[var(--raised)] hover:text-slate-900" title="Mensajes">
               <MessageCircle className="size-5" />
               {unreadMessages > 0 && <Dot n={unreadMessages} />}
             </Link>
-            <Link href="/portal/notificaciones" className="relative text-white/80 hover:text-white" title="Novedades">
+            <Link href="/portal/notificaciones" className="relative grid size-10 place-items-center rounded-md text-slate-600 hover:bg-[var(--raised)] hover:text-slate-900" title="Novedades">
               <Bell className="size-5" />
               {unreadNotifications > 0 && <Dot n={unreadNotifications} />}
             </Link>
-            <Link href="/portal/perfil" className="text-white/80 hover:text-white" title="Mi familia y preferencias">
+            <Link href="/portal/perfil" className="grid size-10 place-items-center rounded-md text-slate-600 hover:bg-[var(--raised)] hover:text-slate-900" title="Mi familia y preferencias">
               <UserRound className="size-5" />
             </Link>
             <form action={logoutPortal}>
-              <button className="text-white/60 hover:text-white" title="Salir">
+              <button className="grid size-10 place-items-center rounded-md text-slate-500 hover:bg-[var(--raised)] hover:text-slate-900" title="Salir" aria-label="Salir">
                 <LogOut className="size-4" />
               </button>
             </form>
@@ -47,7 +48,7 @@ export default async function PortalLayout({ children }: { children: React.React
         </div>
       </header>
       <main className="mx-auto max-w-3xl px-4 py-6">{children}</main>
-      <footer className="pb-8 text-center text-xs text-slate-400">
+      <footer className="pb-8 text-center text-xs text-[var(--ink-soft)]">
         {org.name}
         {org.contactPhone && ` · ${org.contactPhone}`}
         {org.contactEmail && ` · ${org.contactEmail}`}
@@ -57,5 +58,5 @@ export default async function PortalLayout({ children }: { children: React.React
 }
 
 function Dot({ n }: { n: number }) {
-  return <span className="absolute -top-1.5 -right-2 rounded-full bg-rose-500 px-1 text-[10px] font-semibold">{n}</span>;
+  return <span className="absolute top-1 right-0.5 min-w-4 rounded-full bg-brand-600 px-1 text-center text-[11px] leading-4 font-semibold text-white">{n}</span>;
 }

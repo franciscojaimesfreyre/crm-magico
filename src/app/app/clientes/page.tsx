@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Search } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { Badge, Card, EmptyState, LinkButton, PageHeader, Table, Td, Th } from "@/components/ui";
+import { Avatar, Badge, Card, EmptyState, LinkButton, PageHeader, Table, Td, Th } from "@/components/ui";
 import { AT_RISK_MONTHS, tierFor } from "@/lib/clients";
 import { formatDate, money } from "@/lib/format";
 import type { Prisma } from "@/generated/prisma/client";
@@ -78,7 +78,7 @@ export default async function ClientsPage({
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <form className="relative min-w-64 flex-1">
-          <Search className="absolute top-2.5 left-3 size-4 text-slate-400" />
+          <Search className="absolute top-2.5 left-3 size-4 text-slate-500" />
           <input name="q" defaultValue={q} placeholder="Buscar por nombre, email, teléfono o etiqueta" className="field pl-9" />
           {lista && <input type="hidden" name="lista" value={lista} />}
         </form>
@@ -121,7 +121,7 @@ export default async function ClientsPage({
       ) : (
         <Card>
           <Table>
-            <thead className="bg-slate-50">
+            <thead>
               <tr>
                 <Th>Nombre</Th>
                 <Th>Contacto</Th>
@@ -143,10 +143,15 @@ export default async function ClientsPage({
                 return (
                   <tr key={c.id} className="hover:bg-slate-50">
                     <Td>
-                      <Link href={`/app/clientes/${c.id}`} className="font-medium text-slate-900 hover:text-brand-700">
-                        {c.firstName} {c.lastName}
-                      </Link>
-                      {tier && <Badge className={clsx("ml-2", tier.className)}>{tier.name}</Badge>}
+                      <div className="flex items-center gap-3">
+                        <Avatar name={`${c.firstName} ${c.lastName}`} />
+                        <div className="min-w-0">
+                          <Link href={`/app/clientes/${c.id}`} className="font-medium text-slate-900 hover:text-brand-700">
+                            {c.firstName} {c.lastName}
+                          </Link>
+                          {tier && <Badge className={clsx("ml-2", tier.className)}>{tier.name}</Badge>}
+                        </div>
+                      </div>
                     </Td>
                     <Td className="text-xs">
                       <div>{c.email ?? "—"}</div>
@@ -157,13 +162,13 @@ export default async function ClientsPage({
                         {c.tags.slice(0, 3).map((t) => (
                           <Badge key={t}>{t}</Badge>
                         ))}
-                        {c.tags.length > 3 && <span className="text-xs text-slate-400">+{c.tags.length - 3}</span>}
+                        {c.tags.length > 3 && <span className="text-xs text-slate-500">+{c.tags.length - 3}</span>}
                       </div>
                     </Td>
                     <Td className="text-right">{sold.length}</Td>
                     <Td className="text-right">{value ? money(value) : "—"}</Td>
                     <Td className="text-xs">{next ? formatDate(next.startDate) : "—"}</Td>
-                    <Td>{c.account ? <Badge className="bg-emerald-100 text-emerald-800">Activo</Badge> : <span className="text-xs text-slate-400">No</span>}</Td>
+                    <Td>{c.account ? <Badge className="bg-emerald-100 text-emerald-800">Activo</Badge> : <span className="text-xs text-slate-500">No</span>}</Td>
                   </tr>
                 );
               })}

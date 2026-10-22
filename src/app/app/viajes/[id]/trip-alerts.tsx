@@ -19,7 +19,9 @@ function overlapText(a: TripAlert) {
  * que pueden complicar, y eventos, aperturas o promos que pueden sumar.
  */
 export function TripAlerts({ alerts }: { alerts: TripAlert[] }) {
-  const warnings = alerts.filter((a) => a.warning).length;
+  const warningsList = alerts.filter((a) => a.warning);
+  const others = alerts.filter((a) => !a.warning);
+  const warnings = warningsList.length;
   return (
     <Card className="xl:col-span-2">
       <CardHeader
@@ -41,43 +43,62 @@ export function TripAlerts({ alerts }: { alerts: TripAlert[] }) {
         }
       />
       {alerts.length === 0 ? (
-        <p className="p-5 text-sm text-slate-500">No hay novedades con fechas que se crucen con este viaje.</p>
+        <p className="p-5 text-sm text-[var(--ink-soft)]">No hay novedades con fechas que se crucen con este viaje.</p>
       ) : (
-        <ul className="divide-y divide-slate-100">
-          {alerts.map((a) => {
-            const Icon = a.warning ? AlertTriangle : Info;
-            return (
-              <li key={a.item.id}>
-                <details className="group px-5 py-3">
-                  <summary className="flex cursor-pointer list-none items-start gap-3">
-                    <span className={clsx("mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full", a.warning ? "bg-amber-100 text-amber-700" : "bg-sky-100 text-sky-700")}>
-                      <Icon className="size-4" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-medium text-slate-800">{a.item.title}</span>
-                      <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
-                        <Badge className={a.warning ? "bg-amber-50 text-amber-800" : "bg-sky-50 text-sky-800"}>{KNOWLEDGE_CATEGORY_LABEL[a.item.category]}</Badge>
-                        <span className={clsx(a.warning && "font-medium text-amber-800")}>{overlapText(a)}</span>
-                        {a.item.park && <span>· {a.item.park}</span>}
-                      </span>
-                    </span>
-                    <span className="shrink-0 pt-1 text-xs text-brand-700 group-open:hidden">Ver más</span>
-                    <span className="hidden shrink-0 pt-1 text-xs text-slate-500 group-open:inline">Ocultar</span>
-                  </summary>
-                  <div className="mt-2 ml-10 text-sm whitespace-pre-line text-slate-600">
-                    {a.item.content}
-                    {a.item.sourceUrl && (
-                      <a href={a.item.sourceUrl} target="_blank" rel="noreferrer" className="mt-1 block text-xs text-brand-700 hover:underline">
-                        Fuente
-                      </a>
-                    )}
-                  </div>
-                </details>
-              </li>
-            );
-          })}
-        </ul>
+        <>
+          {/* A la vista, lo que puede complicar el viaje; los eventos y aperturas, plegados en una línea. */}
+          {warningsList.length > 0 && <ul className="divide-y divide-[var(--rule)]">{warningsList.map((a) => <AlertRow key={a.item.id} alert={a} />)}</ul>}
+          {others.length > 0 && (
+            <details className="group border-t border-[var(--rule)]">
+              <summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-3 text-sm text-slate-700 hover:bg-[var(--raised)]">
+                <Info className="size-4 shrink-0 text-sky-700" />
+                <span className="flex-1">
+                  {others.length} {others.length === 1 ? "evento, apertura o promoción" : "eventos, aperturas y promociones"} en estas fechas
+                </span>
+                <span className="text-[13px] font-medium text-brand-700 group-open:hidden">Mostrar</span>
+                <span className="hidden text-[13px] text-[var(--ink-soft)] group-open:inline">Ocultar</span>
+              </summary>
+              <ul className="divide-y divide-[var(--rule)] border-t border-[var(--rule)]">
+                {others.map((a) => (
+                  <AlertRow key={a.item.id} alert={a} />
+                ))}
+              </ul>
+            </details>
+          )}
+        </>
       )}
     </Card>
+  );
+}
+
+function AlertRow({ alert: a }: { alert: TripAlert }) {
+  const Icon = a.warning ? AlertTriangle : Info;
+  return (
+    <li>
+      <details className="group px-5 py-3">
+        <summary className="flex cursor-pointer list-none items-start gap-3">
+          <Icon className={clsx("mt-0.5 size-4 shrink-0", a.warning ? "text-amber-700" : "text-sky-700")} />
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-medium text-slate-900">{a.item.title}</span>
+            <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-[var(--ink-soft)]">
+              <span>{KNOWLEDGE_CATEGORY_LABEL[a.item.category]}</span>
+              <span>·</span>
+              <span className={clsx(a.warning && "font-medium text-amber-900")}>{overlapText(a)}</span>
+              {a.item.park && <span>· {a.item.park}</span>}
+            </span>
+          </span>
+          <span className="shrink-0 pt-0.5 text-[13px] font-medium text-brand-700 group-open:hidden">Ver más</span>
+          <span className="hidden shrink-0 pt-0.5 text-[13px] text-[var(--ink-soft)] group-open:inline">Ocultar</span>
+        </summary>
+        <div className="mt-2 ml-7 text-sm whitespace-pre-line text-slate-700">
+          {a.item.content}
+          {a.item.sourceUrl && (
+            <a href={a.item.sourceUrl} target="_blank" rel="noreferrer" className="mt-1 block text-[13px] font-medium text-brand-700 hover:underline">
+              Fuente
+            </a>
+          )}
+        </div>
+      </details>
+    </li>
   );
 }

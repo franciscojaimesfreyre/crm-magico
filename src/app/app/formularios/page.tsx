@@ -21,9 +21,9 @@ export default async function FormsPage() {
       <PageHeader title="Formularios" description="Fichas de la familia, encuestas post-viaje, referidos… Cada formulario tiene un link público; las respuestas quedan acá." />
       <Card className="mb-6">
         <CardHeader title="Crear desde una plantilla" />
-        <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
           {FORM_TEMPLATES.map((t) => (
-            <form key={t.key} action={createForm} className="flex flex-col rounded-xl border border-slate-200 p-4">
+            <form key={t.key} action={createForm} className="flex flex-col rounded-lg border border-slate-200 p-4">
               <input type="hidden" name="template" value={t.key} />
               <p className="font-medium text-slate-900">{t.title}</p>
               <p className="mb-3 flex-1 text-xs text-slate-500">{t.description || "Empezá de cero."}</p>

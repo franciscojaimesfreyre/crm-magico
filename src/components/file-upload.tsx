@@ -59,7 +59,7 @@ export function FileUpload({ direct }: { direct: boolean }) {
             <Loader2 className="size-3.5 animate-spin" /> Subiendo… {state.progress}%
           </p>
           <div className="mt-1 h-1 overflow-hidden rounded bg-slate-100">
-            <div className="h-full bg-brand-500 transition-all" style={{ width: `${state.progress}%` }} />
+            <div className="h-full bg-brand-500 transition-[width]" style={{ width: `${state.progress}%` }} />
           </div>
         </>
       )}
@@ -72,7 +72,7 @@ export function FileUpload({ direct }: { direct: boolean }) {
           </p>
         </>
       )}
-      {state.status === "error" && <p className="mt-1 text-xs text-rose-600">{state.message}</p>}
+      {state.status === "error" && <p className="mt-1 text-xs text-rose-700">{state.message}</p>}
     </div>
   );
 }
@@ -145,20 +145,20 @@ export function MultiFileUpload({ direct }: { direct: boolean }) {
         <ul className="mt-2 space-y-1">
           {files.map((f) => (
             <li key={f.id} className="flex items-center gap-2 text-xs">
-              {f.status === "uploading" && <Loader2 className="size-3.5 shrink-0 animate-spin text-slate-400" />}
+              {f.status === "uploading" && <Loader2 className="size-3.5 shrink-0 animate-spin text-slate-500" />}
               {f.status === "done" && (
                 <>
-                  <CheckCircle2 className="size-3.5 shrink-0 text-emerald-600" />
+                  <CheckCircle2 className="size-3.5 shrink-0 text-emerald-700" />
                   <input type="hidden" name="uploadKeys" value={f.key} />
                   <input type="hidden" name="uploadNames" value={f.name} />
                 </>
               )}
-              <span className={f.status === "error" ? "truncate text-rose-600" : "truncate text-slate-700"}>
+              <span className={f.status === "error" ? "truncate text-rose-700" : "truncate text-slate-700"}>
                 {f.name}
                 {f.status === "uploading" && ` · ${f.progress}%`}
                 {f.status === "error" && ` · ${f.message}`}
               </span>
-              <button type="button" onClick={() => setFiles((list) => list.filter((x) => x.id !== f.id))} className="ml-auto text-slate-400 hover:text-rose-600">
+              <button type="button" onClick={() => setFiles((list) => list.filter((x) => x.id !== f.id))} className="ml-auto text-slate-500 hover:text-rose-600">
                 Quitar
               </button>
             </li>

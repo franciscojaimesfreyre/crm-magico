@@ -26,7 +26,7 @@ export default async function LibraryPage() {
         title="Biblioteca de documentos"
         description="Guías, checklists y políticas que reutilizás. Se adjuntan a cualquier viaje con un clic desde la pestaña Documentos."
       />
-      <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_340px]">
         <div className="space-y-6">
           {docs.length === 0 && <EmptyState title="Tu biblioteca está vacía" description="Subí tu checklist de equipaje, la guía de Lightning Lane, requisitos de pasaporte…" />}
           {[...folders.entries()].map(([folder, list]) => (
@@ -36,7 +36,7 @@ export default async function LibraryPage() {
                 {list.map((d) => (
                   <li key={d.id} className="flex items-center justify-between gap-3 px-5 py-3">
                     <div className="flex min-w-0 items-center gap-3">
-                      <FileText className="size-5 shrink-0 text-slate-400" />
+                      <FileText className="size-5 shrink-0 text-slate-500" />
                       <div className="min-w-0">
                         <a href={d.storageKey ? `/api/archivos/${d.id}?lib=1` : (d.url ?? "#")} target="_blank" className="block truncate text-sm font-medium text-slate-800 hover:text-brand-700">
                           {d.name} {!d.storageKey && <ExternalLink className="inline size-3" />}

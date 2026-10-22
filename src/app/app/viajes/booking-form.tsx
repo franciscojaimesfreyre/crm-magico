@@ -31,7 +31,7 @@ export function BookingForm({
     <ActionForm action={action} className="space-y-6">
       <Card>
         <CardHeader title="Viaje" />
-        <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3">
           {clients && (
             <Field label="Cliente *" className="lg:col-span-2">
               <Select name="clientId" options={clients} defaultValue={defaultClientId} placeholder="Elegí un cliente" required />
@@ -72,7 +72,7 @@ export function BookingForm({
 
       <Card>
         <CardHeader title="Notas" />
-        <div className="grid gap-4 p-5 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
           <Field label="Notas internas" hint="Solo las ves vos. La IA las usa para el itinerario">
             <Textarea name="notes" defaultValue={n(booking?.notes)} rows={4} />
           </Field>

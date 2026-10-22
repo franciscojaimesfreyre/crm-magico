@@ -32,9 +32,9 @@ export default async function SharedItinerary({ params }: Props) {
   if (!b || b.status === "CANCELLED") notFound();
   const days = b.days.length ? b.days : (b.group?.days ?? []);
   return (
-    <div className="min-h-screen bg-[#faf8f5] px-4 py-8">
+    <div className="min-h-screen bg-[var(--ground)] px-4 py-8">
       <div className="mx-auto max-w-3xl">
-        <header className="mb-6 rounded-3xl bg-gradient-to-br from-brand-800 to-fuchsia-700 p-6 text-white">
+        <header className="mb-6 rounded-2xl bg-brand-800 p-6 text-white">
           <p className="text-sm text-white/70">{b.organization.name}</p>
           <h1 className="text-2xl font-semibold">{b.title}</h1>
           <p className="text-white/80">

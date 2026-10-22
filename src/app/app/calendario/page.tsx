@@ -11,9 +11,9 @@ import { appUrl } from "@/lib/app-url";
 export const metadata = { title: "Calendario" };
 
 const KIND_STYLE: Record<CalendarEvent["kind"], string> = {
-  trip: "bg-brand-100 text-brand-800",
-  keydate: "bg-amber-100 text-amber-800",
-  task: "bg-slate-100 text-slate-700",
+  trip: "bg-brand-600 font-semibold text-white",
+  keydate: "bg-amber-100 text-amber-900",
+  task: "bg-sky-100 text-sky-800",
 };
 const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
@@ -59,8 +59,22 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
           </div>
         }
       />
+      <ul className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-slate-700" aria-label="Referencias">
+        {(
+          [
+            ["trip", "Salidas y regresos"],
+            ["keydate", "Fechas clave (reservas, pagos, vuelos)"],
+            ["task", "Tareas"],
+          ] as const
+        ).map(([kind, label]) => (
+          <li key={kind} className="flex items-center gap-1.5">
+            <span className={clsx("size-3 rounded-[4px]", KIND_STYLE[kind])} />
+            {label}
+          </li>
+        ))}
+      </ul>
       <Card className="overflow-hidden">
-        <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50 text-center text-xs font-medium text-slate-500">
+        <div className="grid grid-cols-7 border-b border-[var(--border)] text-center text-xs font-medium text-[var(--ink-soft)]">
           {WEEKDAYS.map((d) => (
             <div key={d} className="py-2">
               {d}
@@ -75,16 +89,16 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
             const isToday = key === today.toISOString().slice(0, 10);
             return (
               <div key={key} className={clsx("min-h-28 border-r border-b border-slate-100 p-1.5", !inMonth && "bg-slate-50/60")}>
-                <p className={clsx("mb-1 text-right text-xs", isToday ? "font-bold text-brand-700" : inMonth ? "text-slate-500" : "text-slate-300")}>
+                <p className={clsx("mb-1 text-right text-xs tabular-nums", isToday ? "font-bold text-brand-700" : inMonth ? "text-slate-500" : "text-slate-300")}>
                   {isToday ? <span className="rounded-full bg-brand-600 px-1.5 py-0.5 text-white">{d.getUTCDate()}</span> : d.getUTCDate()}
                 </p>
                 <div className="space-y-1">
                   {list.slice(0, 4).map((e) => (
-                    <Link key={e.id} href={e.href} className={clsx("block truncate rounded px-1.5 py-0.5 text-[11px]", KIND_STYLE[e.kind])} title={e.title}>
+                    <Link key={e.id} href={e.href} className={clsx("block truncate rounded-md px-1.5 py-0.5 text-xs", KIND_STYLE[e.kind])} title={e.title}>
                       {e.title}
                     </Link>
                   ))}
-                  {list.length > 4 && <p className="px-1 text-[11px] text-slate-400">+{list.length - 4} más</p>}
+                  {list.length > 4 && <p className="px-1 text-xs text-slate-500">+{list.length - 4} más</p>}
                 </div>
               </div>
             );
@@ -95,7 +109,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         <div>
           <p className="font-medium text-slate-800">Sincronizá con Google, Apple u Outlook</p>
           <p className="text-xs text-slate-500">Suscribite a este link desde tu calendario (“Agregar calendario desde URL”). Es privado: no lo compartas.</p>
-          <code className="mt-1 block text-xs text-slate-600">{icalUrl}</code>
+          <code className="mt-1 block text-xs break-all text-slate-700">{icalUrl}</code>
         </div>
         <CopyText text={icalUrl} label="Copiar link" />
       </Card>

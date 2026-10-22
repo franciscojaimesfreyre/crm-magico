@@ -19,9 +19,9 @@ import type { ParkSheet, SectionKind, SheetSection } from "@/lib/park-sheet";
 
 const SECTION_STYLE: Record<SectionKind, { icon: LucideIcon; tone: string }> = {
   MUST_DO: { icon: Star, tone: "bg-rose-100 text-rose-700" },
-  CLASSICS: { icon: Castle, tone: "bg-violet-100 text-violet-700" },
+  CLASSICS: { icon: Castle, tone: "bg-brand-100 text-brand-800" },
   MILD: { icon: CircleCheck, tone: "bg-emerald-100 text-emerald-700" },
-  SHOWS: { icon: Drama, tone: "bg-fuchsia-100 text-fuchsia-700" },
+  SHOWS: { icon: Drama, tone: "bg-brand-50 text-brand-700" },
   CHARACTERS: { icon: Smile, tone: "bg-pink-100 text-pink-700" },
   DINING: { icon: UtensilsCrossed, tone: "bg-amber-100 text-amber-700" },
   SNACKS: { icon: IceCreamCone, tone: "bg-orange-100 text-orange-700" },
@@ -57,23 +57,23 @@ export function ParkSheetCard({
   const tips = sheet.sections.filter((s) => s.kind === "TIPS");
   const rest = sheet.sections.filter((s) => s.kind !== "TIPS");
   return (
-    <div className={clsx("overflow-hidden rounded-xl bg-white/90 ring-1", event ? "ring-indigo-200" : "ring-slate-200/70")}>
+    <div className={clsx("overflow-hidden rounded-lg bg-white/90 ring-1", event ? "ring-amber-200" : "ring-slate-200/70")}>
       {event && (
-        <p className="flex items-center gap-1.5 bg-gradient-to-r from-indigo-600 to-fuchsia-600 px-3 py-1.5 text-xs font-semibold text-white">
+        <p className="flex items-center gap-1.5 bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-950">
           <PartyPopper className="size-3.5" /> Evento especial · {sheet.name}
           {sheet.park && <span className="font-normal text-white/80">en {sheet.park}</span>}
         </p>
       )}
       <div className="p-3">
         {facts.length > 0 && (
-          <div className="grid gap-2 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             {facts.map((f) => (
               <div key={f.label} className="flex items-center gap-2 rounded-lg bg-slate-50 px-2.5 py-2">
-                <span className={clsx("grid size-7 shrink-0 place-items-center rounded-full", event ? "bg-indigo-100 text-indigo-700" : "bg-brand-100 text-brand-700")}>
+                <span className={clsx("grid size-7 shrink-0 place-items-center rounded-full", event ? "bg-amber-100 text-amber-800" : "bg-brand-100 text-brand-700")}>
                   <f.icon className="size-3.5" />
                 </span>
                 <div className="min-w-0">
-                  <p className="text-[10px] font-semibold tracking-wide text-slate-500 uppercase">{f.label}</p>
+                  <p className="text-xs font-semibold text-slate-500">{f.label}</p>
                   <p className="text-sm leading-tight font-medium text-slate-900">{f.value}</p>
                 </div>
               </div>
@@ -90,7 +90,7 @@ export function ParkSheetCard({
         )}
         {tips.map((s, i) => (
           <div key={i} className="mt-3 rounded-lg bg-amber-50/80 p-2.5">
-            <p className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-amber-800 uppercase">
+            <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-800">
               <Lightbulb className="size-3.5" /> {s.title}
             </p>
             <ul className="mt-1.5 space-y-1">
@@ -117,7 +117,7 @@ function Section({ section: s, closedNote }: { section: SheetSection; closedNote
   const numbered = NUMBERED.includes(s.kind);
   return (
     <div className="rounded-lg bg-slate-50/80 p-2.5">
-      <p className="flex items-center gap-2 text-xs font-semibold tracking-wide text-slate-700 uppercase">
+      <p className="flex items-center gap-2 text-xs font-semibold text-slate-700">
         <span className={clsx("grid size-6 shrink-0 place-items-center rounded-full", tone)}>
           <Icon className="size-3.5" />
         </span>
@@ -134,8 +134,8 @@ function Section({ section: s, closedNote }: { section: SheetSection; closedNote
                 <span className={clsx("mt-1.5 size-1.5 shrink-0 rounded-full", closed ? "bg-slate-300" : tone.split(" ")[0])} />
               )}
               <span className="min-w-0 flex-1">
-                <span className={clsx("font-medium", closed ? "text-slate-400 line-through" : "text-slate-900")}>{it.name}</span>
-                {it.time && !closed && <span className="ml-1.5 text-xs font-semibold text-fuchsia-700">{it.time}</span>}
+                <span className={clsx("font-medium", closed ? "text-slate-500 line-through" : "text-slate-900")}>{it.name}</span>
+                {it.time && !closed && <span className="ml-1.5 text-xs font-semibold text-brand-700">{it.time}</span>}
                 {closed ? (
                   <span className="mt-0.5 block w-fit rounded bg-rose-50 px-1.5 py-px text-[11px] font-medium text-rose-700">{closed}</span>
                 ) : (

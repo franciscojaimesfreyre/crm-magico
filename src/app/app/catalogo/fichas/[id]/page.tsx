@@ -49,13 +49,13 @@ export default async function ParkGuidePage({ params }: { params: Promise<{ id: 
         <>
           <p className="mb-3 text-sm text-slate-500">Así aparece en los itinerarios. En cada itinerario la podés editar para ese viaje.</p>
           {upcoming.length > 0 && (
-            <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4">
+            <div className="mb-4 rounded-lg border border-slate-200 bg-white p-4">
               <p className="mb-2 text-sm font-semibold text-slate-900">{guide.kind === "EVENT" ? "Próximas fechas" : "Horarios de los próximos días"}</p>
               {[upcoming.slice(0, VISIBLE_DAYS), upcoming.slice(VISIBLE_DAYS)].map(
                 (days, i) =>
                   days.length > 0 && (
                     <Wrap key={i} more={i === 1 ? days.length : 0}>
-                      <ul className="grid gap-x-4 gap-y-1.5 text-sm sm:grid-cols-2">
+                      <ul className="grid grid-cols-1 gap-x-4 gap-y-1.5 text-sm sm:grid-cols-2">
                         {days.map((d) => (
                           <li key={d.date}>
                             <div className="flex flex-wrap gap-x-2">

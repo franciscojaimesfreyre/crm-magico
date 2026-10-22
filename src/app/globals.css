@@ -1,35 +1,306 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
+/*
+ * CRM Mágico — sistema visual (estilo "framed sheet" con la referencia de Collective OS).
+ * Un marco crema que sostiene el menú y la barra superior; el trabajo, en una hoja blanca con
+ * esquinas grandes. Tarjetas blancas con borde fino y sombra muy suave, botones en píldora (el
+ * principal casi negro), títulos en Inter bold con tracking cerrado. El color va en los datos
+ * (turquesa) y en los estados (pasteles). Solo modo claro.
+ */
 @theme inline {
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --color-brand-50: #f5f3ff;
-  --color-brand-100: #ede9fe;
-  --color-brand-200: #ddd6fe;
-  --color-brand-300: #c4b5fd;
-  --color-brand-400: #a78bfa;
-  --color-brand-500: #8b5cf6;
-  --color-brand-600: #7c3aed;
-  --color-brand-700: #6d28d9;
-  --color-brand-800: #5b21b6;
-  --color-brand-900: #2e1065;
-  --color-ink: #0f172a;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-display);
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  /* Marca: turquesa. 600 en acciones, vínculos y lo activo; 50-200 en áreas; 700-900 tinta del color. */
+  --color-brand-50: #ecf8f6;
+  --color-brand-100: #d2f0eb;
+  --color-brand-200: #a8e1d8;
+  --color-brand-300: #6fcabd;
+  --color-brand-400: #36ad9e;
+  --color-brand-500: #189385;
+  --color-brand-600: #0e7c70;
+  --color-brand-700: #0b6359;
+  --color-brand-800: #0a4f48;
+  --color-brand-900: #083f3a;
+
+  --color-data-50: #e7f6f3;
+  --color-data-100: #cdeee8;
+  --color-data-500: #2bb3a3;
+  --color-data-600: #1f9e8f;
+  --color-data-700: #167a6f;
+
+  /* Grises cálidos, de la familia del crema. 500 en adelante pasa 4.5:1 sobre blanco y sobre el crema. */
+  --color-slate-50: #faf9f6;
+  --color-slate-100: #f3f1ec;
+  --color-slate-200: #e9e5dd;
+  --color-slate-300: #d6d1c7;
+  --color-slate-400: #a9a49b;
+  --color-slate-500: #6e6b66;
+  --color-slate-600: #57544f;
+  --color-slate-700: #424040;
+  --color-slate-800: #2d2d2f;
+  --color-slate-900: #1d1d1f;
+  --color-slate-950: #111112;
+
+  --color-ink: #2d2d2f;
+  --color-ground: #f6f3ec;
+
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.125rem;
+
+  /* Variables de shadcn (las usan los componentes de React Bits), mapeadas a esta paleta. */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
 }
 
-body {
-  background: #f8fafc;
-  color: #0f172a;
+:root {
+  --ground: #f6f3ec; /* el marco */
+  --sheet: #ffffff; /* la hoja */
+  --surface: #ffffff;
+  --raised: #f7f5f0; /* cajas internas */
+  --rule: #f1eee8;
+  --control: #dcd7cd;
+  --text: #2d2d2f;
+  --ink-soft: #6e6b66;
+  --field: #0e7c70;
+  --card-shadow: 0 1px 2px rgb(45 45 47 / 0.04), 0 10px 24px -14px rgb(45 45 47 / 0.12);
+
+  --background: #f6f3ec;
+  --foreground: #2d2d2f;
+  --card: #ffffff;
+  --card-foreground: #2d2d2f;
+  --popover: #ffffff;
+  --popover-foreground: #2d2d2f;
+  --primary: #0e7c70;
+  --primary-foreground: #ffffff;
+  --secondary: #f7f5f0;
+  --secondary-foreground: #2d2d2f;
+  --muted: #f7f5f0;
+  --muted-foreground: #6e6b66;
+  --accent: #f3f1ec;
+  --accent-foreground: #2d2d2f;
+  --destructive: #c4242a;
+  --border: #ebe7df;
+  --input: #dcd7cd;
+  --ring: #189385;
+  --radius: 16px;
 }
 
-/* Inputs nativos coherentes en todo el sistema */
-.field {
-  @apply block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-xs placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none disabled:bg-slate-100;
+@layer base {
+  input[type="checkbox"],
+  input[type="radio"] {
+    accent-color: var(--color-brand-600);
+  }
+  * {
+    @apply border-border;
+  }
+  html {
+    @apply font-sans;
+  }
+  body {
+    background: var(--ground);
+    color: var(--text);
+    font-size: 14px;
+  }
+  h1,
+  h2,
+  h3 {
+    font-weight: 700;
+    letter-spacing: -0.025em;
+  }
 }
 
-.label {
-  @apply mb-1 block text-xs font-medium text-slate-600;
+/* Cifras alineadas en tablas, montos y todo lo que se actualiza. */
+.num,
+td,
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Cifras grandes: bold, tracking cerrado, decimales en gris (ver .figure-dec). */
+.figure {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+}
+.figure-dec {
+  color: var(--color-slate-400);
+  font-weight: 600;
+}
+
+@layer components {
+  /* Campos nativos: blancos, borde de 1px, sin sombra. */
+  .field {
+    @apply block w-full rounded-[10px] border bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-[#6e6b66] focus:border-brand-500 focus:ring-3 focus:ring-brand-100 focus:outline-none disabled:bg-[var(--raised)] disabled:text-slate-600;
+    border-color: var(--control);
+    min-height: 38px;
+  }
+
+  .label {
+    @apply mb-1.5 block text-[13px] font-medium text-slate-800;
+  }
+
+  /*
+   * Ticket: la forma de un viaje. Talón a la izquierda separado por una perforación (la línea
+   * punteada es el corte del ticket, no un adorno) y dos muescas en los bordes.
+   */
+  .ticket {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    box-shadow: var(--card-shadow);
+  }
+  .ticket-stub {
+    position: relative;
+    border-right: 2px dashed var(--border);
+  }
+  /* Las muescas: dos círculos del color de fondo que muerden el borde del ticket. */
+  .ticket-stub::before,
+  .ticket-stub::after {
+    content: "";
+    position: absolute;
+    right: -12px;
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    background: var(--ticket-cut, var(--sheet));
+  }
+  .ticket-stub::before {
+    top: -12px;
+  }
+  .ticket-stub::after {
+    bottom: -12px;
+  }
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-data-600);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--color-data-100);
 }
 
 .prose-msg p + p {
   margin-top: 0.75rem;
+}
+
+/*
+ * Movimiento: respuesta a lo que se hace (apretar, abrir un desplegable, un menú o un diálogo) y,
+ * en el inicio, las cifras que cuentan y el saludo. Solo transform y opacidad; con "reducir
+ * movimiento" quedan los cambios de color y desaparecen los desplazamientos. Tiempos y curva
+ * alineados con las recetas de transitions.dev (carpeta transitions/).
+ */
+:root {
+  --dur-fast: 120ms;
+  --dur: 250ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes t-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes t-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+@keyframes t-sheet {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+}
+
+@keyframes t-check {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+details[open] > :not(summary) {
+  animation: t-reveal var(--dur) var(--ease-out);
+}
+
+details[open] > .t-sheet {
+  animation: t-sheet var(--dur) var(--ease-out);
+}
+
+dialog[open] {
+  animation: t-pop var(--dur) var(--ease-out);
+}
+
+.t-check {
+  animation: t-check var(--dur) var(--ease-out);
+}
+
+.t-press {
+  transition:
+    background-color var(--dur-fast) ease,
+    color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    transform var(--dur-fast) var(--ease-out);
+}
+.t-press:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Un ticket se levanta apenas al pasar el mouse (es un vínculo). */
+.t-lift {
+  transition:
+    transform var(--dur) var(--ease-out),
+    border-color var(--dur-fast) ease;
+}
+.t-lift:hover {
+  transform: translateY(-2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  details[open] > :not(summary),
+  details[open] > .t-sheet,
+  dialog[open],
+  .t-check {
+    animation: none;
+  }
+  .t-press:active:not(:disabled),
+  .t-lift:hover {
+    transform: none;
+  }
 }

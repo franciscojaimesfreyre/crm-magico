@@ -5,7 +5,7 @@ import type { ScheduleEntry } from "@/lib/park-sheet";
 
 export function ThemeParksCredit({ className }: { className?: string }) {
   return (
-    <a href="https://www.themeparks.wiki/" target="_blank" rel="noreferrer" className={clsx("text-xs text-slate-400 hover:text-slate-600 hover:underline", className)}>
+    <a href="https://www.themeparks.wiki/" target="_blank" rel="noreferrer" className={clsx("text-xs text-slate-500 hover:text-slate-600 hover:underline", className)}>
       Powered by ThemeParks.wiki
     </a>
   );
@@ -25,7 +25,7 @@ export function LightningLanePrices({ entry }: { entry: ScheduleEntry }) {
       <summary className="cursor-pointer select-none hover:text-slate-700">Lightning Lane: {summary}</summary>
       <ul className="mt-1 space-y-0.5 pl-4">
         {all.map((p) => (
-          <li key={p.name} className={clsx(!p.available && "text-slate-400 line-through")} title={p.available ? undefined : "Agotado al sincronizar"}>
+          <li key={p.name} className={clsx(!p.available && "text-slate-500 line-through")} title={p.available ? undefined : "Agotado al sincronizar"}>
             {p.name.replace(/^Lightning Lane for /, "")}: {p.price}
           </li>
         ))}

@@ -2,6 +2,7 @@ import { ActionForm, SubmitButton, type ActionState } from "@/components/form-co
 import { Field, Input } from "@/components/ui";
 import { toDateInput } from "@/lib/format";
 import type { Traveler } from "@/generated/prisma/client";
+import { DateInput } from "@/components/date-input";
 
 export function TravelerForm({
   action,
@@ -13,7 +14,7 @@ export function TravelerForm({
   submitLabel: string;
 }) {
   return (
-    <ActionForm action={action} resetOnSuccess={!traveler} className="grid gap-3 sm:grid-cols-4">
+    <ActionForm action={action} resetOnSuccess={!traveler} className="grid grid-cols-1 gap-3 sm:grid-cols-4">
       <Field label="Nombre *">
         <Input name="firstName" defaultValue={traveler?.firstName} required />
       </Field>
@@ -21,7 +22,7 @@ export function TravelerForm({
         <Input name="lastName" defaultValue={traveler?.lastName ?? ""} />
       </Field>
       <Field label="Fecha de nacimiento">
-        <Input name="birthDate" type="date" defaultValue={toDateInput(traveler?.birthDate)} />
+        <DateInput name="birthDate" defaultValue={toDateInput(traveler?.birthDate)} />
       </Field>
       <Field label="Altura (cm)" hint="Para restricciones de atracciones">
         <Input name="heightCm" type="number" min={30} max={250} defaultValue={traveler?.heightCm ?? ""} />
@@ -30,7 +31,7 @@ export function TravelerForm({
         <Input name="relationship" defaultValue={traveler?.relationship ?? ""} placeholder="Hijo/a, pareja…" />
       </Field>
       <Field label="Vencimiento del pasaporte">
-        <Input name="passportExpiry" type="date" defaultValue={toDateInput(traveler?.passportExpiry)} />
+        <DateInput name="passportExpiry" defaultValue={toDateInput(traveler?.passportExpiry)} />
       </Field>
       <Field label="Alimentación">
         <Input name="dietaryNotes" defaultValue={traveler?.dietaryNotes ?? ""} />

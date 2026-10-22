@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { SelectField } from "@/components/select-field";
 
 /**
  * Comisión como porcentaje del importe o como monto fijo en la moneda del viaje.
@@ -36,19 +37,20 @@ export function CommissionInput({
           className="field min-w-0"
           style={{ borderTopRightRadius: 0, borderBottomRightRadius: 0 }}
         />
-        <select
+        <SelectField
           name="commissionMode"
           value={mode}
-          onChange={(e) => setMode(e.target.value as "percent" | "fixed")}
-          className="field"
-          style={{ width: "auto", borderTopLeftRadius: 0, borderBottomLeftRadius: 0, borderLeftWidth: 0, background: "#f8fafc" }}
+          onValueChange={(v) => setMode(v as "percent" | "fixed")}
+          className="w-24 shrink-0"
+          triggerClassName="rounded-l-none border-l-0 bg-[var(--raised)]"
           aria-label="Tipo de comisión"
-        >
-          <option value="percent">%</option>
-          <option value="fixed">{currency}</option>
-        </select>
+          options={[
+            { value: "percent", label: "%" },
+            { value: "fixed", label: currency },
+          ]}
+        />
       </div>
-      <span className="mt-1 block text-xs text-slate-400">
+      <span className="mt-1 block text-xs text-slate-500">
         {mode === "percent" ? `Porcentaje del importe. Vacío = ${defaultRate}%` : `Monto fijo en ${currency}`}
       </span>
     </label>

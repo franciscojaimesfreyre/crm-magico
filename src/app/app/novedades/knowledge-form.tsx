@@ -4,6 +4,7 @@ import { DESTINATIONS, KNOWLEDGE_CATEGORIES } from "@/lib/labels";
 import { toDateInput } from "@/lib/format";
 import type { KnowledgeItem } from "@/generated/prisma/client";
 import { ClosesPicker } from "./closes-picker";
+import { DateInput } from "@/components/date-input";
 
 export function KnowledgeForm({
   action,
@@ -19,7 +20,7 @@ export function KnowledgeForm({
 }) {
   return (
     <ActionForm action={action}>
-      <Card className="grid gap-4 p-5 sm:grid-cols-2">
+      <Card className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
         <Field label="Título *" className="sm:col-span-2">
           <Input name="title" defaultValue={item?.title} required placeholder="Ej: Remodelación de Space Mountain hasta marzo" />
         </Field>
@@ -42,10 +43,10 @@ export function KnowledgeForm({
         </div>
         <ClosesPicker entries={catalog} initialIds={item?.closesEntryIds ?? []} initialManual={item?.closesManual ?? false} />
         <Field label="Vigente desde">
-          <Input type="date" name="validFrom" defaultValue={toDateInput(item?.validFrom)} />
+          <DateInput name="validFrom" defaultValue={toDateInput(item?.validFrom)} />
         </Field>
         <Field label="Vigente hasta" hint="Vencida, la IA deja de usarla">
-          <Input type="date" name="validTo" defaultValue={toDateInput(item?.validTo)} />
+          <DateInput name="validTo" defaultValue={toDateInput(item?.validTo)} />
         </Field>
         <Field label="Etiquetas" hint="Separadas por coma">
           <Input name="tags" defaultValue={item?.tags.join(", ")} />

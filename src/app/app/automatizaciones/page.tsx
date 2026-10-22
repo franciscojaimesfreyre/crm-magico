@@ -57,7 +57,7 @@ export default async function AutomationsPage() {
           </>
         }
       />
-      <div className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {workflows.map((w) => {
           const actions = (Array.isArray(w.actions) ? w.actions : []) as WorkflowAction[];
           return (
@@ -71,7 +71,7 @@ export default async function AutomationsPage() {
                     className={clsx("relative h-5 w-9 rounded-full transition-colors", w.active ? "bg-emerald-500" : "bg-slate-300")}
                     title={w.active ? "Pausar" : "Activar"}
                   >
-                    <span className={clsx("absolute top-0.5 size-4 rounded-full bg-white transition-all", w.active ? "left-4.5" : "left-0.5")} />
+                    <span className={clsx("absolute top-0.5 left-0.5 size-4 rounded-full bg-white transition-transform", w.active && "translate-x-4")} />
                   </button>
                 </form>
               </div>
@@ -85,7 +85,7 @@ export default async function AutomationsPage() {
                   </Badge>
                 ))}
               </div>
-              <p className="mt-auto pt-3 text-[11px] text-slate-400">{w._count.runs} ejecuciones</p>
+              <p className="mt-auto pt-3 text-[11px] text-slate-500">{w._count.runs} ejecuciones</p>
             </Card>
           );
         })}
@@ -106,7 +106,7 @@ export default async function AutomationsPage() {
               </span>
               <span className="flex items-center gap-2 text-xs">
                 {r.success ? <Badge className="bg-emerald-100 text-emerald-800">OK</Badge> : <Badge className="bg-rose-100 text-rose-800" >Error: {r.error}</Badge>}
-                <span className="text-slate-400">{formatDateTime(r.createdAt)}</span>
+                <span className="text-slate-500">{formatDateTime(r.createdAt)}</span>
               </span>
             </li>
           ))}

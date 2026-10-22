@@ -33,7 +33,7 @@ export default async function PortalQuote({ params }: { params: Promise<{ id: st
         ← {b.title}
       </Link>
       <header>
-        <p className="text-xs font-semibold tracking-widest text-amber-600 uppercase">Cotización</p>
+        <p className="text-xs font-semiboldst text-amber-700">Cotización</p>
         <h1 className="text-2xl font-semibold text-slate-900">{quote.title}</h1>
         <p className="text-sm text-slate-500">
           {DESTINATION_LABEL[b.destination]} · {formatRange(b.startDate, b.endDate)}
@@ -42,7 +42,7 @@ export default async function PortalQuote({ params }: { params: Promise<{ id: st
       </header>
 
       {quote.message && (
-        <div className="rounded-2xl bg-white p-4 text-sm whitespace-pre-line text-slate-700 shadow-sm ring-1 ring-slate-100">
+        <div className="rounded-2xl bg-white p-4 text-sm whitespace-pre-line text-slate-700 border border-[var(--border)]">
           {quote.message}
           {b.agent && <p className="mt-3 font-medium text-slate-900">{b.agent.name}</p>}
         </div>
@@ -61,7 +61,7 @@ export default async function PortalQuote({ params }: { params: Promise<{ id: st
             <label
               key={o.id}
               className={clsx(
-                "block rounded-2xl bg-white p-4 shadow-sm ring-1 transition",
+                "block rounded-2xl bg-white p-4 ring-1 transition",
                 accepted ? "ring-2 ring-emerald-400" : "ring-slate-100",
                 open && "cursor-pointer has-[:checked]:ring-2 has-[:checked]:ring-brand-500",
               )}
@@ -79,9 +79,9 @@ export default async function PortalQuote({ params }: { params: Promise<{ id: st
                     {o.items.map((i) => (
                       <li key={i.id} className="flex justify-between gap-3">
                         <span className="text-slate-700">
-                          <span className="text-xs text-slate-400">{ITEM_TYPE_LABEL[i.type]} · </span>
+                          <span className="text-xs text-slate-500">{ITEM_TYPE_LABEL[i.type]} · </span>
                           {i.description}
-                          {i.startDate && <span className="text-xs text-slate-400"> ({formatRange(i.startDate, i.endDate)})</span>}
+                          {i.startDate && <span className="text-xs text-slate-500"> ({formatRange(i.startDate, i.endDate)})</span>}
                         </span>
                         <span className="whitespace-nowrap text-slate-600">{money(i.price, b.currency)}</span>
                       </li>
@@ -103,7 +103,7 @@ export default async function PortalQuote({ params }: { params: Promise<{ id: st
       </ActionForm>
 
       {open && (
-        <details className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
+        <details className="rounded-2xl bg-white p-4 border border-[var(--border)]">
           <summary className="cursor-pointer text-sm text-slate-600">No me convence ninguna opción</summary>
           <ActionForm action={rejectQuote.bind(null, quote.id)} className="mt-3 space-y-3">
             <textarea name="comment" rows={3} className="field" placeholder="Contale a tu agente qué te gustaría cambiar" />

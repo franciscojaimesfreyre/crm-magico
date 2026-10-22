@@ -38,7 +38,7 @@ export default async function StatementsPage() {
       ) : (
         <Card>
           <Table>
-            <thead className="bg-slate-50">
+            <thead>
               <tr>
                 <Th>Agencia</Th>
                 <Th>Período</Th>

@@ -21,7 +21,7 @@ model Organization {
   tagline               String?
   bio                   String?
   logoUrl               String?
-  primaryColor          String    @default("#7c3aed")
+  primaryColor          String    @default("#0e7c70")
   contactEmail          String?
   contactPhone          String?
   defaultCurrency       String    @default("USD")

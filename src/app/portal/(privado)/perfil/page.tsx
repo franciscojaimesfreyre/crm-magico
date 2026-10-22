@@ -6,6 +6,7 @@ import { TRIP_PACES } from "@/lib/labels";
 import { INTEREST_OPTIONS } from "@/lib/clients";
 import { toDateInput } from "@/lib/format";
 import { updatePortalProfile } from "../../actions";
+import { DateInput } from "@/components/date-input";
 
 export const metadata = { title: "Mi familia y preferencias" };
 
@@ -23,7 +24,7 @@ export default async function PortalProfile() {
         Con esta información tu agente arma itinerarios a tu medida: por ejemplo, qué atracciones pueden hacer los chicos según su altura.
       </p>
       <ActionForm action={updatePortalProfile} className="space-y-5">
-        <section className="space-y-3 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+        <section className="space-y-3 rounded-2xl bg-white p-5 border border-[var(--border)]">
           <h2 className="font-semibold text-slate-900">Quiénes viajan</h2>
           {client.travelers.map((t) => (
             <div key={t.id} className="grid grid-cols-[1fr_auto_auto] items-end gap-2">
@@ -31,7 +32,7 @@ export default async function PortalProfile() {
                 {t.firstName} {t.lastName}
               </p>
               <Field label="Nacimiento">
-                <Input type="date" name={`birth-${t.id}`} defaultValue={toDateInput(t.birthDate)} className="w-40" />
+                <DateInput name={`birth-${t.id}`} defaultValue={toDateInput(t.birthDate)} className="w-40" />
               </Field>
               <Field label="Altura (cm)">
                 <Input type="number" name={`height-${t.id}`} defaultValue={t.heightCm ?? ""} className="w-24" min={30} max={250} />
@@ -43,7 +44,7 @@ export default async function PortalProfile() {
               <Input name="newTravelerName" placeholder="Nombre" />
             </Field>
             <Field label="Nacimiento">
-              <Input type="date" name="newTravelerBirth" className="w-40" />
+              <DateInput name="newTravelerBirth" className="w-40" />
             </Field>
             <Field label="Altura (cm)">
               <Input type="number" name="newTravelerHeight" className="w-24" min={30} max={250} />
@@ -51,7 +52,7 @@ export default async function PortalProfile() {
           </div>
         </section>
 
-        <section className="space-y-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+        <section className="space-y-4 rounded-2xl bg-white p-5 border border-[var(--border)]">
           <h2 className="font-semibold text-slate-900">Cómo les gusta viajar</h2>
           <Field label="Ritmo">
             <Select name="pace" options={TRIP_PACES} defaultValue={client.pace ?? ""} placeholder="Elegí uno" />

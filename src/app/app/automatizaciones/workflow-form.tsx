@@ -27,7 +27,7 @@ export function WorkflowForm({
   const actions = (workflow?.actions ?? []) as WorkflowAction[];
   return (
     <ActionForm action={action} className="space-y-6">
-      <Card className="grid gap-4 p-5 sm:grid-cols-2">
+      <Card className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
         <Field label="Nombre *">
           <Input name="name" defaultValue={workflow?.name} required />
         </Field>
@@ -39,7 +39,7 @@ export function WorkflowForm({
 
       <Card>
         <CardHeader title="Cuándo se ejecuta" />
-        <div className="grid gap-4 p-5 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-3">
           <Field label="Disparador">
             <Select name="trigger" options={WORKFLOW_TRIGGERS} defaultValue={workflow?.trigger ?? "DAYS_BEFORE_TRAVEL"} />
           </Field>
@@ -69,7 +69,7 @@ export function WorkflowForm({
           {Array.from({ length: MAX_ACTIONS }, (_, i) => {
             const a = actions[i];
             return (
-              <div key={i} className="grid gap-3 p-5 sm:grid-cols-4">
+              <div key={i} className="grid grid-cols-1 gap-3 p-5 sm:grid-cols-4">
                 <Field label={`Acción ${i + 1}`}>
                   <Select name={`a${i}_type`} options={ACTION_TYPES} defaultValue={a?.type ?? ""} placeholder="—" />
                 </Field>

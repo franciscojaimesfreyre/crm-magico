@@ -78,8 +78,8 @@ export default async function ParkGuidesPage() {
         <div className="space-y-6">
           {[...byDestination.entries()].map(([destination, list]) => (
             <section key={destination}>
-              <h2 className="mb-2 text-sm font-semibold tracking-wide text-slate-500 uppercase">{DESTINATION_LABEL[destination as keyof typeof DESTINATION_LABEL]}</h2>
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <h2 className="mb-2 text-sm font-semibold text-slate-500">{DESTINATION_LABEL[destination as keyof typeof DESTINATION_LABEL]}</h2>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {list.map((g) => {
                   const sections = parseSections(g.sections);
                   const items = sections.reduce((n, s) => n + s.items.length, 0);
@@ -88,7 +88,7 @@ export default async function ParkGuidesPage() {
                     <Link key={g.id} href={`/app/catalogo/fichas/${g.id}`} className="group">
                       <Card className={clsx("h-full p-4 transition-colors group-hover:border-brand-300", !g.published && "opacity-60")}>
                         <div className="flex items-start gap-3">
-                          <span className={clsx("grid size-10 shrink-0 place-items-center rounded-xl", g.kind === "EVENT" ? "bg-indigo-100 text-indigo-700" : "bg-brand-100 text-brand-700")}>
+                          <span className={clsx("grid size-6 shrink-0 place-items-center", g.kind === "EVENT" ? "text-amber-700" : "text-brand-600")}>
                             <Icon className="size-5" />
                           </span>
                           <div className="min-w-0">

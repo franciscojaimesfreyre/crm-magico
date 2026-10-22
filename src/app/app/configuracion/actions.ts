@@ -35,7 +35,7 @@ export async function updateOrganization(_: ActionState, formData: FormData): Pr
       contactEmail: str(formData, "contactEmail"),
       contactPhone: str(formData, "contactPhone"),
       logoUrl: logo && /^https?:\/\//.test(logo) ? logo : null,
-      primaryColor: color && /^#[0-9a-f]{6}$/i.test(color) ? color : "#7c3aed",
+      primaryColor: color && /^#[0-9a-f]{6}$/i.test(color) ? color : "#0e7c70",
       defaultCurrency: str(formData, "defaultCurrency") ?? "USD",
       defaultCommissionRate: rate(formData, "defaultCommissionRate") ?? 10,
     },

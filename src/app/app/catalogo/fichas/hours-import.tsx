@@ -7,6 +7,7 @@ import { buttonClass } from "@/components/ui";
 import { dayNote, guessEvent, parseDisneyFiveDay, parseUniversalHours } from "@/lib/park-hours";
 import { matchParkGuide, type GuideOption } from "@/lib/park-sheet";
 import { applyGuideSchedules } from "./actions";
+import { SelectField } from "@/components/select-field";
 
 const SOURCES = {
   disney: {
@@ -88,7 +89,7 @@ export function HoursImport({ source, guides, today }: { source: keyof typeof SO
   }
 
   return (
-    <div className="mb-6 w-full rounded-xl border border-brand-200 bg-white p-4">
+    <div className="mb-6 w-full rounded-lg border border-brand-200 bg-white p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="font-semibold text-slate-900">{cfg.title}</p>
@@ -104,7 +105,7 @@ export function HoursImport({ source, guides, today }: { source: keyof typeof SO
             <li>Revisá a qué ficha va cada parque y cada evento, y guardá.</li>
           </ol>
         </div>
-        <button type="button" onClick={() => setOpen(false)} className="text-slate-400 hover:text-slate-700" title="Cerrar">
+        <button type="button" onClick={() => setOpen(false)} className="text-slate-500 hover:text-slate-700" title="Cerrar">
           <X className="size-4" />
         </button>
       </div>
@@ -117,37 +118,32 @@ export function HoursImport({ source, guides, today }: { source: keyof typeof SO
             <div key={p.park} className="rounded-lg border border-slate-200 p-3">
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 <span className="font-medium text-slate-900">{p.park}</span>
-                <span className="text-slate-400">→</span>
-                <select className="field w-auto text-sm" value={parkId(p.park)} onChange={(e) => setParkFor((s) => ({ ...s, [p.park]: e.target.value }))}>
-                  <option value="">No guardar</option>
-                  {parkGuides.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      Ficha: {g.name}
-                    </option>
-                  ))}
-                </select>
+                <span className="text-slate-500">→</span>
+                <SelectField
+                  className="w-64"
+                  value={parkId(p.park)}
+                  onValueChange={(v) => setParkFor((s) => ({ ...s, [p.park]: v }))}
+                  placeholder="No guardar"
+                  options={parkGuides.map((g) => ({ value: g.id, label: `Ficha: ${g.name}` }))}
+                />
               </div>
-              <ul className="mt-2 grid gap-1.5 text-xs sm:grid-cols-2 lg:grid-cols-3">
+              <ul className="mt-2 grid grid-cols-1 gap-1.5 text-xs sm:grid-cols-2 lg:grid-cols-3">
                 {p.days.map((d) => (
                   <li key={d.date} className="rounded bg-slate-50 px-2 py-1.5">
                     <span className="font-semibold text-slate-800">{short(d.date)}</span>{" "}
                     <span className="text-slate-900">{d.open || d.close ? `${clock(d.open)} – ${clock(d.close)}` : "Sin horario"}</span>
                     {dayNote(d) && <span className="block text-slate-500">{dayNote(d)}</span>}
                     {d.event && (
-                      <label className="mt-1 flex flex-wrap items-center gap-1 text-indigo-800">
+                      <label className="mt-1 flex flex-wrap items-center gap-1 text-amber-900">
                         Evento {clock(d.event.open)} – {clock(d.event.close)} →
-                        <select
-                          className="rounded border border-slate-200 bg-white px-1 py-0.5 text-xs"
+                        <SelectField
+                          size="sm"
+                          className="w-48"
                           value={eventId(p.park, d.date)}
-                          onChange={(e) => setEventFor((s) => ({ ...s, [eventKey(p.park, d.date)]: e.target.value }))}
-                        >
-                          <option value="">No asignar</option>
-                          {eventGuides.map((g) => (
-                            <option key={g.id} value={g.id}>
-                              {g.name}
-                            </option>
-                          ))}
-                        </select>
+                          onValueChange={(v) => setEventFor((s) => ({ ...s, [eventKey(p.park, d.date)]: v }))}
+                          placeholder="No asignar"
+                          options={eventGuides.map((g) => ({ value: g.id, label: g.name }))}
+                        />
                       </label>
                     )}
                   </li>

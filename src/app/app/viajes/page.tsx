@@ -3,17 +3,18 @@ import clsx from "clsx";
 import { Download, LayoutGrid, List } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { Badge, Card, EmptyState, LinkButton, PageHeader, Select, StatCard, Table, Td, Th, buttonClass } from "@/components/ui";
+import { Badge, Card, EmptyState, LinkButton, PageHeader, Select, StatCard, StatStrip, Table, Td, Th, buttonClass } from "@/components/ui";
 import {
   BOOKING_STATUSES,
   BOOKING_STATUS_COLOR,
   BOOKING_STATUS_LABEL,
   DESTINATIONS,
-  DESTINATION_LABEL,
+  DESTINATION_LABEL, DESTINATION_TONE,
 } from "@/lib/labels";
-import { formatRange, money, toNumber } from "@/lib/format";
+import { daysBetween, formatRange, money, todayUTC, toNumber } from "@/lib/format";
 import { bookingWhere, type BookingFilters } from "./filters";
 import { Kanban } from "./kanban";
+import { DateInput } from "@/components/date-input";
 
 export const metadata = { title: "Viajes" };
 
@@ -61,33 +62,54 @@ export default async function BookingsPage({
         }
       />
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <StatStrip className="mb-6">
         <StatCard label="Viajes" value={active.length} hint={`${bookings.length - active.length} canceladas`} />
         <StatCard label="Consultas y cotizadas" value={active.length - sold.length} />
         <StatCard label="Vendido" value={money(revenue, currency)} hint={`${sold.length} viajes`} />
         <StatCard label="Comisiones" value={money(commission, currency)} tone="good" />
-      </div>
+      </StatStrip>
 
-      <form className="mb-4 grid gap-2 rounded-xl border border-slate-200 bg-white p-3 sm:grid-cols-3 lg:grid-cols-6">
-        <input type="hidden" name="vista" value={view} />
-        <input name="q" defaultValue={filters.q} placeholder="Cliente, código o confirmación" className="field lg:col-span-2" />
-        {view === "lista" && <Select name="estado" defaultValue={filters.estado ?? ""} options={BOOKING_STATUSES} placeholder="Todos los estados" />}
-        <Select name="destino" defaultValue={filters.destino ?? ""} options={DESTINATIONS} placeholder="Todos los destinos" />
-        <input type="date" name="desde" defaultValue={filters.desde} className="field" title="Viaja desde" />
-        <div className="flex gap-2">
-          <input type="date" name="hasta" defaultValue={filters.hasta} className="field" title="Viaja hasta" />
-          <button className={buttonClass("primary")}>Filtrar</button>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        {/* Vista: control segmentado neutro (el color de marca queda para la acción principal). */}
+        <div className="inline-flex rounded-md bg-[var(--raised)] p-0.5" role="tablist" aria-label="Vista">
+          {(
+            [
+              ["lista", "Lista", List],
+              ["tablero", "Tablero", LayoutGrid],
+            ] as const
+          ).map(([key, label, Icon]) => (
+            <Link
+              key={key}
+              href={viewHref(key)}
+              role="tab"
+              aria-selected={view === key}
+              className={clsx(
+                "inline-flex h-8 items-center gap-1.5 rounded px-3 text-[13px] font-medium",
+                view === key ? "bg-white text-slate-900 ring-1 ring-[var(--border)]" : "text-[var(--ink-soft)] hover:text-slate-900",
+              )}
+            >
+              <Icon className="size-4" /> {label}
+            </Link>
+          ))}
         </div>
-      </form>
-
-      <div className="mb-4 flex gap-1">
-        <Link href={viewHref("lista")} className={clsx(buttonClass(view === "lista" ? "primary" : "secondary", "sm"))}>
-          <List className="size-4" /> Lista
-        </Link>
-        <Link href={viewHref("tablero")} className={clsx(buttonClass(view === "tablero" ? "primary" : "secondary", "sm"))}>
-          <LayoutGrid className="size-4" /> Tablero
-        </Link>
+        <p className="text-sm text-[var(--ink-soft)] tabular-nums">
+          {bookings.length} {bookings.length === 1 ? "viaje" : "viajes"}
+        </p>
       </div>
+
+      <form className="mb-4 flex flex-wrap items-center gap-2">
+        <input type="hidden" name="vista" value={view} />
+        <input name="q" defaultValue={filters.q} placeholder="Cliente, código o confirmación" className="field min-w-60 flex-1" />
+        {view === "lista" && <Select name="estado" defaultValue={filters.estado ?? ""} options={BOOKING_STATUSES} placeholder="Todos los estados" className="w-auto" />}
+        <Select name="destino" defaultValue={filters.destino ?? ""} options={DESTINATIONS} placeholder="Todos los destinos" className="w-auto" />
+        <label className="flex items-center gap-1.5 text-[13px] text-[var(--ink-soft)]">
+          Desde <DateInput name="desde" defaultValue={filters.desde} className="w-auto" />
+        </label>
+        <label className="flex items-center gap-1.5 text-[13px] text-[var(--ink-soft)]">
+          Hasta <DateInput name="hasta" defaultValue={filters.hasta} className="w-auto" />
+        </label>
+        <button className={buttonClass("secondary")}>Filtrar</button>
+      </form>
 
       {bookings.length === 0 ? (
         <EmptyState title="No hay viajes" description="Creá un viaje o esperá las consultas de tu formulario web." action={<LinkButton href="/app/viajes/nueva">Nuevo viaje</LinkButton>} />
@@ -104,12 +126,13 @@ export default async function BookingsPage({
             dates: formatRange(b.startDate, b.endDate),
             total: toNumber(b.totalPrice),
             totalLabel: money(b.totalPrice, b.currency),
+            daysToGo: b.startDate ? daysBetween(todayUTC(), b.startDate) : null,
           }))}
         />
       ) : (
         <Card>
           <Table>
-            <thead className="bg-slate-50">
+            <thead>
               <tr>
                 <Th>Cliente</Th>
                 <Th>Destino</Th>
@@ -128,11 +151,16 @@ export default async function BookingsPage({
                     <Link href={`/app/viajes/${b.id}`} className="font-medium text-slate-900 hover:text-brand-700">
                       {b.client.firstName} {b.client.lastName}
                     </Link>
-                    <p className="text-xs text-slate-400">
+                    <p className="text-xs text-slate-500">
                       {b.code} · {b.title}
                     </p>
                   </Td>
-                  <Td className="text-xs">{DESTINATION_LABEL[b.destination]}</Td>
+                  <Td className="text-xs">
+                    <span className="flex items-center gap-1.5">
+                      <span className={clsx("size-2 shrink-0 rounded-full", DESTINATION_TONE[b.destination].dot)} />
+                      {DESTINATION_LABEL[b.destination]}
+                    </span>
+                  </Td>
                   <Td>
                     <Badge className={BOOKING_STATUS_COLOR[b.status]}>{BOOKING_STATUS_LABEL[b.status]}</Badge>
                   </Td>
@@ -140,7 +168,7 @@ export default async function BookingsPage({
                   <Td className="text-right">{b.adults + b.children}</Td>
                   <Td className="text-xs whitespace-nowrap">
                     {b.items.length === 0 ? (
-                      <span className="text-slate-400">—</span>
+                      <span className="text-slate-500">—</span>
                     ) : (
                       <>
                         {b.items.filter((i) => i.status === "CONFIRMED").length}/{b.items.filter((i) => i.status !== "CANCELLED").length} confirmadas
@@ -149,7 +177,7 @@ export default async function BookingsPage({
                   </Td>
                   <Td className="text-right whitespace-nowrap">{money(b.totalPrice, b.currency)}</Td>
                   <Td className="text-right whitespace-nowrap">
-                    <span className="text-emerald-700">{money(b.commissionAmount, b.currency)}</span>
+                    <span className="text-slate-700">{money(b.commissionAmount, b.currency)}</span>
                   </Td>
                 </tr>
               ))}

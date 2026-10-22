@@ -28,6 +28,8 @@ import { PlaceGuideCard } from "@/components/place-guide";
 import { ParkSheetCard } from "@/components/park-sheet";
 import { ParkSheetForm } from "@/components/park-sheet-form";
 import { emptySheet, eventDateWarning, eventTitle, sheetForPark, sheetFromGuide, sheetNames, type GuideOption, type ParkSheet, type TripEvent } from "@/lib/park-sheet";
+import { DateInput } from "@/components/date-input";
+import { SelectField } from "@/components/select-field";
 
 // ─── Estado del editor ───────────────────────────────────────────────────────
 
@@ -568,7 +570,7 @@ export function ItineraryEditor({
   return (
     <DndContext id="itinerary-editor" sensors={sensors} collisionDetection={closestCorners} onDragStart={onDragStart} onDragEnd={onDragEnd}>
       {/* Barra superior */}
-      <div className="sticky top-14 z-10 -mx-6 mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/95 px-6 py-3 backdrop-blur">
+      <div className="sticky top-[52px] z-10 -mx-4 mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] bg-[var(--ground)] px-4 py-3 sm:-mx-6 sm:px-6 lg:top-0 lg:-mx-10 lg:px-10">
         <div className="flex flex-wrap items-center gap-2">
           {startDate && endDate && (
             <button type="button" onClick={generateDays} className={buttonClass("secondary", "sm")}>
@@ -585,7 +587,7 @@ export function ItineraryEditor({
           )}
           {aiEnabled && missingGuides > 0 && (
             <button type="button" onClick={() => requestGuides(days)} className={buttonClass("secondary", "sm")}>
-              <Sparkles className="size-4 text-fuchsia-600" /> Recomendaciones para {missingGuides === 1 ? "1 día de crucero" : `${missingGuides} días de crucero`}
+              <Sparkles className="size-4 text-brand-600" /> Recomendaciones para {missingGuides === 1 ? "1 día de crucero" : `${missingGuides} días de crucero`}
             </button>
           )}
         </div>
@@ -603,7 +605,7 @@ export function ItineraryEditor({
       </div>
 
       {aiOpen && (
-        <div className="mb-4 rounded-xl border border-fuchsia-200 bg-gradient-to-br from-fuchsia-50 to-brand-50 p-4">
+        <div className="mb-4 rounded-lg border border-brand-200 bg-brand-50 p-4">
           <div className="flex items-start justify-between">
             <div>
               <p className="font-semibold text-slate-900">Itinerario con IA</p>
@@ -611,13 +613,13 @@ export function ItineraryEditor({
                 Usa las edades de los viajeros, los intereses y el presupuesto del grupo, las reservas, los vuelos, las notas del viaje, el catálogo de parques y las novedades vigentes. No recibe nombres ni datos personales; las alturas las revisa el sistema.
               </p>
             </div>
-            <button type="button" onClick={() => setAiOpen(false)} className="text-slate-400 hover:text-slate-700">
+            <button type="button" onClick={() => setAiOpen(false)} className="text-slate-500 hover:text-slate-700">
               <X className="size-4" />
             </button>
           </div>
           <fieldset className="mt-3">
-            <legend className="mb-1.5 text-xs font-semibold tracking-wide text-slate-500 uppercase">Nivel de detalle</legend>
-            <div className="grid gap-2 sm:grid-cols-2">
+            <legend className="mb-1.5 text-xs font-semibold text-slate-500">Nivel de detalle</legend>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {DETAIL_OPTIONS.map((o) => (
                 <label
                   key={o.value}
@@ -661,10 +663,10 @@ export function ItineraryEditor({
       )}
 
       {aiResult && (
-        <div className="mb-4 rounded-xl border border-brand-200 bg-white p-4 text-sm">
+        <div className="mb-4 rounded-lg border border-brand-200 bg-white p-4 text-sm">
           <div className="flex items-start justify-between gap-3">
             <p className="font-semibold text-slate-900">Propuesta de la IA</p>
-            <button type="button" onClick={() => setAiResult(null)} className="text-slate-400 hover:text-slate-700">
+            <button type="button" onClick={() => setAiResult(null)} className="text-slate-500 hover:text-slate-700">
               <X className="size-4" />
             </button>
           </div>
@@ -689,9 +691,9 @@ export function ItineraryEditor({
       )}
 
       {catalog.length > 0 && days.some((d) => d.items.length > 0) && (
-        <div className={clsx("mb-4 rounded-xl border p-4 text-sm", checks.count + checks.missing.length > 0 ? "border-amber-200 bg-amber-50/60" : "border-emerald-200 bg-emerald-50/60")}>
+        <div className={clsx("mb-4 rounded-lg border p-4 text-sm", checks.count + checks.missing.length > 0 ? "border-amber-200 bg-amber-50/60" : "border-emerald-200 bg-emerald-50/60")}>
           <p className="flex items-center gap-2 font-semibold text-slate-900">
-            <ShieldCheck className={clsx("size-4", checks.count + checks.missing.length > 0 ? "text-amber-600" : "text-emerald-600")} />
+            <ShieldCheck className={clsx("size-4", checks.count + checks.missing.length > 0 ? "text-amber-700" : "text-emerald-700")} />
             Revisión automática
             <span className="font-normal text-slate-600">
               {checks.count + checks.missing.length === 0
@@ -710,7 +712,7 @@ export function ItineraryEditor({
                   className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-white px-2.5 py-1 text-xs text-slate-700 hover:border-amber-500"
                   title={`Agregar al día ${m.dayIndex + 1}`}
                 >
-                  <Plus className="size-3" /> {m.entry.name} <span className="text-slate-400">· día {m.dayIndex + 1}</span>
+                  <Plus className="size-3" /> {m.entry.name} <span className="text-slate-500">· día {m.dayIndex + 1}</span>
                 </button>
               ))}
               {checks.missing.length > 1 && (
@@ -723,7 +725,7 @@ export function ItineraryEditor({
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[220px_1fr]">
         {/* Paleta */}
         <aside className="space-y-4 lg:sticky lg:top-32 lg:self-start">
           <div>
@@ -742,7 +744,7 @@ export function ItineraryEditor({
                   <PaletteChip key={g.id} id={`guide:${g.id}`} label={g.kind === "EVENT" ? `Evento: ${g.name}` : g.name} type="PARK" />
                 ))}
               </div>
-              <p className="mt-1 text-[11px] text-slate-400">Se suman con su ficha: horarios, imperdibles, shows, dónde comer y tips.</p>
+              <p className="mt-1 text-[11px] text-slate-500">Se suman con su ficha: horarios, imperdibles, shows, dónde comer y tips.</p>
             </div>
           )}
           <div>
@@ -768,7 +770,7 @@ export function ItineraryEditor({
         {/* Días */}
         <div className="space-y-4">
           {days.length === 0 && (
-            <div className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">
+            <div className="rounded-lg border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">
               {startDate && endDate ? "Generá los días según las fechas del viaje o agregalos a mano." : "Agregá el primer día."}
             </div>
           )}
@@ -872,23 +874,18 @@ function DayColumn({
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `day:${day.key}` });
   return (
-    <section className={clsx("rounded-xl border bg-white transition-colors", isOver ? "border-brand-400 ring-2 ring-brand-100" : "border-slate-200")}>
+    <section className={clsx("rounded-lg border bg-white transition-colors", isOver ? "border-brand-400 ring-2 ring-brand-100" : "border-slate-200")}>
       <header className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-3">
         <span className="rounded-md bg-brand-600 px-2 py-0.5 text-xs font-semibold text-white">Día {number}</span>
-        <input
-          type="date"
-          value={day.date ?? ""}
-          onChange={(e) => onPatch({ date: e.target.value || null })}
-          className="rounded-md border border-transparent px-1 py-0.5 text-sm text-slate-600 hover:border-slate-200"
-        />
-        <span className="hidden text-xs text-slate-400 first-letter:uppercase sm:inline-block">{prettyDate(day.date)}</span>
+        <DateInput value={day.date ?? ""} onChange={(v) => onPatch({ date: v || null })} placeholder="Sin fecha" size="sm" className="w-44" />
+        <span className="hidden text-xs text-slate-500 first-letter:uppercase sm:inline-block">{prettyDate(day.date)}</span>
         <input
           value={day.title ?? ""}
           onChange={(e) => onPatch({ title: e.target.value })}
           placeholder="Parque o lugar del día"
           className="min-w-40 flex-1 rounded-md border border-transparent px-2 py-0.5 text-sm font-medium text-slate-900 hover:border-slate-200 focus:border-brand-400 focus:outline-none"
         />
-        <button type="button" onClick={onSort} className="text-slate-400 hover:text-slate-700" title="Ordenar por horario">
+        <button type="button" onClick={onSort} className="text-slate-500 hover:text-slate-700" title="Ordenar por horario">
           <ArrowDownUp className="size-4" />
         </button>
         <button type="button" onClick={onRemove} className="text-slate-300 hover:text-rose-600" title="Eliminar día">
@@ -901,7 +898,7 @@ function DayColumn({
             key={g.id}
             type="button"
             onClick={() => onAddEvent(g)}
-            className="flex w-full items-center gap-2 rounded-lg border border-dashed border-indigo-300 bg-indigo-50/60 px-3 py-2 text-left text-xs text-indigo-800 hover:border-indigo-500"
+            className="flex w-full items-center gap-2 rounded-lg border border-dashed border-amber-300 bg-amber-50 px-3 py-2 text-left text-xs text-amber-900 hover:border-amber-500"
           >
             <PartyPopper className="size-4 shrink-0" />
             <span>
@@ -932,7 +929,7 @@ function DayColumn({
             />
           ))}
         </SortableContext>
-        {day.items.length === 0 && <p className="rounded-lg border border-dashed border-slate-200 py-4 text-center text-xs text-slate-400">Soltá actividades acá</p>}
+        {day.items.length === 0 && <p className="rounded-lg border border-dashed border-slate-200 py-4 text-center text-xs text-slate-500">Soltá actividades acá</p>}
         <div className="flex items-center justify-between pt-1">
           <button type="button" onClick={onAddItem} className="text-xs font-medium text-brand-700 hover:underline">
             + Agregar actividad
@@ -989,7 +986,7 @@ function SortableItem({
       className={clsx("rounded-lg border-l-4", ACTIVITY_TYPE_COLOR[item.type], isDragging && "opacity-40")}
     >
       <div className="flex items-center gap-2 px-2 py-2">
-        <button type="button" {...listeners} {...attributes} className="cursor-grab text-slate-400 active:cursor-grabbing" title="Arrastrar">
+        <button type="button" {...listeners} {...attributes} className="cursor-grab text-slate-500 active:cursor-grabbing" title="Arrastrar">
           <GripVertical className="size-4" />
         </button>
         <button type="button" onClick={onToggle} className="min-w-0 flex-1 text-left">
@@ -1022,15 +1019,9 @@ function SortableItem({
         </button>
       </div>
       {open && (
-        <div className="grid gap-2 border-t border-white/60 bg-white/70 p-3 sm:grid-cols-6">
+        <div className="grid grid-cols-1 gap-2 border-t border-white/60 bg-white/70 p-3 sm:grid-cols-6">
           <input className="field sm:col-span-3" value={item.title} onChange={(e) => onPatch({ title: e.target.value })} placeholder="Título" autoFocus />
-          <select className="field sm:col-span-1" value={item.type} onChange={(e) => onPatch({ type: e.target.value as ActivityType })}>
-            {ACTIVITY_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
-            ))}
-          </select>
+          <SelectField className="sm:col-span-1" value={item.type} onValueChange={(v) => onPatch({ type: v as ActivityType })} options={ACTIVITY_TYPES} aria-label="Tipo de actividad" />
           <input
             className="field"
             type="time"
@@ -1058,30 +1049,24 @@ function SortableItem({
 
 /** Opciones de fichas para elegir: parques y eventos, del destino del viaje primero. */
 function GuideSelect({ guides, value, onPick, placeholder }: { guides: GuideOption[]; value?: string; onPick: (g: GuideOption) => void; placeholder: string }) {
+  const groups = (["PARK", "EVENT"] as const)
+    .map((kind) => ({
+      label: kind === "PARK" ? "Parques" : "Eventos especiales",
+      options: guides.filter((g) => g.kind === kind).map((g) => ({ value: g.id, label: kind === "EVENT" ? eventTitle(g) : g.name })),
+    }))
+    .filter((g) => g.options.length > 0);
   return (
-    <select
-      className="field w-auto max-w-full text-xs"
+    <SelectField
+      size="sm"
+      className="w-64 max-w-full"
       value={value ?? ""}
-      onChange={(e) => {
-        const g = guides.find((x) => x.id === e.target.value);
+      placeholder={placeholder}
+      groups={groups}
+      onValueChange={(v) => {
+        const g = guides.find((x) => x.id === v);
         if (g) onPick(g);
       }}
-    >
-      <option value="" disabled>
-        {placeholder}
-      </option>
-      {(["PARK", "EVENT"] as const).map((kind) => (
-        <optgroup key={kind} label={kind === "PARK" ? "Parques" : "Eventos especiales"}>
-          {guides
-            .filter((g) => g.kind === kind)
-            .map((g) => (
-              <option key={g.id} value={g.id}>
-                {kind === "EVENT" ? eventTitle(g) : g.name}
-              </option>
-            ))}
-        </optgroup>
-      ))}
-    </select>
+    />
   );
 }
 
@@ -1124,8 +1109,8 @@ function ParkSection({
       <div className="space-y-2 px-3 pb-3">
         {/* Itinerarios viejos: recomendaciones de la IA, hasta que se reemplacen por la ficha. */}
         {item.guide && <PlaceGuideCard guide={item.guide} onRemovePick={(index) => onPatch({ guide: { ...item.guide!, picks: item.guide!.picks.filter((_, i) => i !== index) } })} />}
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-violet-300 bg-white/70 px-3 py-2 text-xs text-slate-600">
-          <FerrisWheel className="size-4 text-violet-600" />
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-brand-300 bg-white/70 px-3 py-2 text-xs text-slate-600">
+          <FerrisWheel className="size-4 text-brand-600" />
           <span>{item.guide ? "Reemplazar por la ficha del catálogo:" : "Sumá la ficha del parque (horarios, imperdibles, shows, dónde comer y tips):"}</span>
           {guides.length > 0 && <GuideSelect guides={guides} onPick={use} placeholder="Elegí el parque o evento" />}
           <button
@@ -1162,7 +1147,7 @@ function ParkSection({
   return (
     <div className="px-3 pb-3">
       {editingSheet ? (
-        <div className="rounded-xl bg-white p-3 ring-1 ring-brand-200">
+        <div className="rounded-lg bg-white p-3 ring-1 ring-brand-200">
           <ParkSheetForm sheet={sheet} onChange={(next) => onPatch({ sheet: next })} />
           <div className="mt-3 flex justify-end">
             <button type="button" onClick={() => setEditingSheet(false)} className={buttonClass("secondary", "sm")}>
@@ -1212,7 +1197,7 @@ function ParkSection({
             <RotateCcw className="size-3" /> Restaurar del catálogo
           </button>
         )}
-        <button type="button" onClick={() => onPatch({ sheet: null })} className="inline-flex items-center gap-1 text-slate-400 hover:text-rose-600">
+        <button type="button" onClick={() => onPatch({ sheet: null })} className="inline-flex items-center gap-1 text-slate-500 hover:text-rose-600">
           <Trash2 className="size-3" /> Quitar ficha
         </button>
       </div>
@@ -1243,7 +1228,7 @@ function GuideSection({
   if (status.loading) {
     return (
       <div className="px-3 pb-3">
-        <p className="flex animate-pulse items-center gap-2 rounded-lg bg-white/80 px-3 py-2.5 text-xs text-fuchsia-700">
+        <p className="flex animate-pulse items-center gap-2 rounded-lg bg-white/80 px-3 py-2.5 text-xs text-brand-700">
           <Sparkles className="size-4" /> Armando recomendaciones y tips para {place}…
         </p>
       </div>
@@ -1257,7 +1242,7 @@ function GuideSection({
             <button
               type="button"
               onClick={onGuide}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-dashed border-fuchsia-300 bg-white/70 px-3 py-2 text-xs font-medium text-fuchsia-700 hover:border-fuchsia-500 hover:bg-white"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-dashed border-brand-300 bg-white/70 px-3 py-2 text-xs font-medium text-brand-700 hover:border-brand-500 hover:bg-white"
             >
               <Sparkles className="size-3.5" /> Sumar atracciones recomendadas y tips con IA
             </button>
@@ -1311,7 +1296,7 @@ function GuideSection({
             <RefreshCw className="size-3" /> Regenerar con IA
           </button>
         )}
-        <button type="button" onClick={() => onPatch({ guide: null })} className="inline-flex items-center gap-1 text-slate-400 hover:text-rose-600">
+        <button type="button" onClick={() => onPatch({ guide: null })} className="inline-flex items-center gap-1 text-slate-500 hover:text-rose-600">
           <Trash2 className="size-3" /> Quitar recomendaciones
         </button>
       </div>
@@ -1337,7 +1322,7 @@ function GuideForm({ guide, catalog, onChange, onDone }: { guide: PlaceGuide; ca
   }
   const listId = useMemo(() => newKey("catalog"), []);
   return (
-    <div className="mx-3 mb-3 space-y-3 rounded-xl bg-white p-3 ring-1 ring-brand-200">
+    <div className="mx-3 mb-3 space-y-3 rounded-lg bg-white p-3 ring-1 ring-brand-200">
       <datalist id={listId}>
         {catalog.map((e) => (
           <option key={e.id} value={e.name}>
@@ -1346,19 +1331,13 @@ function GuideForm({ guide, catalog, onChange, onDone }: { guide: PlaceGuide; ca
         ))}
       </datalist>
       <div>
-        <p className="mb-1.5 text-xs font-semibold tracking-wide text-brand-700 uppercase">Recomendaciones</p>
+        <p className="mb-1.5 text-xs font-semibold text-brand-700">Recomendaciones</p>
         <ul className="space-y-2">
           {guide.picks.map((p, i) => (
-            <li key={i} className="grid gap-1.5 rounded-lg bg-slate-50 p-2 sm:grid-cols-[minmax(0,1fr)_9rem_auto]">
+            <li key={i} className="grid grid-cols-1 gap-1.5 rounded-lg bg-slate-50 p-2 sm:grid-cols-[minmax(0,1fr)_9rem_auto]">
               <input className="field" value={p.name} onChange={(e) => renamePick(i, e.target.value)} list={listId} placeholder="Atracción, show, restaurante…" />
-              <select className="field" value={p.kind} onChange={(e) => patchPick(i, { kind: e.target.value as GuidePickKind })}>
-                {GUIDE_PICK_KINDS.map((k) => (
-                  <option key={k} value={k}>
-                    {GUIDE_PICK_LABEL[k]}
-                  </option>
-                ))}
-              </select>
-              <div className="flex items-center justify-end gap-1 text-slate-400">
+              <SelectField value={p.kind} onValueChange={(v) => patchPick(i, { kind: v as GuidePickKind })} options={GUIDE_PICK_KINDS.map((k) => ({ value: k, label: GUIDE_PICK_LABEL[k] }))} aria-label="Tipo" />
+              <div className="flex items-center justify-end gap-1 text-slate-500">
                 <button type="button" onClick={() => movePick(i, -1)} disabled={i === 0} className="p-1 hover:text-slate-700 disabled:opacity-30" title="Subir">
                   <ChevronUp className="size-4" />
                 </button>
@@ -1382,7 +1361,7 @@ function GuideForm({ guide, catalog, onChange, onDone }: { guide: PlaceGuide; ca
         </button>
       </div>
       <div>
-        <p className="mb-1.5 text-xs font-semibold tracking-wide text-amber-800 uppercase">Tips</p>
+        <p className="mb-1.5 text-xs font-semibold text-amber-800">Tips</p>
         <ul className="space-y-1.5">
           {guide.tips.map((t, i) => (
             <li key={i} className="flex items-start gap-1.5">
@@ -1393,7 +1372,7 @@ function GuideForm({ guide, catalog, onChange, onDone }: { guide: PlaceGuide; ca
                 onChange={(e) => onChange({ ...guide, tips: guide.tips.map((x, j) => (j === i ? e.target.value : x)) })}
                 placeholder="Un consejo práctico para ese día"
               />
-              <button type="button" onClick={() => onChange({ ...guide, tips: guide.tips.filter((_, j) => j !== i) })} className="p-1 pt-2 text-slate-400 hover:text-rose-600" title="Quitar">
+              <button type="button" onClick={() => onChange({ ...guide, tips: guide.tips.filter((_, j) => j !== i) })} className="p-1 pt-2 text-slate-500 hover:text-rose-600" title="Quitar">
                 <Trash2 className="size-3.5" />
               </button>
             </li>

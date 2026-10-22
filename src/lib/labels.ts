@@ -226,18 +226,19 @@ export const ACTIVITY_TYPE_LABEL: Record<ActivityType, string> = {
 export const ACTIVITY_TYPES = options(ACTIVITY_TYPE_LABEL);
 // Cuatro familias, no un color por tipo: parques y lo que se hace adentro (marca), comidas y compras
 // (ámbar), descansos (verde), traslados y cruceros (celeste); lo demás, neutro.
+/** Color de cada tipo de actividad (borde y fondo suave): cada tipo se reconoce de un vistazo en el itinerario. */
 export const ACTIVITY_TYPE_COLOR: Record<ActivityType, string> = {
   PARK: "border-l-brand-500 bg-brand-50",
-  RIDE: "border-l-brand-300 bg-white",
-  SHOW: "border-l-brand-300 bg-white",
-  DINING: "border-l-amber-400 bg-amber-50/60",
-  CHARACTER: "border-l-brand-300 bg-white",
+  RIDE: "border-l-violet-400 bg-violet-50/60",
+  SHOW: "border-l-indigo-400 bg-indigo-50/60",
+  DINING: "border-l-amber-400 bg-amber-50/70",
+  CHARACTER: "border-l-rose-400 bg-rose-50/60",
   BREAK: "border-l-emerald-400 bg-emerald-50/60",
-  TRAVEL: "border-l-sky-400 bg-sky-50/60",
-  SHOPPING: "border-l-amber-400 bg-white",
-  POOL: "border-l-emerald-400 bg-white",
-  CRUISE: "border-l-sky-500 bg-sky-50/60",
-  CUSTOM: "border-l-slate-300 bg-white",
+  TRAVEL: "border-l-sky-400 bg-sky-50/70",
+  SHOPPING: "border-l-orange-400 bg-orange-50/60",
+  POOL: "border-l-cyan-400 bg-cyan-50/60",
+  CRUISE: "border-l-blue-500 bg-blue-50/60",
+  CUSTOM: "border-l-slate-300 bg-slate-50",
 };
 
 export const KNOWLEDGE_CATEGORY_LABEL: Record<KnowledgeCategory, string> = {

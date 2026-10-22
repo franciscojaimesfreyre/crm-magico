@@ -5,6 +5,7 @@ import { CalendarClock, RefreshCw, Trash2 } from "lucide-react";
 import { LightningLanePrices, ThemeParksCredit } from "@/components/themeparks";
 import type { ScheduleEntry } from "@/lib/park-sheet";
 import { DateInput } from "@/components/date-input";
+import { TimeInput } from "@/components/time-input";
 
 /** Filas que se ven antes de "Ver todas" (los parques sincronizados tienen unos 70 días). */
 const VISIBLE_ROWS = 8;
@@ -92,8 +93,8 @@ export function ScheduleEditor({
             ) : (
               <DateInput min={today} value={r.date} onChange={(v) => v && set(r.date, { date: v })} required />
             )}
-            <input type="time" className="field" value={r.openTime ?? ""} onChange={(e) => set(r.date, { openTime: e.target.value || null })} aria-label={park ? "Abre" : "Empieza"} title={park ? "Abre" : "Empieza"} />
-            <input type="time" className="field" value={r.closeTime ?? ""} onChange={(e) => set(r.date, { closeTime: e.target.value || null })} aria-label={park ? "Cierra" : "Termina"} title={park ? "Cierra" : "Termina"} />
+            <TimeInput value={r.openTime} onChange={(v) => set(r.date, { openTime: v || null })} aria-label={park ? "Abre" : "Empieza"} placeholder={park ? "Abre" : "Empieza"} />
+            <TimeInput value={r.closeTime} onChange={(v) => set(r.date, { closeTime: v || null })} aria-label={park ? "Cierra" : "Termina"} placeholder={park ? "Cierra" : "Termina"} />
             <input className="field" value={r.note} onChange={(e) => set(r.date, { note: e.target.value })} placeholder={park ? "Nota (ej: Early Entry 8:30, cierra a las 18 por la fiesta)" : "Nota (ej: ingreso desde las 16:00, agotada)"} />
             <button type="button" onClick={() => remove(r.date)} className="p-1 text-slate-500 hover:text-rose-600" title={window.includes(r.date) ? "Vaciar" : "Quitar fecha"}>
               <Trash2 className="size-4" />

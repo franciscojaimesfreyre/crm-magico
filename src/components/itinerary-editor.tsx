@@ -1,22 +1,25 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   DndContext,
   DragOverlay,
   PointerSensor,
   closestCorners,
+  pointerWithin,
   useDraggable,
   useDroppable,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import clsx from "clsx";
-import { AlertTriangle, ArrowDownUp, BookmarkPlus, CalendarPlus, ChevronDown, ChevronUp, Clock, FerrisWheel, GripVertical, MapPin, PartyPopper, Pencil, Plus, RefreshCw, RotateCcw, Save, ShieldCheck, Sparkles, Star, Trash2, Wand2, X } from "lucide-react";
+import { AlertTriangle, ArrowDownUp, BellRing, BookmarkPlus, CalendarPlus, ChevronDown, ChevronsDownUp, ChevronsUpDown, ChevronUp, Clock, FerrisWheel, GripVertical, MapPin, PartyPopper, Pencil, Plus, RefreshCw, RotateCcw, Save, ShieldCheck, Sparkles, Star, Trash2, Wand2, X } from "lucide-react";
 import { ACTIVITY_TYPES, ACTIVITY_TYPE_COLOR, ACTIVITY_TYPE_LABEL } from "@/lib/labels";
 import { buttonClass } from "@/components/ui";
 import type { ActivityType } from "@/generated/prisma/enums";
@@ -25,11 +28,16 @@ import { proposeItinerary, proposePlaceGuide, saveItinerary, type ItineraryDayIn
 import { saveActivityFromItinerary } from "@/app/app/plantillas/actions";
 import { GUIDE_PICK_KINDS, GUIDE_PICK_LABEL, hasGuide, type GuidePick, type GuidePickKind, type PlaceGuide } from "@/lib/place-guide";
 import { PlaceGuideCard } from "@/components/place-guide";
-import { ParkSheetCard } from "@/components/park-sheet";
+import { CollapsibleParkSheet } from "@/components/park-sheet";
 import { ParkSheetForm } from "@/components/park-sheet-form";
 import { emptySheet, eventDateWarning, eventTitle, sheetForPark, sheetFromGuide, sheetNames, type GuideOption, type ParkSheet, type TripEvent } from "@/lib/park-sheet";
 import { DateInput } from "@/components/date-input";
 import { SelectField } from "@/components/select-field";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/shadcn/dialog";
+import { Field, FieldLabel } from "@/components/shadcn/field";
+import { Input } from "@/components/shadcn/input";
+import { Textarea } from "@/components/shadcn/textarea";
+import { TimeInput } from "@/components/time-input";
 
 // ─── Estado del editor ───────────────────────────────────────────────────────
 
@@ -59,6 +67,19 @@ type DayState = { key: string; date: string | null; title: string | null; notes:
 export type EditorTemplate = { id: string; type: ActivityType; title: string; location: string | null; durationMin: number | null; notes: string | null };
 
 const NONE: never[] = [];
+
+/**
+ * Dónde cae lo que se arrastra: manda el puntero. Sobre una actividad, esa actividad; sobre el resto de un
+ * día (su encabezado o el espacio de abajo), ese día, al final. Solo si el puntero no está sobre ningún día,
+ * lo más cercano. (Por cercanía de bordes, al bajar hasta el final de un día se "enganchaba" el día siguiente.)
+ */
+const dropTarget: CollisionDetection = (args) => {
+  const within = pointerWithin(args);
+  const items = within.filter((c) => !String(c.id).startsWith("day:"));
+  if (items.length) return items;
+  if (within.length) return within;
+  return closestCorners(args);
+};
 
 let counter = 0;
 const newKey = (p: string) => `${p}-${Date.now().toString(36)}-${(counter++).toString(36)}`;
@@ -158,9 +179,56 @@ export function ItineraryEditor({
   const [templates, setTemplates] = useState(initialTemplates);
   const [dirty, setDirty] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
+  // Días abiertos: arrancan todos cerrados; se abren al tocarlos, al agregarlos o al soltarles una actividad.
+  const [openDays, setOpenDays] = useState<Set<string>>(() => new Set());
+  const openDay = (key: string) => setOpenDays((prev) => (prev.has(key) ? prev : new Set(prev).add(key)));
+  const toggleDay = (key: string) =>
+    setOpenDays((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   const [activeLabel, setActiveLabel] = useState<string | null>(null);
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
-  const [notify, setNotify] = useState(true);
+  // Al guardar se pregunta si avisarle al cliente (o a los viajeros del grupo).
+  const [confirmSave, setConfirmSave] = useState(false);
+  // Salir con cambios sin guardar: los vínculos de la app y el botón Atrás abren un diálogo; cerrar o
+  // recargar la pestaña, el aviso del navegador (es el único que permite en esos casos).
+  const router = useRouter();
+  const [leaveTo, setLeaveTo] = useState<string | null>(null); // "back" = salir con el botón Atrás
+  const leaving = useRef(false);
+  useEffect(() => {
+    if (!dirty) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => e.preventDefault();
+    // Atrás no descarga la página, así que el navegador no avisa: se agrega una entrada igual al historial
+    // y, si la sacan con Atrás, se vuelve a poner y se pregunta.
+    history.pushState(history.state, "", location.href);
+    const onPopState = () => {
+      history.pushState(history.state, "", location.href);
+      setLeaveTo("back");
+    };
+    window.addEventListener("popstate", onPopState);
+    const onClick = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const a = (e.target as Element | null)?.closest("a");
+      if (!a || !a.href || a.target === "_blank" || a.hasAttribute("download")) return;
+      const url = new URL(a.href, location.href);
+      if (url.origin !== location.origin || (url.pathname === location.pathname && url.search === location.search)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setLeaveTo(url.pathname + url.search + url.hash);
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    document.addEventListener("click", onClick, true);
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      window.removeEventListener("popstate", onPopState);
+      document.removeEventListener("click", onClick, true);
+      // Ya guardado: se saca la entrada extra para que Atrás funcione normal (salvo que se esté saliendo).
+      if (!leaving.current) history.back();
+    };
+  }, [dirty]);
   const [saving, startSave] = useTransition();
   const [aiOpen, setAiOpen] = useState(initialDays.length === 0 && aiEnabled);
   const [aiInstructions, setAiInstructions] = useState("");
@@ -251,6 +319,7 @@ export function ItineraryEditor({
 
   function addMustDo(dayIndex: number, entry: CheckEntry) {
     update((prev) => prev.map((d, di) => (di === dayIndex ? { ...d, items: [...d.items, mustDoItem(entry)] } : d)));
+    if (days[dayIndex]) openDay(days[dayIndex].key);
   }
 
   function addAllMustDos() {
@@ -280,6 +349,8 @@ export function ItineraryEditor({
   }
 
   function addDay() {
+    const key = newKey("d");
+    openDay(key);
     update((prev) => {
       const last = prev[prev.length - 1]?.date;
       let date: string | null = null;
@@ -288,7 +359,7 @@ export function ItineraryEditor({
         d.setUTCDate(d.getUTCDate() + 1);
         date = d.toISOString().slice(0, 10);
       }
-      return [...prev, { key: newKey("d"), date, title: null, notes: null, items: [] }];
+      return [...prev, { key, date, title: null, notes: null, items: [] }];
     });
   }
 
@@ -348,6 +419,7 @@ export function ItineraryEditor({
       ...item,
     };
     update((prev) => prev.map((d) => (d.key === dayKey ? { ...d, items: [...d.items, created] } : d)));
+    openDay(dayKey);
     if (!item) setEditing(created.key);
     return created;
   }
@@ -410,8 +482,14 @@ export function ItineraryEditor({
       if (!pos) return;
       targetDay = pos.day;
       targetIndex = pos.index;
+      // Desde la paleta o desde otro día: si se suelta sobre la mitad de abajo de una actividad, va después
+      // (si no, nunca podría quedar última). Dentro del mismo día manda el reordenamiento de la lista.
+      const dragged = e.active.rect.current.translated;
+      const fromSameDay = itemIndex.get(activeId)?.day === pos.day;
+      if (!fromSameDay && dragged && dragged.top + dragged.height / 2 > e.over.rect.top + e.over.rect.height / 2) targetIndex += 1;
     }
 
+    openDay(days[targetDay].key);
     const pal = paletteItem(activeId);
     if (pal) {
       const item: ItemState = {
@@ -458,7 +536,8 @@ export function ItineraryEditor({
 
   // ── Guardar / IA
 
-  function save() {
+  function save(notify: boolean) {
+    setConfirmSave(false);
     const payload: ItineraryDayInput[] = days.map((d) => ({
       date: d.date,
       title: d.title?.trim() || null,
@@ -480,7 +559,7 @@ export function ItineraryEditor({
       if ("error" in res && res.error) setMessage({ tone: "error", text: res.error });
       else {
         setDirty(false);
-        setMessage({ tone: "ok", text: notify ? "Itinerario guardado y avisado al cliente." : "Itinerario guardado." });
+        setMessage({ tone: "ok", text: notify ? (target.kind === "group" ? "Itinerario guardado y avisado a los viajeros." : "Itinerario guardado y avisado al cliente.") : "Itinerario guardado." });
       }
     });
   }
@@ -568,9 +647,9 @@ export function ItineraryEditor({
   }
 
   return (
-    <DndContext id="itinerary-editor" sensors={sensors} collisionDetection={closestCorners} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+    <DndContext id="itinerary-editor" sensors={sensors} collisionDetection={dropTarget} onDragStart={onDragStart} onDragEnd={onDragEnd}>
       {/* Barra superior */}
-      <div className="sticky top-[52px] z-10 -mx-4 mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] bg-[var(--ground)] px-4 py-3 sm:-mx-6 sm:px-6 lg:top-0 lg:-mx-10 lg:px-10">
+      <div className="sticky top-14 z-10 -mx-4 mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] bg-[var(--sheet)]/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:top-0 lg:-mx-8 lg:px-8">
         <div className="flex flex-wrap items-center gap-2">
           {startDate && endDate && (
             <button type="button" onClick={generateDays} className={buttonClass("secondary", "sm")}>
@@ -594,13 +673,63 @@ export function ItineraryEditor({
         <div className="flex items-center gap-3">
           {message && <span className={clsx("text-sm", message.tone === "ok" ? "text-emerald-700" : "text-rose-700")}>{message.text}</span>}
           {dirty && !message && <span className="text-sm text-amber-700">Cambios sin guardar</span>}
-          <label className="flex items-center gap-1.5 text-xs text-slate-600">
-            <input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} className="rounded border-slate-300" />
-            Avisar al cliente
-          </label>
-          <button type="button" onClick={save} disabled={saving} className={buttonClass("primary")}>
+          <button type="button" onClick={() => setConfirmSave(true)} disabled={saving} className={buttonClass("primary")}>
             <Save className="size-4" /> {saving ? "Guardando…" : "Guardar"}
           </button>
+          <Dialog open={leaveTo !== null} onOpenChange={(open) => !open && setLeaveTo(null)}>
+            <DialogContent>
+              <DialogHeader>
+                <span className="grid size-11 place-items-center rounded-full bg-amber-50 text-amber-700">
+                  <AlertTriangle className="size-5" />
+                </span>
+                <DialogTitle>¿Salir sin guardar?</DialogTitle>
+                <DialogDescription>Hiciste cambios en el itinerario que todavía no se guardaron. Si salís ahora, se pierden.</DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const to = leaveTo!;
+                    leaving.current = true;
+                    setDirty(false);
+                    setLeaveTo(null);
+                    // Atrás: dos pasos (la entrada extra y la página de la que venían).
+                    if (to === "back") history.go(-2);
+                    else router.push(to);
+                  }}
+                  className={buttonClass("danger")}
+                >
+                  Salir sin guardar
+                </button>
+                <button type="button" onClick={() => setLeaveTo(null)} className={buttonClass("primary")} autoFocus>
+                  Seguir editando
+                </button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          <Dialog open={confirmSave} onOpenChange={setConfirmSave}>
+            <DialogContent>
+              <DialogHeader>
+                <span className="grid size-11 place-items-center rounded-full bg-brand-50 text-brand-700">
+                  <BellRing className="size-5" />
+                </span>
+                <DialogTitle>{target.kind === "group" ? "¿Avisarles a los viajeros del grupo?" : "¿Avisarle al cliente?"}</DialogTitle>
+                <DialogDescription>
+                  {target.kind === "group"
+                    ? "Cada viajero del grupo recibe una notificación en su portal: «El itinerario del grupo fue actualizado»."
+                    : "Le llega una notificación en su portal: «Tu itinerario fue actualizado», con el link para verlo."}
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <button type="button" onClick={() => save(false)} className={buttonClass("secondary")}>
+                  Guardar sin avisar
+                </button>
+                <button type="button" onClick={() => save(true)} className={buttonClass("primary")} autoFocus>
+                  <BellRing className="size-4" /> Guardar y avisar
+                </button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -691,36 +820,47 @@ export function ItineraryEditor({
       )}
 
       {catalog.length > 0 && days.some((d) => d.items.length > 0) && (
-        <div className={clsx("mb-4 rounded-lg border p-4 text-sm", checks.count + checks.missing.length > 0 ? "border-amber-200 bg-amber-50/60" : "border-emerald-200 bg-emerald-50/60")}>
-          <p className="flex items-center gap-2 font-semibold text-slate-900">
-            <ShieldCheck className={clsx("size-4", checks.count + checks.missing.length > 0 ? "text-amber-700" : "text-emerald-700")} />
-            Revisión automática
-            <span className="font-normal text-slate-600">
+        <div className={clsx("mb-6 rounded-2xl px-4 py-3 text-sm ring-1", checks.count + checks.missing.length > 0 ? "bg-amber-50 ring-amber-200" : "bg-emerald-50 ring-emerald-200")}>
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <ShieldCheck className={clsx("size-4 shrink-0", checks.count + checks.missing.length > 0 ? "text-amber-700" : "text-emerald-700")} />
+            <span className="font-semibold text-slate-900">Revisión automática</span>
+            <span className="text-slate-700">
               {checks.count + checks.missing.length === 0
-                ? "· Todo en orden: alturas, cierres e imperdibles."
-                : `· ${checks.count} ${checks.count === 1 ? "aviso" : "avisos"} en las actividades${checks.missing.length ? ` · ${checks.missing.length} ${checks.missing.length === 1 ? "imperdible falta" : "imperdibles faltan"}` : ""}`}
+                ? "Todo en orden: alturas, cierres e imperdibles."
+                : [
+                    checks.count > 0 && `${checks.count} ${checks.count === 1 ? "aviso" : "avisos"} en las actividades (abrí el día para verlos)`,
+                    checks.missing.length > 0 && `${checks.missing.length} ${checks.missing.length === 1 ? "imperdible falta" : "imperdibles faltan"}`,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
             </span>
           </p>
-          <p className="mt-1 text-xs text-slate-500">Se calcula con el catálogo de parques y la altura de cada viajero, sea una propuesta de la IA o lo que armes a mano.</p>
           {checks.missing.length > 0 && (
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              {checks.missing.map((m) => (
-                <button
-                  key={m.entry.id}
-                  type="button"
-                  onClick={() => addMustDo(m.dayIndex, m.entry)}
-                  className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-white px-2.5 py-1 text-xs text-slate-700 hover:border-amber-500"
-                  title={`Agregar al día ${m.dayIndex + 1}`}
-                >
-                  <Plus className="size-3" /> {m.entry.name} <span className="text-slate-500">· día {m.dayIndex + 1}</span>
-                </button>
-              ))}
-              {checks.missing.length > 1 && (
-                <button type="button" onClick={addAllMustDos} className="text-xs font-medium text-brand-700 hover:underline">
-                  Agregar todos
-                </button>
-              )}
-            </div>
+            <details className="group mt-1 pl-6">
+              <summary className="cursor-pointer list-none text-[13px] font-semibold text-brand-700 hover:underline [&::-webkit-details-marker]:hidden">
+                <span className="group-open:hidden">Ver imperdibles que faltan</span>
+                <span className="hidden group-open:inline">Ocultar</span>
+              </summary>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                {checks.missing.map((m) => (
+                  <button
+                    key={m.entry.id}
+                    type="button"
+                    onClick={() => addMustDo(m.dayIndex, m.entry)}
+                    className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-white px-2.5 py-1 text-xs text-slate-700 hover:border-amber-500"
+                    title={`Agregar al día ${m.dayIndex + 1}`}
+                  >
+                    <Plus className="size-3" /> {m.entry.name} <span className="text-slate-500">· día {m.dayIndex + 1}</span>
+                  </button>
+                ))}
+                {checks.missing.length > 1 && (
+                  <button type="button" onClick={addAllMustDos} className="text-xs font-semibold text-brand-700 hover:underline">
+                    Agregar todos
+                  </button>
+                )}
+              </div>
+              <p className="mt-2 text-xs text-slate-500">Se calcula con el catálogo de parques y la altura de cada viajero, sea una propuesta de la IA o lo que armes a mano.</p>
+            </details>
           )}
         </div>
       )}
@@ -768,7 +908,22 @@ export function ItineraryEditor({
         </aside>
 
         {/* Días */}
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-3">
+          {days.length > 1 && (
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-[var(--ink-soft)]">
+                {days.length} días · {days.reduce((n, d) => n + d.items.length, 0)} actividades
+              </p>
+              <button
+                type="button"
+                onClick={() => setOpenDays(openDays.size === days.length ? new Set() : new Set(days.map((d) => d.key)))}
+                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-semibold text-brand-700 hover:bg-brand-50"
+              >
+                {openDays.size === days.length ? <ChevronsDownUp className="size-4" /> : <ChevronsUpDown className="size-4" />}
+                {openDays.size === days.length ? "Cerrar todos" : "Abrir todos"}
+              </button>
+            </div>
+          )}
           {days.length === 0 && (
             <div className="rounded-lg border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">
               {startDate && endDate ? "Generá los días según las fechas del viaje o agregalos a mano." : "Agregá el primer día."}
@@ -779,6 +934,8 @@ export function ItineraryEditor({
               key={day.key}
               day={day}
               number={di + 1}
+              open={openDays.has(day.key)}
+              onToggle={() => toggleDay(day.key)}
               warnings={checks.itemWarnings[di] ?? []}
               guideStatus={guideStatus}
               aiEnabled={aiEnabled}
@@ -832,6 +989,8 @@ function PaletteChip({ id, label, type }: { id: string; label: string; type: Act
 function DayColumn({
   day,
   number,
+  open,
+  onToggle,
   warnings,
   guideStatus,
   aiEnabled,
@@ -853,6 +1012,8 @@ function DayColumn({
 }: {
   day: DayState;
   number: number;
+  open: boolean;
+  onToggle: () => void;
   warnings: ItemWarning[][];
   guideStatus: Record<string, GuideStatus>;
   aiEnabled: boolean;
@@ -872,27 +1033,41 @@ function DayColumn({
   onPatchItem: (key: string, p: Partial<ItemState>) => void;
   onRemoveItem: (key: string) => void;
 }) {
+  // Todo el día recibe actividades, abierto o cerrado (al soltar una, se abre).
   const { setNodeRef, isOver } = useDroppable({ id: `day:${day.key}` });
+  const flagged = warnings.some((w) => w.length > 0) || pendingEvents.length > 0;
   return (
-    <section className={clsx("rounded-lg border bg-white transition-colors", isOver ? "border-brand-400 ring-2 ring-brand-100" : "border-slate-200")}>
-      <header className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-3">
-        <span className="rounded-md bg-brand-600 px-2 py-0.5 text-xs font-semibold text-white">Día {number}</span>
-        <DateInput value={day.date ?? ""} onChange={(v) => onPatch({ date: v || null })} placeholder="Sin fecha" size="sm" className="w-44" />
-        <span className="hidden text-xs text-slate-500 first-letter:uppercase sm:inline-block">{prettyDate(day.date)}</span>
-        <input
-          value={day.title ?? ""}
-          onChange={(e) => onPatch({ title: e.target.value })}
-          placeholder="Parque o lugar del día"
-          className="min-w-40 flex-1 rounded-md border border-transparent px-2 py-0.5 text-sm font-medium text-slate-900 hover:border-slate-200 focus:border-brand-400 focus:outline-none"
-        />
-        <button type="button" onClick={onSort} className="text-slate-500 hover:text-slate-700" title="Ordenar por horario">
-          <ArrowDownUp className="size-4" />
+    <section ref={setNodeRef} className={clsx("rounded-2xl border bg-white transition-colors", isOver ? "border-brand-400 ring-2 ring-brand-100" : "border-[var(--border)]")}>
+      {!open ? (
+        <button type="button" onClick={onToggle} aria-expanded={false} className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-left hover:bg-[var(--raised)] sm:px-5">
+          <span className="shrink-0 rounded-full bg-brand-600 px-2.5 py-0.5 text-xs font-semibold text-white">Día {number}</span>
+          <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-slate-900">{day.title || <span className="font-normal text-[var(--ink-soft)]">Sin título</span>}</span>
+          {flagged && <AlertTriangle className="size-4 shrink-0 text-amber-600" aria-label="Este día tiene avisos" />}
+          <span className="shrink-0 text-sm text-[var(--ink-soft)] first-letter:uppercase">{day.date ? prettyDate(day.date) : "Sin fecha"}</span>
+          <ChevronDown className="size-4 shrink-0 text-slate-500" />
         </button>
-        <button type="button" onClick={onRemove} className="text-slate-300 hover:text-rose-600" title="Eliminar día">
-          <Trash2 className="size-4" />
-        </button>
-      </header>
-      <div ref={setNodeRef} className="space-y-2 p-3">
+      ) : (
+        <>
+          <header className="flex flex-wrap items-center gap-2.5 border-b border-[var(--rule)] px-4 py-3 sm:px-5">
+            <button type="button" onClick={onToggle} aria-expanded className="flex items-center gap-2" title="Cerrar el día">
+              <ChevronDown className="size-4 rotate-180 text-slate-500" />
+              <span className="rounded-full bg-brand-600 px-2.5 py-0.5 text-xs font-semibold text-white">Día {number}</span>
+            </button>
+            <DateInput value={day.date ?? ""} onChange={(v) => onPatch({ date: v || null })} placeholder="Sin fecha" size="sm" className="w-44" />
+            <input
+              value={day.title ?? ""}
+              onChange={(e) => onPatch({ title: e.target.value })}
+              placeholder="Parque o lugar del día"
+              className="min-w-40 flex-1 rounded-lg border border-transparent px-2 py-1 text-[15px] font-semibold text-slate-900 hover:border-[var(--control)] focus:border-brand-400 focus:outline-none"
+            />
+            <button type="button" onClick={onSort} className="rounded-full p-1.5 text-slate-500 hover:bg-[var(--raised)] hover:text-slate-800" title="Ordenar por horario">
+              <ArrowDownUp className="size-4" />
+            </button>
+            <button type="button" onClick={onRemove} className="rounded-full p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600" title="Eliminar día">
+              <Trash2 className="size-4" />
+            </button>
+          </header>
+      <div className="space-y-2.5 px-3 pt-4 pb-4 sm:px-5">
         {pendingEvents.map((g) => (
           <button
             key={g.id}
@@ -929,10 +1104,10 @@ function DayColumn({
             />
           ))}
         </SortableContext>
-        {day.items.length === 0 && <p className="rounded-lg border border-dashed border-slate-200 py-4 text-center text-xs text-slate-500">Soltá actividades acá</p>}
-        <div className="flex items-center justify-between pt-1">
-          <button type="button" onClick={onAddItem} className="text-xs font-medium text-brand-700 hover:underline">
-            + Agregar actividad
+        {day.items.length === 0 && <p className="rounded-xl border border-dashed border-[var(--control)] py-5 text-center text-sm text-[var(--ink-soft)]">Soltá actividades acá</p>}
+        <div className="pt-1">
+          <button type="button" onClick={onAddItem} className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[13px] font-semibold text-brand-700 hover:bg-brand-50">
+            <Plus className="size-4" /> Agregar actividad
           </button>
         </div>
         <textarea
@@ -940,9 +1115,11 @@ function DayColumn({
           onChange={(e) => onPatch({ notes: e.target.value })}
           placeholder="Notas del día (visibles para el cliente)"
           rows={1}
-          className="w-full resize-y rounded-md border border-slate-100 px-2 py-1 text-xs text-slate-600 placeholder:text-slate-300 focus:border-brand-300 focus:outline-none"
+          className="w-full resize-y rounded-xl border border-[var(--rule)] bg-[var(--raised)] px-3 py-2 text-[13px] text-slate-700 placeholder:text-slate-500 focus:border-brand-300 focus:outline-none"
         />
       </div>
+        </>
+      )}
     </section>
   );
 }
@@ -979,19 +1156,20 @@ function SortableItem({
   onRemove: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.key });
+  const fid = useId();
   return (
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={clsx("rounded-lg border-l-4", ACTIVITY_TYPE_COLOR[item.type], isDragging && "opacity-40")}
+      className={clsx("rounded-xl border-l-4", ACTIVITY_TYPE_COLOR[item.type], isDragging && "opacity-40")}
     >
-      <div className="flex items-center gap-2 px-2 py-2">
+      <div className="flex items-center gap-2.5 px-2.5 py-2.5">
         <button type="button" {...listeners} {...attributes} className="cursor-grab text-slate-500 active:cursor-grabbing" title="Arrastrar">
           <GripVertical className="size-4" />
         </button>
         <button type="button" onClick={onToggle} className="min-w-0 flex-1 text-left">
-          <p className="truncate text-sm font-medium text-slate-900">{item.title || "Sin título"}</p>
-          <p className="flex flex-wrap gap-3 text-xs text-slate-500">
+          <p className="truncate text-sm font-semibold text-slate-900">{item.title || "Sin título"}</p>
+          <p className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-600">
             <span>{ACTIVITY_TYPE_LABEL[item.type]}</span>
             {item.startTime && (
               <span className="inline-flex items-center gap-1">
@@ -1019,23 +1197,42 @@ function SortableItem({
         </button>
       </div>
       {open && (
-        <div className="grid grid-cols-1 gap-2 border-t border-white/60 bg-white/70 p-3 sm:grid-cols-6">
-          <input className="field sm:col-span-3" value={item.title} onChange={(e) => onPatch({ title: e.target.value })} placeholder="Título" autoFocus />
-          <SelectField className="sm:col-span-1" value={item.type} onValueChange={(v) => onPatch({ type: v as ActivityType })} options={ACTIVITY_TYPES} aria-label="Tipo de actividad" />
-          <input
-            className="field"
-            type="time"
-            value={item.startTime ?? ""}
-            onChange={(e) => {
-              const startTime = e.target.value || null;
-              onPatch({ startTime, endTime: item.endTime ?? (startTime ? addMinutes(startTime, 60) : null) });
-            }}
-            title="Desde"
-          />
-          <input className="field" type="time" value={item.endTime ?? ""} onChange={(e) => onPatch({ endTime: e.target.value || null })} title="Hasta" />
-          <input className="field sm:col-span-3" value={item.location ?? ""} onChange={(e) => onPatch({ location: e.target.value })} placeholder="Lugar / parque / área" />
-          <input className="field sm:col-span-3" value={item.confirmationNumber ?? ""} onChange={(e) => onPatch({ confirmationNumber: e.target.value })} placeholder="N° de confirmación" />
-          <textarea className="field sm:col-span-6" rows={2} value={item.notes ?? ""} onChange={(e) => onPatch({ notes: e.target.value })} placeholder="Notas y tips para el cliente" />
+        <div className="grid grid-cols-1 gap-x-3 gap-y-4 border-t border-white/60 bg-white/80 p-4 sm:grid-cols-6">
+          <Field className="sm:col-span-3">
+            <FieldLabel htmlFor={`${fid}-title`}>Título</FieldLabel>
+            <Input id={`${fid}-title`} value={item.title} onChange={(e) => onPatch({ title: e.target.value })} placeholder="Ej: Desayuno con personajes" autoFocus />
+          </Field>
+          <Field className="sm:col-span-3">
+            <FieldLabel htmlFor={`${fid}-type`}>Tipo</FieldLabel>
+            <SelectField id={`${fid}-type`} value={item.type} onValueChange={(v) => onPatch({ type: v as ActivityType })} options={ACTIVITY_TYPES} />
+          </Field>
+          <Field className="sm:col-span-2">
+            <FieldLabel htmlFor={`${fid}-from`}>Desde</FieldLabel>
+            <TimeInput
+              id={`${fid}-from`}
+              value={item.startTime}
+              onChange={(v) => {
+                const startTime = v || null;
+                onPatch({ startTime, endTime: item.endTime ?? (startTime ? addMinutes(startTime, 60) : null) });
+              }}
+            />
+          </Field>
+          <Field className="sm:col-span-2">
+            <FieldLabel htmlFor={`${fid}-to`}>Hasta</FieldLabel>
+            <TimeInput id={`${fid}-to`} value={item.endTime} onChange={(v) => onPatch({ endTime: v || null })} />
+          </Field>
+          <Field className="sm:col-span-2">
+            <FieldLabel htmlFor={`${fid}-conf`}>N° de confirmación</FieldLabel>
+            <Input id={`${fid}-conf`} value={item.confirmationNumber ?? ""} onChange={(e) => onPatch({ confirmationNumber: e.target.value })} placeholder="Opcional" />
+          </Field>
+          <Field className="sm:col-span-6">
+            <FieldLabel htmlFor={`${fid}-place`}>Lugar</FieldLabel>
+            <Input id={`${fid}-place`} value={item.location ?? ""} onChange={(e) => onPatch({ location: e.target.value })} placeholder="Parque, área o dirección" />
+          </Field>
+          <Field className="sm:col-span-6">
+            <FieldLabel htmlFor={`${fid}-notes`}>Notas y tips para el cliente</FieldLabel>
+            <Textarea id={`${fid}-notes`} rows={2} value={item.notes ?? ""} onChange={(e) => onPatch({ notes: e.target.value })} placeholder="Ej: llegar 15 minutos antes; pedir mesa en la ventana" />
+          </Field>
           <SaveAsTemplate item={item} onSaved={onTemplateSaved} />
         </div>
       )}
@@ -1156,7 +1353,7 @@ function ParkSection({
           </div>
         </div>
       ) : (
-        <ParkSheetCard sheet={sheet} closedNote={closedNote} />
+        <CollapsibleParkSheet sheet={sheet} closedNote={closedNote} />
       )}
       {eventWarning && (
         <p className="mt-1.5 flex items-start gap-1.5 rounded-lg bg-amber-50 px-2 py-1.5 text-xs text-amber-800">
@@ -1331,13 +1528,19 @@ function GuideForm({ guide, catalog, onChange, onDone }: { guide: PlaceGuide; ca
         ))}
       </datalist>
       <div>
-        <p className="mb-1.5 text-xs font-semibold text-brand-700">Recomendaciones</p>
-        <ul className="space-y-2">
+        <p className="mb-2 text-sm font-semibold text-slate-900">Recomendaciones</p>
+        <ul className="space-y-3">
           {guide.picks.map((p, i) => (
-            <li key={i} className="grid grid-cols-1 gap-1.5 rounded-lg bg-slate-50 p-2 sm:grid-cols-[minmax(0,1fr)_9rem_auto]">
-              <input className="field" value={p.name} onChange={(e) => renamePick(i, e.target.value)} list={listId} placeholder="Atracción, show, restaurante…" />
-              <SelectField value={p.kind} onValueChange={(v) => patchPick(i, { kind: v as GuidePickKind })} options={GUIDE_PICK_KINDS.map((k) => ({ value: k, label: GUIDE_PICK_LABEL[k] }))} aria-label="Tipo" />
-              <div className="flex items-center justify-end gap-1 text-slate-500">
+            <li key={i} className="grid grid-cols-1 items-end gap-x-3 gap-y-3 rounded-xl bg-[var(--raised)] p-3 sm:grid-cols-[minmax(0,1fr)_10rem_auto]">
+              <Field>
+                <FieldLabel htmlFor={`${listId}-${i}-name`}>Qué</FieldLabel>
+                <Input id={`${listId}-${i}-name`} value={p.name} onChange={(e) => renamePick(i, e.target.value)} list={listId} placeholder="Atracción, show, restaurante…" />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor={`${listId}-${i}-kind`}>Tipo</FieldLabel>
+                <SelectField id={`${listId}-${i}-kind`} value={p.kind} onValueChange={(v) => patchPick(i, { kind: v as GuidePickKind })} options={GUIDE_PICK_KINDS.map((k) => ({ value: k, label: GUIDE_PICK_LABEL[k] }))} />
+              </Field>
+              <div className="flex items-center justify-end gap-1 pb-2 text-slate-500">
                 <button type="button" onClick={() => movePick(i, -1)} disabled={i === 0} className="p-1 hover:text-slate-700 disabled:opacity-30" title="Subir">
                   <ChevronUp className="size-4" />
                 </button>
@@ -1348,7 +1551,10 @@ function GuideForm({ guide, catalog, onChange, onDone }: { guide: PlaceGuide; ca
                   <Trash2 className="size-3.5" />
                 </button>
               </div>
-              <textarea className="field sm:col-span-3" rows={2} value={p.why} onChange={(e) => patchPick(i, { why: e.target.value })} placeholder="Por qué se la recomendás a esta familia" />
+              <Field className="sm:col-span-3">
+                <FieldLabel htmlFor={`${listId}-${i}-why`}>Por qué se la recomendás</FieldLabel>
+                <Textarea id={`${listId}-${i}-why`} rows={2} value={p.why} onChange={(e) => patchPick(i, { why: e.target.value })} placeholder="Ej: a Mía le encantan las princesas y es corta" />
+              </Field>
             </li>
           ))}
         </ul>
@@ -1361,13 +1567,14 @@ function GuideForm({ guide, catalog, onChange, onDone }: { guide: PlaceGuide; ca
         </button>
       </div>
       <div>
-        <p className="mb-1.5 text-xs font-semibold text-amber-800">Tips</p>
+        <p className="mb-2 text-sm font-semibold text-slate-900">Tips</p>
         <ul className="space-y-1.5">
           {guide.tips.map((t, i) => (
             <li key={i} className="flex items-start gap-1.5">
-              <textarea
-                className="field flex-1"
+              <Textarea
+                className="flex-1"
                 rows={2}
+                aria-label={`Tip ${i + 1}`}
                 value={t}
                 onChange={(e) => onChange({ ...guide, tips: guide.tips.map((x, j) => (j === i ? e.target.value : x)) })}
                 placeholder="Un consejo práctico para ese día"

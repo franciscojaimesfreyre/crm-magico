@@ -2,6 +2,10 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* Sin modo oscuro por ahora: las clases dark: de shadcn solo aplicarían bajo .dark, que el sitio no usa
+   (por defecto Tailwind las activa con el modo oscuro del sistema y grisaba los campos). */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /*
  * CRM Mágico — sistema visual (estilo "framed sheet" con la referencia de Collective OS).
  * Un marco crema que sostiene el menú y la barra superior; el trabajo, en una hoja blanca con

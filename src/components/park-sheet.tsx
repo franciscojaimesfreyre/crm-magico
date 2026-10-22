@@ -1,9 +1,11 @@
 import clsx from "clsx";
 import {
   Castle,
+  ChevronDown,
   CircleCheck,
   Clock,
   Drama,
+  FerrisWheel,
   Footprints,
   IceCreamCone,
   Lightbulb,
@@ -36,6 +38,45 @@ const NUMBERED: SectionKind[] = ["MUST_DO", "CLASSICS"];
 const hours = (s: ParkSheet) => (s.openTime && s.closeTime ? `${s.openTime} – ${s.closeTime}` : (s.openTime ?? s.closeTime ?? ""));
 
 /**
+ * La ficha plegada, para el itinerario: una barra con el parque (o el evento) y el horario del día, y un
+ * botón "Ver ficha" que se nota que se toca. Adentro, la ficha completa. Es un <details>: funciona igual
+ * en el servidor (portal, link público) y en el editor, y al imprimir se abre con el resto.
+ */
+export function CollapsibleParkSheet({ sheet, closedNote }: { sheet: ParkSheet; closedNote?: (name: string) => string | null }) {
+  const event = sheet.kind === "EVENT";
+  const Icon = event ? PartyPopper : FerrisWheel;
+  const time = hours(sheet);
+  return (
+    <details data-fold className={clsx("group/sheet overflow-hidden rounded-xl bg-white ring-1", event ? "ring-amber-200" : "ring-brand-200")}>
+      <summary className="flex cursor-pointer list-none items-center gap-3 px-3 py-2.5 select-none hover:bg-[var(--raised)] [&::-webkit-details-marker]:hidden">
+        <span className={clsx("grid size-8 shrink-0 place-items-center rounded-full", event ? "bg-amber-100 text-amber-800" : "bg-brand-100 text-brand-700")}>
+          <Icon className="size-4" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold text-slate-900">{event ? `Ficha del evento · ${sheet.name}` : `Ficha de ${sheet.name}`}</span>
+          <span className="block truncate text-xs text-[var(--ink-soft)]">
+            {time ? `${event ? "Fiesta" : "Abre"} ${time} · ` : ""}imperdibles, shows, dónde comer y tips
+          </span>
+        </span>
+        <span
+          className={clsx(
+            "inline-flex shrink-0 items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold",
+            event ? "bg-amber-100 text-amber-900" : "bg-brand-600 text-white",
+          )}
+        >
+          <span className="group-open/sheet:hidden">Ver ficha</span>
+          <span className="hidden group-open/sheet:inline">Ocultar</span>
+          <ChevronDown className="size-3.5 transition-transform group-open/sheet:rotate-180" />
+        </span>
+      </summary>
+      <div className="border-t border-[var(--rule)]">
+        <ParkSheetCard sheet={sheet} closedNote={closedNote} bare />
+      </div>
+    </details>
+  );
+}
+
+/**
  * Ficha de un parque o evento especial dentro del itinerario: horarios, llegada recomendada, show
  * principal y las secciones (imperdibles, leves, shows, dónde comer, tips…). Sin hooks: la usan la
  * vista del viajero (servidor) y el editor (cliente).
@@ -43,8 +84,11 @@ const hours = (s: ParkSheet) => (s.openTime && s.closeTime ? `${s.openTime} – 
 export function ParkSheetCard({
   sheet,
   closedNote,
+  bare = false,
 }: {
   sheet: ParkSheet;
+  /** Dentro de la ficha plegada: sin marco propio. */
+  bare?: boolean;
   /** Si una atracción o show está cerrado ese día, el texto a mostrar ("Cerrada · reabre el 31/12/2026"). */
   closedNote?: (name: string) => string | null;
 }) {
@@ -57,7 +101,7 @@ export function ParkSheetCard({
   const tips = sheet.sections.filter((s) => s.kind === "TIPS");
   const rest = sheet.sections.filter((s) => s.kind !== "TIPS");
   return (
-    <div className={clsx("overflow-hidden rounded-lg bg-white/90 ring-1", event ? "ring-amber-200" : "ring-slate-200/70")}>
+    <div className={clsx(!bare && "overflow-hidden rounded-lg bg-white/90 ring-1", !bare && (event ? "ring-amber-200" : "ring-slate-200/70"))}>
       {event && (
         <p className="flex items-center gap-1.5 bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-950">
           <PartyPopper className="size-3.5" /> Evento especial · {sheet.name}

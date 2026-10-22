@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Plane } from "lucide-react";
 import { buttonClass } from "@/components/ui";
 import { DateInput } from "@/components/date-input";
+import { TimeInput } from "@/components/time-input";
 
 export type FlightLegValues = { date: string; time: string; airline: string; flightNumber: string };
 
@@ -25,7 +26,7 @@ function LegRow({ prefix, title, values }: { prefix: string; title: string; valu
         </label>
         <label className="block">
           <span className="label">Hora</span>
-          <input type="time" name={`${prefix}Time`} defaultValue={values?.time} className="field" />
+          <TimeInput name={`${prefix}Time`} defaultValue={values?.time} />
         </label>
         <label className="block">
           <span className="label">Aerolínea</span>

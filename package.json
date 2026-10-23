@@ -11,6 +11,7 @@
     "db:up": "docker compose up -d",
     "db:migrate": "prisma migrate dev && prisma generate",
     "db:seed": "tsx --conditions=react-server prisma/seed.ts",
+    "media": "tsx --conditions=react-server --env-file=.env scripts/media.ts",
     "db:reset": "prisma migrate reset --force && prisma generate && tsx --conditions=react-server prisma/seed.ts",
     "typecheck": "tsc --noEmit"
   },

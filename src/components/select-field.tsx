@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { ChevronDown } from "lucide-react";
 import { Select as SelectPrimitive } from "@base-ui/react/select";
@@ -53,13 +53,27 @@ export function SelectField({
   const changed = useRef(false);
   const label = current === "" && placeholder !== undefined ? placeholder : (all.find((o) => o.value === current)?.label ?? placeholder ?? "");
 
+  // Después de guardar, el servidor manda el valor nuevo: se adopta (React resetea el formulario al terminar
+  // la acción, a veces antes de que llegue, y sin esto quedaba el valor viejo en pantalla).
+  const [prevInitial, setPrevInitial] = useState(initial);
+  if (initial !== prevInitial) {
+    setPrevInitial(initial);
+    setInner(initial);
+  }
+
+  // Se lee el último valor recibido en el momento (no el de cuando se armó el listener) y un instante
+  // después, porque React resetea el formulario casi junto con la llegada de los datos nuevos.
+  const latestInitial = useRef(initial);
+  useLayoutEffect(() => {
+    latestInitial.current = initial;
+  }, [initial]);
   useEffect(() => {
     const form = hidden.current?.form;
     if (!form) return;
-    const reset = () => setInner(initial);
+    const reset = () => setTimeout(() => setInner(latestInitial.current), 0);
     form.addEventListener("reset", reset);
     return () => form.removeEventListener("reset", reset);
-  }, [initial]);
+  }, []);
 
   // Avisa al formulario como lo haría un select nativo (hay pantallas que escuchan "change" en el form).
   useEffect(() => {

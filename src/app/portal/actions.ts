@@ -20,6 +20,7 @@ import { splitList } from "@/lib/clients";
 import { DESTINATION_LABEL } from "@/lib/labels";
 import type { ActionState } from "@/components/form-controls";
 import type { Destination, TripPace } from "@/generated/prisma/enums";
+import { avatarFromForm } from "@/lib/avatars-server";
 
 // ─── Acceso ──────────────────────────────────────────────────────────────────
 
@@ -263,11 +264,13 @@ export async function updatePortalProfile(_: ActionState, formData: FormData): P
   const travelers = await db.traveler.findMany({ where: { clientId: account.clientId } });
   for (const t of travelers) {
     const height = Number(formData.get(`height-${t.id}`));
+    const avatar = await avatarFromForm(formData, account.client.organizationId, `avatar-${t.id}`);
     await db.traveler.update({
       where: { id: t.id },
       data: {
         birthDate: parseDateInput(formData.get(`birth-${t.id}`)) ?? t.birthDate,
         heightCm: Number.isFinite(height) && height > 0 ? Math.round(height) : t.heightCm,
+        avatar,
       },
     });
   }
@@ -280,11 +283,12 @@ export async function updatePortalProfile(_: ActionState, formData: FormData): P
         firstName: newName,
         birthDate: parseDateInput(formData.get("newTravelerBirth")),
         heightCm: Number.isFinite(height) && height > 0 ? Math.round(height) : null,
+        avatar: await avatarFromForm(formData, account.client.organizationId, "newTravelerAvatar"),
       },
     });
   }
   await logActivity({ organizationId: account.client.organizationId, clientId: account.clientId, type: "portal", description: "El cliente actualizó sus preferencias desde el portal" });
-  revalidatePath("/portal/perfil");
+  revalidatePath("/portal", "layout");
   return { ok: "¡Gracias! Tu agente va a usar esta información para planificar mejor." };
 }
 

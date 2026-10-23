@@ -7,6 +7,12 @@ import { Avatar, buttonClass } from "@/components/ui";
 import { DESTINATION_LABEL } from "@/lib/labels";
 import { daysBetween, formatRange, todayUTC } from "@/lib/format";
 import { mainStay } from "@/lib/trips";
+import { TravelerAvatar } from "@/components/traveler-avatar";
+import { resolveAvatar } from "@/lib/avatars";
+import { portalPersona } from "@/lib/avatars-server";
+import { TripBanner } from "@/components/trip-banner";
+import { bannerItem } from "@/lib/media";
+import clsx from "clsx";
 
 export const metadata = { title: "Mis viajes" };
 
@@ -31,6 +37,8 @@ export default async function PortalHome() {
   const next = upcoming.find((b) => b.startDate && ["BOOKED", "PAID_IN_FULL", "TRAVELED"].includes(b.status)) ?? upcoming[0];
   const daysLeft = next?.startDate ? daysBetween(today, next.startDate) : null;
   const agent = client.owner;
+  const persona = await portalPersona(account.clientId);
+  const family = persona.travelers.slice(0, 4);
 
   return (
     <div className="space-y-6">
@@ -54,7 +62,7 @@ export default async function PortalHome() {
       ))}
 
       {next ? (
-        <section className="overflow-hidden rounded-[18px] bg-[var(--field)] p-6 text-white sm:p-8">
+        <TripBanner banner={next.banner} className={clsx("rounded-[18px] p-6 sm:p-8", bannerItem(next.banner) && "pt-40 sm:pt-52")}>
           <p className="text-sm text-white/80">
             {daysLeft !== null && daysLeft > 0 && daysLeft <= 7
               ? `¡Ya casi, ${client.firstName}! Tu viaje empieza muy pronto`
@@ -83,7 +91,7 @@ export default async function PortalHome() {
               <MessageCircle className="size-4" /> Escribirle a {agent?.name.split(" ")[0] ?? "tu agente"}
             </Link>
           </div>
-        </section>
+        </TripBanner>
       ) : (
         <section className="rounded-3xl bg-white p-8 text-center">
           <Sparkles className="mx-auto size-8 text-brand-500" />
@@ -113,12 +121,21 @@ export default async function PortalHome() {
           </div>
         </Link>
         <Link href="/portal/perfil" className="flex items-center gap-3 rounded-2xl bg-white p-4 border border-[var(--border)] hover:ring-brand-200">
-          <span className="flex size-10 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
-            <Sparkles className="size-5" />
+          {/* La familia con sus personajes, uno encima del otro. */}
+          <span className="flex shrink-0 -space-x-2.5">
+            {family.length ? (
+              family.map((t) => (
+                <TravelerAvatar key={t.id} avatar={resolveAvatar(t.avatar, persona.images)} name={`${t.firstName} ${t.lastName ?? ""}`} size="sm" className="ring-2 ring-white" />
+              ))
+            ) : (
+              <span className="flex size-10 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
+                <Sparkles className="size-5" />
+              </span>
+            )}
           </span>
           <div>
             <p className="font-medium text-slate-900">Tu familia y gustos</p>
-            <p className="text-xs text-slate-500">Para planificar a tu medida</p>
+            <p className="text-xs text-slate-500">{family.some((t) => t.avatar) ? "Sus personajes y lo que les gusta" : "Elegí un personaje para cada uno"}</p>
           </div>
         </Link>
       </div>

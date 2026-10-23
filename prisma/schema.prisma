@@ -53,6 +53,7 @@ model Organization {
   contracts            Contract[]
   commissionStatements CommissionStatement[]
   forms                Form[]
+  avatarImages         AvatarImage[]
 }
 
 enum UserRole {
@@ -201,6 +202,8 @@ model Traveler {
   birthDate          DateTime? @db.Date
   heightCm           Int? // para restricciones de altura de atracciones
   relationship       String? // titular, pareja, hijo/a, abuelo/a...
+  /// Personaje del viajero: "set:<id>" (set propio, lib/avatars.ts) o "img:<AvatarImage.id>" (galería de la agencia).
+  avatar             String?
   dietaryNotes       String?
   accessibilityNotes String?
   passportExpiry     DateTime? @db.Date
@@ -209,6 +212,21 @@ model Traveler {
 
   bookings     BookingTraveler[]
   reservations BookingItemTraveler[]
+}
+
+/// Imagen de la galería de personajes de una agencia (la suben los agentes; se eligen como avatar de un viajero).
+model AvatarImage {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  /// Color del fondo del avatar y del portal cuando es el personaje del titular (hex).
+  color          String       @default("#0e7c70")
+  storageKey     String
+  mimeType       String?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId])
 }
 
 /// Credenciales del cliente en portales de proveedores (MyDisney, Universal...). Cifradas.
@@ -267,6 +285,8 @@ model Booking {
   group          Group?       @relation(fields: [groupId], references: [id], onDelete: SetNull)
 
   title       String
+  /// Banner del viaje (lib/media.ts): se ve detrás de la cabecera del viaje en el portal del cliente.
+  banner      String?
   destination Destination
   status      BookingStatus @default(INQUIRY)
   startDate   DateTime?     @db.Date

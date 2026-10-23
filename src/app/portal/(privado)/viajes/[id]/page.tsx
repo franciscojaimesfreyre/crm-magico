@@ -14,6 +14,11 @@ import { loadThread } from "@/lib/messages";
 import { readClientThread, sendClientMessage } from "../../../actions";
 import type { BookingStatus } from "@/generated/prisma/enums";
 import { describeFlightLegs, paymentProgress } from "@/lib/trips";
+import { TravelerAvatar } from "@/components/traveler-avatar";
+import { resolveAvatar } from "@/lib/avatars";
+import { avatarImages } from "@/lib/avatars-server";
+import { TripBanner } from "@/components/trip-banner";
+import { bannerItem } from "@/lib/media";
 
 const CLIENT_STATUS: Record<BookingStatus, string> = {
   INQUIRY: "Estamos armando tu cotización",
@@ -55,13 +60,14 @@ export default async function PortalTrip({
   if (!b) notFound();
   const today = todayUTC();
   const daysLeft = b.startDate ? daysBetween(today, b.startDate) : null;
+  const gallery = await avatarImages(account.client.organizationId);
 
   return (
     <div>
       <Link href="/portal" className="text-sm text-slate-500 hover:text-slate-800">
         ← Mis viajes
       </Link>
-      <div className="mt-2 mb-4 rounded-2xl bg-brand-800 p-5 text-white">
+      <TripBanner banner={b.banner} className={clsx("mt-2 mb-4 rounded-2xl p-5 sm:p-6", bannerItem(b.banner) && "pt-32 sm:pt-44")}>
         <p className="text-xs text-white/70">{CLIENT_STATUS[b.status]}</p>
         <h1 className="text-2xl font-semibold">{b.title}</h1>
         <p className="text-sm text-white/80">
@@ -72,14 +78,14 @@ export default async function PortalTrip({
             <span className="text-3xl font-semibold">{daysLeft}</span> días para el viaje
           </p>
         )}
-      </div>
+      </TripBanner>
 
-      <div className="mb-4 flex gap-1 overflow-x-auto rounded-full bg-white p-1 border border-[var(--border)]">
+      <div className="mb-4 flex gap-1 overflow-x-auto rounded-full border border-[var(--border)] bg-white p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {TABS.map((t) => (
           <Link
             key={t.key}
             href={`/portal/viajes/${b.id}?tab=${t.key}`}
-            className={clsx("flex-1 rounded-full px-3 py-1.5 text-center text-sm font-medium whitespace-nowrap", tab === t.key ? "bg-brand-600 text-white" : "text-slate-600 hover:bg-slate-50")}
+            className={clsx("flex-1 rounded-full px-3 py-1.5 text-center text-sm font-medium whitespace-nowrap", tab === t.key ? "bg-[var(--field)] text-white" : "text-slate-600 hover:bg-slate-50")}
           >
             {t.label}
           </Link>
@@ -186,17 +192,21 @@ export default async function PortalTrip({
 
 
           <Section title="Viajeros">
-            <ul className="space-y-1 text-sm text-slate-700">
+            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {b.travelers.map(({ traveler: t }) => {
                 const age = ageOn(t.birthDate, b.startDate ?? undefined);
                 return (
-                  <li key={t.id}>
-                    {t.firstName} {t.lastName}
-                    {age !== null && <span className="text-slate-500"> · {age} años</span>}
+                  <li key={t.id} className="flex flex-col items-center gap-1.5 text-center">
+                    <TravelerAvatar avatar={resolveAvatar(t.avatar, gallery)} name={`${t.firstName} ${t.lastName ?? ""}`} size="lg" />
+                    <span className="text-sm font-semibold text-slate-900">{t.firstName}</span>
+                    {age !== null && <span className="-mt-1 text-xs text-slate-500">{age} años</span>}
                   </li>
                 );
               })}
             </ul>
+            <Link href="/portal/perfil" className="mt-3 inline-block text-xs font-semibold text-brand-700 hover:underline">
+              Elegir personajes
+            </Link>
           </Section>
         </div>
       )}

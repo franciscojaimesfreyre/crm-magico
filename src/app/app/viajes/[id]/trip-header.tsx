@@ -6,6 +6,8 @@ import { BOOKING_STATUS_COLOR, BOOKING_STATUS_LABEL, DESTINATION_LABEL, DESTINAT
 import { daysBetween, todayUTC } from "@/lib/format";
 import { computeKeyDates } from "@/lib/key-dates";
 import type { LoadedBooking } from "./data";
+import { bannerItem } from "@/lib/media";
+import { TripBanner } from "@/components/trip-banner";
 
 // Fechas cortas para la cabecera: "sáb 29 nov" y "29 nov" (las fechas del viaje se guardan en UTC).
 const DAY = new Intl.DateTimeFormat("es-AR", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
@@ -19,6 +21,7 @@ const clean = (s: string) => s.replace(/\./g, "").replace(",", "");
 export function TripHeader({ booking: b, actions }: { booking: LoadedBooking; actions: ReactNode }) {
   const today = todayUTC();
   const tone = DESTINATION_TONE[b.destination];
+  const banner = bannerItem(b.banner);
   const client = `${b.client.firstName} ${b.client.lastName}`;
   const nights = b.startDate && b.endDate ? daysBetween(b.startDate, b.endDate) : null;
   const nextKey = computeKeyDates(b).find((k) => k.date >= today);
@@ -41,27 +44,49 @@ export function TripHeader({ booking: b, actions }: { booking: LoadedBooking; ac
   const years = b.startDate ? [...new Set([b.startDate, b.endDate].filter(Boolean).map((d) => d!.getUTCFullYear()))].join("/") : null;
   const soon = toStart !== null && toStart >= 0 && toStart <= 7;
 
+  // Código, destino, estado, nombre del viaje, cliente y acciones. onImage: en blanco, sobre el banner.
+  const identity = (onImage: boolean) => (
+    <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+      <div className="min-w-0">
+        <p className={clsx("flex flex-wrap items-center gap-x-2 text-[13px]", onImage ? "text-white/85" : "text-[var(--ink-soft)]")}>
+          <span className={clsx("font-mono", onImage && "font-semibold text-white")}>{b.code}</span>
+          <span aria-hidden>·</span>
+          <span className={clsx("inline-flex items-center gap-1.5 font-medium", onImage ? "text-white" : tone.ink)}>
+            <span className={clsx("size-2 rounded-full", tone.dot)} />
+            {DESTINATION_LABEL[b.destination]}
+          </span>
+          <Badge className={clsx("ml-1 [text-shadow:none]", BOOKING_STATUS_COLOR[b.status])}>{BOOKING_STATUS_LABEL[b.status]}</Badge>
+        </p>
+        <h1 className={clsx("mt-1.5 leading-tight", onImage ? "text-[28px] text-white sm:text-[34px]" : "text-[28px] text-slate-900")}>{b.title}</h1>
+        <Link href={`/app/clientes/${b.clientId}`} className={clsx("mt-2 inline-flex items-center gap-2 text-sm font-medium hover:underline", onImage ? "text-white" : "text-brand-700")}>
+          <Avatar name={client} className="size-7 text-[11px] [text-shadow:none]" />
+          {client}
+        </Link>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 [text-shadow:none]">{actions}</div>
+    </div>
+  );
+
   return (
     <header className="mb-6">
-      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
-        <div className="min-w-0">
-          <p className="flex flex-wrap items-center gap-x-2 text-[13px] text-[var(--ink-soft)]">
-            <span className="font-mono">{b.code}</span>
-            <span aria-hidden>·</span>
-            <span className={clsx("inline-flex items-center gap-1.5 font-medium", tone.ink)}>
-              <span className={clsx("size-2 rounded-full", tone.dot)} />
-              {DESTINATION_LABEL[b.destination]}
-            </span>
-            <Badge className={clsx("ml-1", BOOKING_STATUS_COLOR[b.status])}>{BOOKING_STATUS_LABEL[b.status]}</Badge>
-          </p>
-          <h1 className="mt-1.5 text-[28px] leading-tight text-slate-900">{b.title}</h1>
-          <Link href={`/app/clientes/${b.clientId}`} className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-brand-700 hover:underline">
-            <Avatar name={client} className="size-7 text-[11px]" />
-            {client}
+      {/*
+        Con banner: la imagen casi a su alto completo (4:1) y los datos del viaje por delante, sobre un
+        degradé oscuro de abajo hacia arriba que garantiza que se lean con cualquier ilustración.
+        Sin banner: los mismos datos sobre la hoja, como siempre.
+      */}
+      {banner ? (
+        <TripBanner banner={b.banner} className="flex min-h-64 flex-col justify-end rounded-[20px] px-5 pt-20 pb-5 sm:px-6 lg:aspect-[4/1] lg:min-h-0">
+          <Link
+            href={`/app/viajes/${b.id}/editar`}
+            className="absolute top-3 right-3 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-slate-900 [text-shadow:none] hover:bg-white"
+          >
+            Cambiar banner
           </Link>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">{actions}</div>
-      </div>
+          {identity(true)}
+        </TripBanner>
+      ) : (
+        identity(false)
+      )}
 
       {/* Las fechas del viaje mandan: primero y más grandes. Cuánto falta y quiénes viajan, al lado y más chicos. */}
       <Card className="mt-5 grid grid-cols-2 divide-[var(--rule)] sm:grid-cols-[2fr_1fr_1fr] sm:divide-x">

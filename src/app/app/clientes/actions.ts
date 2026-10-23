@@ -17,6 +17,7 @@ import { buildTemplateVars } from "@/lib/template-context";
 import type { ActionState } from "@/components/form-controls";
 import type { BudgetLevel, TripPace } from "@/generated/prisma/enums";
 import { appUrl } from "@/lib/app-url";
+import { avatarFromForm } from "@/lib/avatars-server";
 
 async function ownClient(id: string) {
   const user = await requireUser();
@@ -142,10 +143,11 @@ function travelerData(formData: FormData) {
 }
 
 export async function addTraveler(clientId: string, _: ActionState, formData: FormData): Promise<ActionState> {
-  await ownClient(clientId);
+  const { user } = await ownClient(clientId);
   const data = travelerData(formData);
   if (!data.firstName) return { error: "El nombre del viajero es obligatorio" };
-  await db.traveler.create({ data: { clientId, ...data } });
+  const avatar = await avatarFromForm(formData, user.organizationId);
+  await db.traveler.create({ data: { clientId, ...data, avatar } });
   revalidatePath(`/app/clientes/${clientId}`);
   return { ok: "Viajero agregado" };
 }
@@ -156,7 +158,8 @@ export async function updateTraveler(travelerId: string, _: ActionState, formDat
   if (!traveler) return { error: "Viajero no encontrado" };
   const data = travelerData(formData);
   if (!data.firstName) return { error: "El nombre del viajero es obligatorio" };
-  await db.traveler.update({ where: { id: travelerId }, data });
+  const avatar = await avatarFromForm(formData, user.organizationId);
+  await db.traveler.update({ where: { id: travelerId }, data: { ...data, avatar } });
   revalidatePath(`/app/clientes/${traveler.clientId}`);
   return { ok: "Viajero actualizado" };
 }
@@ -222,6 +225,8 @@ export async function regenerateInviteCode(clientId: string) {
   await ownClient(clientId);
   await db.client.update({ where: { id: clientId }, data: { inviteCode: await uniqueInviteCode() } });
   revalidatePath(`/app/clientes/${clientId}`);
+  // También se comparte desde la vista de cada viaje.
+  revalidatePath("/app/viajes/[id]", "page");
 }
 
 export async function sendPortalInvite(clientId: string, _state?: ActionState, _formData?: FormData): Promise<ActionState> {

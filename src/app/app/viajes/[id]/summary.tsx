@@ -1,7 +1,7 @@
 import Link from "next/link";
 import clsx from "clsx";
 import { ActionForm, SubmitButton } from "@/components/form-controls";
-import { Avatar, Badge, Card, CardHeader, StatCard, StatStrip, Textarea } from "@/components/ui";
+import { Badge, Card, CardHeader, StatCard, StatStrip, Textarea } from "@/components/ui";
 import {
   COMMISSION_STATUS_COLOR,
   COMMISSION_STATUS_LABEL,
@@ -18,8 +18,10 @@ import type { LoadedBooking } from "./data";
 import { TripFlights } from "./flights";
 import { TripAlerts } from "./trip-alerts";
 import type { TripAlert } from "@/lib/knowledge-alerts";
+import { TravelerAvatar } from "@/components/traveler-avatar";
+import { resolveAvatar, type AvatarImageOption } from "@/lib/avatars";
 
-export function Summary({ booking: b, alerts }: { booking: LoadedBooking; alerts: TripAlert[] | null }) {
+export function Summary({ booking: b, alerts, gallery = [] }: { booking: LoadedBooking; alerts: TripAlert[] | null; gallery?: AvatarImageOption[] }) {
   const today = todayUTC();
   const keyDates = computeKeyDates(b);
   const upcomingDates = keyDates.filter((k) => k.date >= today);
@@ -182,7 +184,7 @@ export function Summary({ booking: b, alerts }: { booking: LoadedBooking; alerts
                       <li key={t.id}>
                         <label className="flex items-center gap-3 text-sm">
                           <input type="checkbox" name="travelerIds" value={t.id} defaultChecked={selected.has(t.id)} className="size-4 rounded border-slate-300 accent-brand-600" />
-                          <Avatar name={name} className="size-7 text-[11px]" />
+                          <TravelerAvatar avatar={resolveAvatar(t.avatar, gallery)} name={name} size="xs" />
                           <span className="font-medium text-slate-800">{name}</span>
                           <span className="text-xs text-slate-500">{[age !== null && `${age} años al viajar`, t.heightCm && `${t.heightCm} cm`].filter(Boolean).join(" · ")}</span>
                         </label>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { CalendarDays } from "lucide-react";
 import { es } from "react-day-picker/locale";
@@ -71,14 +71,28 @@ export function DateInput({
   const minDate = parse(min);
   const maxDate = parse(max);
 
+  // Después de guardar, el servidor manda el valor nuevo: se adopta (React resetea el formulario al terminar
+  // la acción, a veces antes de que llegue, y sin esto quedaba el valor viejo en pantalla).
+  const [prevDefault, setPrevDefault] = useState(defaultValue);
+  if (defaultValue !== prevDefault) {
+    setPrevDefault(defaultValue);
+    setInner(defaultValue ?? "");
+  }
+
   // Como un input nativo: si el formulario se resetea, vuelve al valor inicial.
+  // Se lee el último valor recibido en el momento (no el de cuando se armó el listener) y un instante
+  // después, porque React resetea el formulario casi junto con la llegada de los datos nuevos.
+  const latestDefault = useRef(defaultValue);
+  useLayoutEffect(() => {
+    latestDefault.current = defaultValue;
+  }, [defaultValue]);
   useEffect(() => {
     const form = hidden.current?.form;
     if (!form) return;
-    const reset = () => setInner(defaultValue ?? "");
+    const reset = () => setTimeout(() => setInner(latestDefault.current ?? ""), 0);
     form.addEventListener("reset", reset);
     return () => form.removeEventListener("reset", reset);
-  }, [defaultValue]);
+  }, []);
 
   // Avisa al formulario como lo haría un input nativo (hay pantallas que escuchan "change" en el form).
   const changed = useRef(false);

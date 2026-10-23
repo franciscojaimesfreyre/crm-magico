@@ -7,6 +7,8 @@ import { INTEREST_OPTIONS } from "@/lib/clients";
 import { toDateInput } from "@/lib/format";
 import { updatePortalProfile } from "../../actions";
 import { DateInput } from "@/components/date-input";
+import { AvatarPicker } from "@/components/avatar-picker";
+import { avatarImages } from "@/lib/avatars-server";
 
 export const metadata = { title: "Mi familia y preferencias" };
 
@@ -14,8 +16,9 @@ export default async function PortalProfile() {
   const account = await requireClientAccount();
   const client = await db.client.findUniqueOrThrow({
     where: { id: account.clientId },
-    include: { travelers: { orderBy: { createdAt: "asc" } } },
+    include: { travelers: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] } },
   });
+  const gallery = await avatarImages(client.organizationId);
   const other = client.interests.filter((i) => !INTEREST_OPTIONS.includes(i));
   return (
     <div>
@@ -26,28 +29,36 @@ export default async function PortalProfile() {
       <ActionForm action={updatePortalProfile} className="space-y-5">
         <section className="space-y-3 rounded-2xl bg-white p-5 border border-[var(--border)]">
           <h2 className="font-semibold text-slate-900">Quiénes viajan</h2>
+          <p className="-mt-1 text-sm text-slate-500">Tocá el personaje de cada uno para cambiarlo.</p>
+          {/* En el teléfono: personaje y nombre arriba, los datos debajo; en pantallas anchas, todo en una fila. */}
           {client.travelers.map((t) => (
-            <div key={t.id} className="grid grid-cols-[1fr_auto_auto] items-end gap-2">
-              <p className="pb-2 text-sm font-medium text-slate-800">
-                {t.firstName} {t.lastName}
-              </p>
+            <div key={t.id} className="grid grid-cols-2 items-end gap-x-3 gap-y-2 sm:grid-cols-[minmax(0,1fr)_11rem_7rem]">
+              <div className="col-span-2 flex items-center gap-3 sm:col-span-1">
+                <AvatarPicker compact name={`avatar-${t.id}`} defaultValue={t.avatar} travelerName={t.firstName} images={gallery} />
+                <p className="text-sm font-semibold text-slate-900">
+                  {t.firstName} {t.lastName}
+                </p>
+              </div>
               <Field label="Nacimiento">
-                <DateInput name={`birth-${t.id}`} defaultValue={toDateInput(t.birthDate)} className="w-40" />
+                <DateInput name={`birth-${t.id}`} defaultValue={toDateInput(t.birthDate)} />
               </Field>
               <Field label="Altura (cm)">
-                <Input type="number" name={`height-${t.id}`} defaultValue={t.heightCm ?? ""} className="w-24" min={30} max={250} />
+                <Input type="number" name={`height-${t.id}`} defaultValue={t.heightCm ?? ""} min={30} max={250} />
               </Field>
             </div>
           ))}
-          <div className="grid grid-cols-[1fr_auto_auto] items-end gap-2 border-t border-dashed border-slate-200 pt-3">
-            <Field label="Agregar a alguien">
-              <Input name="newTravelerName" placeholder="Nombre" />
-            </Field>
+          <div className="grid grid-cols-2 items-end gap-x-3 gap-y-2 border-t border-dashed border-slate-200 pt-4 sm:grid-cols-[minmax(0,1fr)_11rem_7rem]">
+            <div className="col-span-2 flex items-end gap-3 sm:col-span-1">
+              <AvatarPicker compact name="newTravelerAvatar" travelerName="" images={gallery} />
+              <Field label="Agregar a alguien" className="flex-1">
+                <Input name="newTravelerName" placeholder="Nombre" />
+              </Field>
+            </div>
             <Field label="Nacimiento">
-              <DateInput name="newTravelerBirth" className="w-40" />
+              <DateInput name="newTravelerBirth" />
             </Field>
             <Field label="Altura (cm)">
-              <Input type="number" name="newTravelerHeight" className="w-24" min={30} max={250} />
+              <Input type="number" name="newTravelerHeight" min={30} max={250} />
             </Field>
           </div>
         </section>

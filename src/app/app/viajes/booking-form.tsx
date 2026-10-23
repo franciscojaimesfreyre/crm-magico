@@ -6,6 +6,7 @@ import { BOOKING_STATUSES, DESTINATIONS } from "@/lib/labels";
 import { toDateInput } from "@/lib/format";
 import { DateRangeFields } from "@/components/date-range-fields";
 import type { Booking } from "@/generated/prisma/client";
+import { BannerPicker } from "@/components/banner-picker";
 
 type Opt = { value: string; label: string };
 
@@ -67,6 +68,13 @@ export function BookingForm({
               <Select name="currency" defaultValue={booking.currency ?? defaultCurrency} options={["USD", "EUR", "ARS", "MXN", "CLP", "COP", "BRL", "UYU"].map((c) => ({ value: c, label: c }))} />
             </Field>
           )}
+        </div>
+      </Card>
+
+      <Card>
+        <CardHeader title="Banner del viaje" description="Se ve arriba en el portal del cliente, detrás del nombre del viaje." />
+        <div className="p-5">
+          <BannerPicker defaultValue={booking?.banner} title={booking?.title} />
         </div>
       </Card>
 

@@ -31,6 +31,9 @@ import {
 import { CopyText, RevealPassword, TemplatePicker } from "./client-widgets";
 import { TravelerForm } from "./traveler-form";
 import { appUrl } from "@/lib/app-url";
+import { TravelerAvatar } from "@/components/traveler-avatar";
+import { resolveAvatar } from "@/lib/avatars";
+import { avatarImages } from "@/lib/avatars-server";
 
 const TABS = [
   { key: "viajes", label: "Viajes" },
@@ -57,13 +60,14 @@ export default async function ClientPage({
       account: true,
       referredBy: true,
       referrals: { select: { id: true, firstName: true, lastName: true } },
-      travelers: { orderBy: { createdAt: "asc" } },
+      travelers: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
       bookings: { orderBy: { startDate: "desc" } },
       supplierLogins: { orderBy: { supplier: "asc" } },
       activities: { orderBy: { createdAt: "desc" }, take: 50, include: { user: { select: { name: true } } } },
     },
   });
   if (!client) notFound();
+  const avatarGallery = await avatarImages(user.organizationId);
 
   const sold = client.bookings.filter((b) => !["INQUIRY", "QUOTED", "CANCELLED"].includes(b.status));
   const lifetime = sold.reduce((s, b) => s + Number(b.totalPrice), 0);
@@ -162,7 +166,9 @@ export default async function ClientPage({
                   <Card key={t.id}>
                     <details>
                       <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 p-4">
-                        <div>
+                        <div className="flex min-w-0 items-center gap-3">
+                          <TravelerAvatar avatar={resolveAvatar(t.avatar, avatarGallery)} name={`${t.firstName} ${t.lastName ?? ""}`} size="md" />
+                          <div className="min-w-0">
                           <p className="font-medium text-slate-900">
                             {t.firstName} {t.lastName}
                             {t.relationship && <span className="ml-2 text-xs text-slate-500">{t.relationship}</span>}
@@ -178,11 +184,12 @@ export default async function ClientPage({
                               .filter(Boolean)
                               .join(" · ") || "Sin datos adicionales"}
                           </p>
+                          </div>
                         </div>
                         <span className="text-xs text-brand-700">Editar</span>
                       </summary>
                       <div className="border-t border-slate-100 p-4">
-                        <TravelerForm action={updateTraveler.bind(null, t.id)} traveler={t} submitLabel="Guardar" />
+                        <TravelerForm action={updateTraveler.bind(null, t.id)} traveler={t} submitLabel="Guardar" avatarImages={avatarGallery} />
                         <form action={deleteTraveler.bind(null, t.id)} className="mt-3">
                           <ConfirmButton message={`¿Eliminar a ${t.firstName}?`}>
                             <Trash2 className="size-3.5" /> Eliminar viajero
@@ -196,7 +203,7 @@ export default async function ClientPage({
               <Card>
                 <CardHeader title="Agregar viajero" description="Edad y altura ayudan a la IA a elegir atracciones aptas." />
                 <div className="p-4">
-                  <TravelerForm action={addTraveler.bind(null, id)} submitLabel="Agregar" />
+                  <TravelerForm action={addTraveler.bind(null, id)} submitLabel="Agregar" avatarImages={avatarGallery} />
                 </div>
               </Card>
             </div>

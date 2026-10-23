@@ -10,9 +10,10 @@ import { changeBookingStatus, confirmationData, nextBookingCode, recalcBookingTo
 import { logActivity, notifyClient } from "@/lib/events";
 import { incomingFiles, type StoredFile } from "@/lib/incoming-files";
 import { runEventWorkflows } from "@/lib/automations";
-import { DESTINATION_LABEL, RESERVATION_STATUS_LABEL } from "@/lib/labels";
+import { DESTINATION_LABEL, RESERVATION_STATUS_LABEL, BOOKING_STATUS_LABEL } from "@/lib/labels";
 import type { ActionState } from "@/components/form-controls";
 import type { BookingStatus, CommissionStatus, Destination, ItemType, ReservationStatus } from "@/generated/prisma/enums";
+import { bannerItem } from "@/lib/media";
 
 async function ownBooking(id: string) {
   const user = await requireUser();
@@ -44,6 +45,8 @@ function bookingFields(formData: FormData) {
     currency: str(formData, "currency"),
     notes: str(formData, "notes"),
     clientNotes: str(formData, "clientNotes"),
+    // Solo banners del catálogo (lib/media.ts); vacío = sin banner.
+    banner: bannerItem(str(formData, "banner"))?.id ?? null,
   };
 }
 
@@ -107,15 +110,11 @@ export async function updateBooking(id: string, _: ActionState, formData: FormDa
 }
 
 export async function setBookingStatus(id: string, status: BookingStatus) {
+  if (!(status in BOOKING_STATUS_LABEL)) return;
   const { user } = await ownBooking(id);
   await changeBookingStatus({ bookingId: id, status, userId: user.id });
   revalidatePath("/app/viajes");
   revalidatePath(`/app/viajes/${id}`);
-}
-
-export async function setBookingStatusForm(id: string, formData: FormData) {
-  const status = String(formData.get("status")) as BookingStatus;
-  await setBookingStatus(id, status);
 }
 
 export async function cancelBooking(id: string, formData: FormData) {

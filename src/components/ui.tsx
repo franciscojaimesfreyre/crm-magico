@@ -295,13 +295,15 @@ export function Avatar({ name, className }: { name: string; className?: string }
 
 export function Tabs({ tabs, active }: { tabs: { href: string; label: string; key: string; count?: number }[]; active: string }) {
   return (
-    <div className="mb-6 flex gap-1 overflow-x-auto border-b border-[var(--border)]">
+    // La línea de base es una sombra interna (no un borde con las pestañas corridas 1 px): así no aparece
+    // una barra de scroll vertical. En el teléfono se deslizan de costado, sin barra visible.
+    <div className="mb-6 flex gap-1 overflow-x-auto shadow-[inset_0_-1px_0_var(--border)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {tabs.map((t) => (
         <Link
           key={t.key}
           href={t.href}
           className={clsx(
-            "-mb-px border-b-2 px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors",
+            "border-b-2 px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors",
             t.key === active ? "border-slate-900 text-slate-900" : "border-transparent text-[var(--ink-soft)] hover:text-slate-900",
           )}
         >

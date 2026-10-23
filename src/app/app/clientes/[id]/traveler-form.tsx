@@ -3,18 +3,26 @@ import { Field, Input } from "@/components/ui";
 import { toDateInput } from "@/lib/format";
 import type { Traveler } from "@/generated/prisma/client";
 import { DateInput } from "@/components/date-input";
+import { AvatarPicker } from "@/components/avatar-picker";
+import type { AvatarImageOption } from "@/lib/avatars";
 
 export function TravelerForm({
   action,
   traveler,
   submitLabel,
+  avatarImages = [],
 }: {
   action: (state: ActionState, formData: FormData) => Promise<ActionState>;
   traveler?: Traveler;
   submitLabel: string;
+  /** Galería de personajes de la agencia (además del set propio). */
+  avatarImages?: AvatarImageOption[];
 }) {
   return (
     <ActionForm action={action} resetOnSuccess={!traveler} className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+      <div className="sm:col-span-4">
+        <AvatarPicker defaultValue={traveler?.avatar} travelerName={traveler?.firstName ?? ""} images={avatarImages} />
+      </div>
       <Field label="Nombre *">
         <Input name="firstName" defaultValue={traveler?.firstName} required />
       </Field>

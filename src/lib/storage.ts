@@ -157,6 +157,25 @@ export async function duplicateUpload(key: string, organizationId: string) {
   return target;
 }
 
+/**
+ * Imágenes propias del producto (personajes y banners): viven en "media/…", fuera de las carpetas de las
+ * organizaciones, y las sube scripts/media.ts. Devuelve cómo entregarlas, igual que downloadTarget.
+ */
+export async function mediaTarget(key: string) {
+  if (!/^media\/[a-z0-9-]+\/[a-z0-9-]+\.webp$/.test(key)) return null;
+  return downloadTarget(key, { filename: path.basename(key), mimeType: "image/webp", download: false });
+}
+
+export async function putMedia(key: string, body: Buffer) {
+  if (storageMode() === "r2") {
+    await r2().send(new PutObjectCommand({ Bucket: bucket(), Key: key, Body: body, ContentType: "image/webp", CacheControl: "public, max-age=31536000, immutable" }));
+  } else {
+    const full = resolveKey(key);
+    await mkdir(path.dirname(full), { recursive: true });
+    await writeFile(full, body);
+  }
+}
+
 export async function removeUpload(key: string) {
   try {
     if (storageMode() === "r2") await r2().send(new DeleteObjectCommand({ Bucket: bucket(), Key: key }));

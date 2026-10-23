@@ -51,3 +51,10 @@ next-env.d.ts
 
 # Archivos de trabajo del rediseño (inspector de taste-skill)
 /.taste-skill
+
+# Copias de la base local (tienen datos): nunca al repo
+/backups
+
+# Imágenes originales (personajes y banners): se optimizan con npm run media y se sirven desde R2
+/images
+/storage/media-build

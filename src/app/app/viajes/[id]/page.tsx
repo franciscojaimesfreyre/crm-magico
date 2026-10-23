@@ -11,10 +11,11 @@ import { bookingClosures } from "@/lib/catalog";
 import { TaskList } from "@/components/task-list";
 import { TaskForm } from "@/components/task-form";
 import { BOOKING_STATUSES, CONTRACT_STATUS_COLOR, CONTRACT_STATUS_LABEL, ITEM_TYPE_BASE, ITEM_TYPE_LABEL } from "@/lib/labels";
-import { fileSize, formatDateTime, toDateInput, toNumber } from "@/lib/format";
+import { fileSize, formatDate, formatDateTime, toDateInput, toNumber } from "@/lib/format";
 import { TripHeader } from "./trip-header";
 import { loadThread } from "@/lib/messages";
-import { cancelBooking, deleteBooking, setBookingStatusForm } from "../actions";
+import { cancelBooking, deleteBooking, setBookingStatus } from "../actions";
+import { StatusSelect } from "@/components/status-select";
 import { addBookingDocument, attachFromLibrary, deleteDocument, toggleDocumentVisibility } from "@/app/app/documentos/actions";
 import { readThread, sendAgentMessage } from "@/app/app/mensajes/actions";
 import { CopyText } from "@/app/app/clientes/[id]/client-widgets";
@@ -29,6 +30,9 @@ import { tripKnowledgeAlerts } from "@/lib/knowledge-alerts";
 import { eventGuideFor, guideOptions } from "@/lib/park-guides";
 import { eventDateWarning } from "@/lib/park-sheet";
 import type { ItemType } from "@/generated/prisma/enums";
+import { avatarImages } from "@/lib/avatars-server";
+import { ShareAccessButton } from "@/components/share-access";
+import { regenerateInviteCode, sendPortalInvite } from "@/app/app/clientes/actions";
 
 const TABS = [
   { key: "resumen", label: "Resumen" },
@@ -65,12 +69,21 @@ export default async function BookingPage({
         booking={b}
         actions={
           <>
-            <form action={setBookingStatusForm.bind(null, b.id)} className="flex items-center gap-2">
-              <Select key={b.status} name="status" defaultValue={b.status} options={BOOKING_STATUSES} className="w-40" aria-label="Estado del viaje" />
-              <SubmitButton variant="secondary" pendingText="…">
-                Cambiar
-              </SubmitButton>
-            </form>
+            <StatusSelect action={setBookingStatus.bind(null, b.id) as (status: string) => Promise<void>} value={b.status} options={BOOKING_STATUSES} />
+            <ShareAccessButton
+              firstName={b.client.firstName}
+              email={b.client.email}
+              inviteCode={b.client.inviteCode}
+              registerUrl={`${baseUrl}/portal/registro?codigo=${b.client.inviteCode}`}
+              tripUrl={`${baseUrl}/portal/viajes/${b.id}`}
+              account={
+                b.client.account
+                  ? { since: formatDate(b.client.account.createdAt), lastLogin: b.client.account.lastLoginAt ? formatDateTime(b.client.account.lastLoginAt) : null }
+                  : null
+              }
+              regenerate={regenerateInviteCode.bind(null, b.clientId)}
+              sendInvite={sendPortalInvite.bind(null, b.clientId)}
+            />
             <LinkButton href={`/app/viajes/${b.id}/editar`}>
               <Pencil className="size-4" /> Editar viaje
             </LinkButton>
@@ -99,7 +112,7 @@ export default async function BookingPage({
 
       {tab === "resumen" && (
         <>
-          <Summary booking={b} alerts={await tripKnowledgeAlerts(b)} />
+          <Summary booking={b} alerts={await tripKnowledgeAlerts(b)} gallery={await avatarImages(user.organizationId)} />
           <div className="mt-8 flex flex-wrap gap-3 border-t border-slate-200 pt-6">
             {b.status !== "CANCELLED" && (
               <form action={cancelBooking.bind(null, b.id)} className="flex items-center gap-2">

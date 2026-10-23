@@ -3,16 +3,21 @@ import { Bell, LogOut, MessageCircle, UserRound } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireClientAccount } from "@/lib/auth";
 import { logoutPortal } from "../actions";
+import { portalPersona } from "@/lib/avatars-server";
+import { TravelerAvatar } from "@/components/traveler-avatar";
 
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
   const account = await requireClientAccount();
   const org = account.client.organization;
-  const [unreadNotifications, unreadMessages] = await Promise.all([
+  const [unreadNotifications, unreadMessages, persona] = await Promise.all([
     db.notification.count({ where: { clientAccountId: account.id, readAt: null } }),
     db.message.count({ where: { clientId: account.clientId, senderType: { not: "CLIENT" }, readByClientAt: null } }),
+    portalPersona(account.clientId),
   ]);
+  // El portal toma el color del personaje del titular (la cabecera del viaje y la pestaña activa).
+  const theme = persona.avatar ? ({ "--field": persona.avatar.color } as React.CSSProperties) : undefined;
   return (
-    <div className="min-h-screen bg-[var(--ground)]">
+    <div className="min-h-screen bg-[var(--ground)]" style={theme}>
       {/* Barra clara con la marca de la agencia (su logo o su inicial en su color). */}
       <header className="sticky top-0 z-20 bg-[var(--ground)]">
         <div className="mx-auto flex h-16 max-w-3xl items-center justify-between px-4">
@@ -37,7 +42,7 @@ export default async function PortalLayout({ children }: { children: React.React
               {unreadNotifications > 0 && <Dot n={unreadNotifications} />}
             </Link>
             <Link href="/portal/perfil" className="grid size-10 place-items-center rounded-md text-slate-600 hover:bg-[var(--raised)] hover:text-slate-900" title="Mi familia y preferencias">
-              <UserRound className="size-5" />
+              {persona.avatar ? <TravelerAvatar avatar={persona.avatar} name={persona.self?.firstName ?? ""} size="xs" /> : <UserRound className="size-5" />}
             </Link>
             <form action={logoutPortal}>
               <button className="grid size-10 place-items-center rounded-md text-slate-500 hover:bg-[var(--raised)] hover:text-slate-900" title="Salir" aria-label="Salir">

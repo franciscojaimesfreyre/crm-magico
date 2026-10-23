@@ -12,6 +12,12 @@ import {
   updateMyAccount,
   updateOrganization,
 } from "./actions";
+import { TravelerAvatar } from "@/components/traveler-avatar";
+import { AVATAR_COLORS, AVATAR_SET, resolveAvatar } from "@/lib/avatars";
+import { avatarImages } from "@/lib/avatars-server";
+import { addAvatarImage, deleteAvatarImage } from "./avatar-actions";
+import { FileUpload } from "@/components/file-upload";
+import { storageMode } from "@/lib/storage";
 
 export const metadata = { title: "Configuración" };
 
@@ -23,6 +29,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const tabs = [
     { key: "negocio", label: "Mi negocio" },
     { key: "agencia", label: "Mi agencia" },
+    { key: "personajes", label: "Personajes" },
     { key: "cuenta", label: "Mi cuenta" },
   ];
 
@@ -153,6 +160,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           </div>
         ))}
 
+      {tab === "personajes" && <AvatarGallery organizationId={user.organizationId} />}
+
       {tab === "cuenta" && (
         <Card>
           <CardHeader title="Mi cuenta" description={user.email} />
@@ -175,6 +184,75 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           </ActionForm>
         </Card>
       )}
+    </div>
+  );
+}
+
+/** Los personajes que se pueden elegir para los viajeros: el set del CRM y las imágenes propias de la agencia. */
+async function AvatarGallery({ organizationId }: { organizationId: string }) {
+  const images = await avatarImages(organizationId);
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader
+          title="Personajes de tu agencia"
+          description="Imágenes propias para que elijas como personaje de cada viajero (y ellos desde su portal). Usá imágenes tuyas o con permiso de uso: las de personajes de Disney o Universal tienen derechos de autor."
+        />
+        {images.length > 0 && (
+          <ul className="grid grid-cols-3 gap-4 p-5 sm:grid-cols-5">
+            {images.map((img) => (
+              <li key={img.id} className="flex flex-col items-center gap-1.5 text-center">
+                <TravelerAvatar avatar={resolveAvatar(`img:${img.id}`, images)} name={img.name} size="lg" />
+                <span className="text-xs font-medium text-slate-800">{img.name}</span>
+                <form action={deleteAvatarImage.bind(null, img.id)}>
+                  <ConfirmButton message={`¿Quitar "${img.name}"? Los viajeros que lo tenían vuelven a sus iniciales.`}>Quitar</ConfirmButton>
+                </form>
+              </li>
+            ))}
+          </ul>
+        )}
+        <ActionForm action={addAvatarImage} resetOnSuccess className="grid grid-cols-1 gap-4 border-t border-[var(--rule)] p-5 sm:grid-cols-2">
+          <Field label="Imagen" hint="PNG, JPG o WEBP cuadrada, hasta 5 MB">
+            <FileUpload direct={storageMode() === "r2"} />
+          </Field>
+          <Field label="Nombre">
+            <Input name="name" placeholder="Ej: Orejas de ratón" maxLength={40} />
+          </Field>
+          <fieldset className="sm:col-span-2">
+            <legend className="label">Color de fondo (también tiñe el portal del cliente)</legend>
+            <div className="flex flex-wrap gap-2">
+              {AVATAR_COLORS.map((c, i) => (
+                <label key={c} className="cursor-pointer">
+                  <input type="radio" name="color" value={c} defaultChecked={i === 0} className="peer sr-only" />
+                  <span className="block size-8 rounded-full ring-2 ring-transparent ring-offset-2 peer-checked:ring-slate-900 peer-focus-visible:ring-brand-400" style={{ backgroundColor: c }} aria-label={c} />
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          <div className="sm:col-span-2">
+            <SubmitButton>Agregar personaje</SubmitButton>
+          </div>
+        </ActionForm>
+      </Card>
+
+      <Card>
+        <CardHeader title="Personajes del CRM" description="Ilustraciones propias, disponibles para todas las agencias." />
+        <div className="space-y-5 p-5">
+          {AVATAR_SET.map((g) => (
+            <section key={g.group}>
+              <h3 className="mb-2 text-[11px] font-semibold tracking-[0.06em] text-[var(--ink-soft)] uppercase">{g.group}</h3>
+              <ul className="grid grid-cols-4 gap-3 sm:grid-cols-8">
+                {g.items.map((it) => (
+                  <li key={it.id} className="flex flex-col items-center gap-1 text-center">
+                    <TravelerAvatar avatar={resolveAvatar(`set:${it.id}`)} name={it.label} size="md" />
+                    <span className="text-[11px] leading-tight text-slate-600">{it.label}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+      </Card>
     </div>
   );
 }

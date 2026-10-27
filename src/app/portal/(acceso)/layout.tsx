@@ -1,14 +1,15 @@
-import { BrandMark } from "@/components/brand-mark";
+import { MadeWithYorno } from "@/components/brand";
 
 export default function PortalAuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[var(--ground)] px-4 py-12">
       <div className="w-full max-w-md">
-        <div className="mb-6 flex items-center justify-center gap-2.5 text-slate-900">
-          <BrandMark className="size-9" />
-          <span className="text-xl font-bold tracking-[-0.01em]">Tu portal de viajes</span>
+        {/* Lo ve el cliente final: el portal es de su agencia; Yorno solo firma al pie. */}
+        <h1 className="mb-6 text-center text-2xl text-slate-900">Tu portal de viajes</h1>
+        <div className="rounded-2xl border border-[var(--border)] bg-white p-8 shadow-[var(--card-shadow)]">{children}</div>
+        <div className="mt-6 flex justify-center">
+          <MadeWithYorno />
         </div>
-        <div className="rounded-lg border border-[var(--border)] bg-white p-8">{children}</div>
       </div>
     </div>
   );

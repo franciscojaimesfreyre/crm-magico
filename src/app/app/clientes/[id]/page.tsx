@@ -327,7 +327,7 @@ export default async function ClientPage({
               </p>
             )}
             <div className="border-t border-[var(--rule)] pt-3">
-              <p className="text-[11px] font-semibold tracking-[0.06em] text-[var(--ink-soft)] uppercase">Total vendido</p>
+              <p className="text-[12px] font-semibold tracking-[0.06em] text-[var(--ink-soft)] uppercase">Total vendido</p>
               <p className="figure mt-1 text-2xl text-brand-700">
                 <Amount value={money(lifetime)} />
               </p>

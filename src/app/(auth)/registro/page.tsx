@@ -81,7 +81,7 @@ export default async function SignupPage({ searchParams }: { searchParams: Promi
             {invitedBy ? (
               <input type="hidden" name="agencyCode" value={invitedBy.inviteCode ?? ""} />
             ) : (
-              <Field label="Código de tu agencia (opcional)" hint="Si tu agencia usa CRM Mágico, te lo pasa ella. Lo podés cargar después.">
+              <Field label="Código de tu agencia (opcional)" hint="Si tu agencia usa Yorno, te lo pasa ella. Lo podés cargar después.">
                 <Input name="agencyCode" className="uppercase" autoComplete="off" />
               </Field>
             )}

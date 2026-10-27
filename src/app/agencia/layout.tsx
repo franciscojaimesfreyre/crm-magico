@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { LogOut, Sparkles } from "lucide-react";
+import { LogOut } from "lucide-react";
+import { YornoMonogram } from "@/components/brand";
 import { requireAgencyUser } from "@/lib/auth";
 import { Avatar } from "@/components/ui";
 import { logout } from "@/app/(auth)/actions";
@@ -8,13 +9,11 @@ export default async function AgencyLayout({ children }: { children: React.React
   const user = await requireAgencyUser();
   return (
     <div className="min-h-screen">
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white print:hidden">
+      <header className="sticky top-0 z-20 border-b border-[var(--border)] bg-white print:hidden">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-5">
             <Link href="/agencia" className="flex shrink-0 items-center gap-2 font-semibold text-slate-900">
-              <span className="flex size-8 items-center justify-center rounded-lg bg-brand-600 text-white">
-                <Sparkles className="size-4" />
-              </span>
+              <YornoMonogram className="h-8 text-brand-600" />
               <span className="hidden truncate sm:inline">{user.agency.name}</span>
             </Link>
             <nav className="flex gap-4 text-sm font-medium text-slate-600">

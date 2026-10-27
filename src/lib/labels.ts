@@ -84,10 +84,11 @@ export const PIPELINE: BookingStatus[] = [
   "COMPLETED",
 ];
 
+// Colores funcionales del manual: Cotizando en Menta, Confirmado (reservado) en Verde Yorno pleno.
 export const BOOKING_STATUS_COLOR: Record<BookingStatus, string> = {
   INQUIRY: "bg-sky-100 text-sky-800",
-  QUOTED: "bg-amber-100 text-amber-900",
-  BOOKED: "bg-brand-100 text-brand-800",
+  QUOTED: "bg-brand-200 text-brand-900",
+  BOOKED: "bg-brand-600 text-white",
   PAID_IN_FULL: "bg-emerald-100 text-emerald-800",
   TRAVELED: "bg-cyan-100 text-cyan-800",
   COMPLETED: "bg-slate-200 text-slate-700",
@@ -112,8 +113,8 @@ export const RESERVATION_STATUS_LABEL: Record<ReservationStatus, string> = {
 };
 export const RESERVATION_STATUSES = options(RESERVATION_STATUS_LABEL);
 export const RESERVATION_STATUS_COLOR: Record<ReservationStatus, string> = {
-  PENDING: "bg-amber-100 text-amber-800",
-  CONFIRMED: "bg-emerald-100 text-emerald-800",
+  PENDING: "bg-amber-400 text-slate-900",
+  CONFIRMED: "bg-brand-600 text-white",
   CANCELLED: "bg-rose-100 text-rose-800 line-through",
 };
 

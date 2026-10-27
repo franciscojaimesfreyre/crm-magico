@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Bell, LogOut, MessageCircle, UserRound } from "lucide-react";
 import { db } from "@/lib/db";
@@ -5,6 +6,14 @@ import { requireClientAccount } from "@/lib/auth";
 import { logoutPortal } from "../actions";
 import { portalPersona } from "@/lib/avatars-server";
 import { TravelerAvatar } from "@/components/traveler-avatar";
+import { MadeWithYorno } from "@/components/brand";
+
+// En el portal manda la marca de la agencia: la pestaña dice "Mis viajes · Viajes Encantados".
+export async function generateMetadata(): Promise<Metadata> {
+  const account = await requireClientAccount();
+  const name = account.client.organization.name;
+  return { title: { default: name, template: `%s · ${name}` } };
+}
 
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
   const account = await requireClientAccount();
@@ -53,10 +62,13 @@ export default async function PortalLayout({ children }: { children: React.React
         </div>
       </header>
       <main className="mx-auto max-w-3xl px-4 py-6">{children}</main>
-      <footer className="pb-8 text-center text-xs text-[var(--ink-soft)]">
-        {org.name}
-        {org.contactPhone && ` · ${org.contactPhone}`}
-        {org.contactEmail && ` · ${org.contactEmail}`}
+      <footer className="space-y-3 pb-8 text-center text-xs text-[var(--ink-soft)]">
+        <p>
+          {org.name}
+          {org.contactPhone && ` · ${org.contactPhone}`}
+          {org.contactEmail && ` · ${org.contactEmail}`}
+        </p>
+        <MadeWithYorno />
       </footer>
     </div>
   );

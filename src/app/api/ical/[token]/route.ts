@@ -21,7 +21,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//CRM Magico//ES",
+    "PRODID:-//Yorno//ES",
     "CALSCALE:GREGORIAN",
     `X-WR-CALNAME:${escape(org.name)} — CRM`,
     ...events.flatMap((e) => [

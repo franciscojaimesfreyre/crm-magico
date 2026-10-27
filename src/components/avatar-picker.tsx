@@ -90,7 +90,7 @@ export function AvatarPicker({
           <div className="space-y-6">
             {groups.map((g) => (
               <section key={g.group}>
-                <h3 className="mb-3 text-[11px] font-semibold tracking-[0.06em] text-[var(--ink-soft)] uppercase">{g.group}</h3>
+                <h3 className="mb-3 text-[12px] font-semibold tracking-[0.06em] text-[var(--ink-soft)] uppercase">{g.group}</h3>
                 <ul className="grid grid-cols-3 gap-x-3 gap-y-4 sm:grid-cols-5 md:grid-cols-6">
                   {g.items.map((item) => {
                     const on = item.value === value;

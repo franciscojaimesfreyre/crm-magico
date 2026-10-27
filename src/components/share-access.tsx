@@ -85,7 +85,7 @@ export function ShareAccessButton({
           ) : (
             <div className="space-y-5">
               <div className="rounded-2xl bg-[var(--raised)] px-4 py-5 text-center">
-                <p className="text-[11px] font-semibold tracking-[0.06em] text-[var(--ink-soft)] uppercase">Código de invitación</p>
+                <p className="text-[12px] font-semibold tracking-[0.06em] text-[var(--ink-soft)] uppercase">Código de invitación</p>
                 <p className="mt-1 font-mono text-3xl font-semibold tracking-widest text-brand-700">{inviteCode}</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">

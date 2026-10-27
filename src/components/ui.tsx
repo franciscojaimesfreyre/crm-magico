@@ -9,8 +9,9 @@ import { SelectField } from "@/components/select-field";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger" | "magic";
 
-// Botones en píldora: el principal en el turquesa de la marca; el secundario blanco con borde; el resto, texto. Las
-// acciones de IA ("magic") van en el turquesa pálido de los datos, nunca con degradado.
+// Botones del manual de Yorno: rectángulos redondeados (10 px, como los campos). El principal en Verde Yorno, solo
+// para la acción principal; el secundario blanco con borde; el resto, texto. Las acciones de IA ("magic") van en
+// el verde pálido de los datos, nunca con degradado.
 const VARIANTS: Record<Variant, string> = {
   primary: "bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-800",
   secondary: "bg-white text-slate-800 border border-[var(--control)] hover:bg-[var(--raised)] active:bg-[var(--border)]",
@@ -27,7 +28,7 @@ const SIZES = {
 export function buttonClass(variant: Variant = "primary", size: keyof typeof SIZES = "md", className?: string) {
   // cn (tailwind-merge): las clases que se pasan ganan sobre las de la variante.
   return cn(
-    "t-press inline-flex items-center justify-center gap-1.5 rounded-full font-semibold whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60",
+    "t-press inline-flex items-center justify-center gap-1.5 rounded-[10px] font-semibold whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60",
     VARIANTS[variant],
     SIZES[size],
     className,
@@ -98,7 +99,7 @@ export function PageHeader({
       )}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-[28px] leading-[1.15] text-slate-900">{title}</h1>
+          <h1 className="text-[28px] leading-[1.15] text-slate-900 sm:text-[32px]">{title}</h1>
           {description && <div className="mt-2 max-w-3xl text-[15px] text-[var(--ink-soft)]">{description}</div>}
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
@@ -141,7 +142,7 @@ export function StatCard({
 }) {
   return (
     <Card className="min-w-0 p-5">
-      <p className="text-[11px] font-semibold tracking-[0.06em] text-[var(--ink-soft)] uppercase">{label}</p>
+      <p className="text-[12px] font-semibold tracking-[0.06em] text-[var(--ink-soft)] uppercase">{label}</p>
       <p
         className={clsx(
           "figure mt-2 text-[21px] leading-tight sm:text-[26px] xl:text-[30px]",

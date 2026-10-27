@@ -7,51 +7,84 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
- * CRM Mágico — sistema visual (estilo "framed sheet" con la referencia de Collective OS).
- * Un marco crema que sostiene el menú y la barra superior; el trabajo, en una hoja blanca con
- * esquinas grandes. Tarjetas blancas con borde fino y sombra muy suave, botones en píldora (el
- * principal casi negro), títulos en Inter bold con tracking cerrado. El color va en los datos
- * (turquesa) y en los estados (pasteles). Solo modo claro.
+ * Yorno — sistema visual (manual de marca v1, octubre 2026).
+ * Mucho crema y aire; el Verde noche para leer; el Verde Yorno para lo que se toca o se destaca.
+ * El menú lateral va en Verde noche con el logotipo en crema; el trabajo, sobre el crema, en tarjetas
+ * blancas. Texto e interfaz en Outfit (el logotipo es un SVG, nunca se escribe con una tipografía).
+ * Los colores funcionales (confirmado, pago pendiente, vencido) son solo del producto. Solo modo claro.
  */
 @theme inline {
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
   --font-heading: var(--font-display);
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
-  /* Marca: turquesa. 600 en acciones, vínculos y lo activo; 50-200 en áreas; 700-900 tinta del color. */
-  --color-brand-50: #ecf8f6;
-  --color-brand-100: #d2f0eb;
-  --color-brand-200: #a8e1d8;
-  --color-brand-300: #6fcabd;
-  --color-brand-400: #36ad9e;
-  --color-brand-500: #189385;
+  /* Verde Yorno (600): acciones, vínculos y lo activo. 200 es la Menta (apoyo, resaltados). */
+  --color-brand-50: #edf7f4;
+  --color-brand-100: #d6eee8;
+  --color-brand-200: #a9d8cf;
+  --color-brand-300: #77c0b3;
+  --color-brand-400: #3fa294;
+  --color-brand-500: #1a8c7f;
   --color-brand-600: #0e7c70;
   --color-brand-700: #0b6359;
   --color-brand-800: #0a4f48;
-  --color-brand-900: #083f3a;
+  --color-brand-900: #0f2f2b;
 
-  --color-data-50: #e7f6f3;
-  --color-data-100: #cdeee8;
+  --color-data-50: #edf7f4;
+  --color-data-100: #d6eee8;
   --color-data-500: #2bb3a3;
   --color-data-600: #1f9e8f;
   --color-data-700: #167a6f;
 
-  /* Grises cálidos, de la familia del crema. 500 en adelante pasa 4.5:1 sobre blanco y sobre el crema. */
-  --color-slate-50: #faf9f6;
-  --color-slate-100: #f3f1ec;
-  --color-slate-200: #e9e5dd;
-  --color-slate-300: #d6d1c7;
-  --color-slate-400: #a9a49b;
-  --color-slate-500: #6e6b66;
-  --color-slate-600: #57544f;
-  --color-slate-700: #424040;
-  --color-slate-800: #2d2d2f;
-  --color-slate-900: #1d1d1f;
-  --color-slate-950: #111112;
+  /* Neutros de la marca: del Verde noche (900) a la Arena (200). 500 en adelante pasa 4.5:1 sobre el crema. */
+  --color-slate-50: #fbf9f4;
+  --color-slate-100: #f3efe5;
+  --color-slate-200: #ede8dc;
+  --color-slate-300: #d9d2c2;
+  --color-slate-400: #a3aaa4;
+  --color-slate-500: #5c6b67;
+  --color-slate-600: #4a5b57;
+  --color-slate-700: #344642;
+  --color-slate-800: #213a36;
+  --color-slate-900: #0f2f2b;
+  --color-slate-950: #0a201d;
 
-  --color-ink: #2d2d2f;
-  --color-ground: #f6f3ec;
+  /* Funcionales del manual: Pago pendiente (ámbar #E8B04B = 400) y Vencido (#B4472F = 600). */
+  --color-amber-50: #fdf8ec;
+  --color-amber-100: #fbefd4;
+  --color-amber-200: #f6dfa9;
+  --color-amber-300: #f0c97a;
+  --color-amber-400: #e8b04b;
+  --color-amber-500: #d4962c;
+  --color-amber-600: #b07818;
+  --color-amber-700: #8a5c12;
+  --color-amber-800: #6c4710;
+  --color-amber-900: #57390f;
+  --color-amber-950: #2f1f08;
+  --color-rose-50: #fbf0ec;
+  --color-rose-100: #f6ddd5;
+  --color-rose-200: #ecbbac;
+  --color-rose-300: #de917b;
+  --color-rose-400: #cd6c51;
+  --color-rose-500: #c0573c;
+  --color-rose-600: #b4472f;
+  --color-rose-700: #963a26;
+  --color-rose-800: #77301f;
+  --color-rose-900: #5c2618;
+  --color-red-50: #fbf0ec;
+  --color-red-100: #f6ddd5;
+  --color-red-200: #ecbbac;
+  --color-red-300: #de917b;
+  --color-red-400: #cd6c51;
+  --color-red-500: #c0573c;
+  --color-red-600: #b4472f;
+  --color-red-700: #963a26;
+  --color-red-800: #77301f;
+  --color-red-900: #5c2618;
+
+  --color-ink: #0f2f2b;
+  --color-ground: #f7f3ea;
 
   --text-xs: 0.8125rem;
   --text-xs--line-height: 1.125rem;
@@ -84,35 +117,38 @@
 }
 
 :root {
-  --ground: #f6f3ec; /* el marco */
-  --sheet: #ffffff; /* la hoja */
+  --ground: #f7f3ea; /* Crema: el fondo base */
+  --sheet: #f7f3ea; /* el área de trabajo, sobre el mismo crema */
   --surface: #ffffff;
-  --raised: #f7f5f0; /* cajas internas */
-  --rule: #f1eee8;
-  --control: #dcd7cd;
-  --text: #2d2d2f;
-  --ink-soft: #6e6b66;
+  --raised: #f1ece1; /* cajas internas y columnas: se distinguen del crema y del blanco */
+  --rule: #eee8dc;
+  --control: #d9d2c2;
+  --text: #0f2f2b; /* Verde noche */
+  --ink-soft: #5c6b67;
   --field: #0e7c70;
-  --card-shadow: 0 1px 2px rgb(45 45 47 / 0.04), 0 10px 24px -14px rgb(45 45 47 / 0.12);
+  --night: #0f2f2b;
+  --mint: #a9d8cf;
+  --sand: #ede8dc;
+  --card-shadow: 0 1px 2px rgb(15 47 43 / 0.04), 0 10px 24px -14px rgb(15 47 43 / 0.12);
 
-  --background: #f6f3ec;
-  --foreground: #2d2d2f;
+  --background: #f7f3ea;
+  --foreground: #0f2f2b;
   --card: #ffffff;
-  --card-foreground: #2d2d2f;
+  --card-foreground: #0f2f2b;
   --popover: #ffffff;
-  --popover-foreground: #2d2d2f;
+  --popover-foreground: #0f2f2b;
   --primary: #0e7c70;
   --primary-foreground: #ffffff;
-  --secondary: #f7f5f0;
-  --secondary-foreground: #2d2d2f;
-  --muted: #f7f5f0;
-  --muted-foreground: #6e6b66;
-  --accent: #f3f1ec;
-  --accent-foreground: #2d2d2f;
-  --destructive: #c4242a;
-  --border: #ebe7df;
-  --input: #dcd7cd;
-  --ring: #189385;
+  --secondary: #f7f3ea;
+  --secondary-foreground: #0f2f2b;
+  --muted: #f7f3ea;
+  --muted-foreground: #5c6b67;
+  --accent: #f3efe5;
+  --accent-foreground: #0f2f2b;
+  --destructive: #b4472f;
+  --border: #e6e0d2;
+  --input: #d9d2c2;
+  --ring: #1a8c7f;
   --radius: 16px;
 }
 
@@ -130,13 +166,13 @@
   body {
     background: var(--ground);
     color: var(--text);
-    font-size: 14px;
+    font-size: 15px;
   }
   h1,
   h2,
   h3 {
     font-weight: 700;
-    letter-spacing: -0.025em;
+    letter-spacing: -0.02em;
   }
 }
 
@@ -151,7 +187,7 @@ td,
 .figure {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
 }
 .figure-dec {
   color: var(--color-slate-400);
@@ -161,7 +197,7 @@ td,
 @layer components {
   /* Campos nativos: blancos, borde de 1px, sin sombra. */
   .field {
-    @apply block w-full rounded-[10px] border bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-[#6e6b66] focus:border-brand-500 focus:ring-3 focus:ring-brand-100 focus:outline-none disabled:bg-[var(--raised)] disabled:text-slate-600;
+    @apply block w-full rounded-[10px] border bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-[#5c6b67] focus:border-brand-500 focus:ring-3 focus:ring-brand-100 focus:outline-none disabled:bg-[var(--raised)] disabled:text-slate-600;
     border-color: var(--control);
     min-height: 38px;
   }
@@ -212,7 +248,7 @@ td,
 }
 
 ::selection {
-  background: var(--color-data-100);
+  background: var(--mint);
 }
 
 .prose-msg p + p {

@@ -213,7 +213,7 @@ export default async function Dashboard() {
                     <li key={i}>
                       <Link href={`/app/viajes/${k.booking.id}`} className="flex items-center gap-4 rounded-xl px-3 py-2.5 hover:bg-[var(--raised)]">
                         <span className={clsx("flex w-12 shrink-0 flex-col items-center rounded-xl py-1.5", urgencyTone(diff).soft, urgencyTone(diff).ink)}>
-                          <span className="text-[11px] font-semibold tracking-[0.06em] uppercase opacity-80">{formatDate(k.date, { month: "short", day: undefined, year: undefined }).replace(".", "")}</span>
+                          <span className="text-[12px] font-semibold tracking-[0.06em] uppercase opacity-80">{formatDate(k.date, { month: "short", day: undefined, year: undefined }).replace(".", "")}</span>
                           <span className="figure text-xl leading-none">{k.date.getUTCDate()}</span>
                         </span>
                         <div className="min-w-0 flex-1">

@@ -14,7 +14,7 @@ function transport() {
 
 function toHtml(body: string) {
   const escaped = body.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  return `<div style="font-family:system-ui,sans-serif;font-size:15px;line-height:1.5;color:#1e293b">${escaped
+  return `<div style="font-family:system-ui,sans-serif;font-size:15px;line-height:1.5;color:#0f2f2b">${escaped
     .split(/\n{2,}/)
     .map((p) => `<p>${p.replace(/\n/g, "<br>")}</p>`)
     .join("")}</div>`;

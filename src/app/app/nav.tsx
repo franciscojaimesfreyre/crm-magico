@@ -69,7 +69,7 @@ function NavLink({ href, active, children }: { href: string; active: boolean; ch
       aria-current={active ? "page" : undefined}
       className={clsx(
         "group flex h-10 items-center gap-2.5 rounded-xl px-2 text-sm transition-colors",
-        active ? "bg-white font-semibold text-slate-900 shadow-[var(--card-shadow)]" : "text-slate-600 hover:bg-white/60 hover:text-slate-900",
+        active ? "bg-white/12 font-semibold text-[var(--ground)]" : "text-[var(--ground)]/75 hover:bg-white/6 hover:text-[var(--ground)]",
       )}
     >
       {children}
@@ -78,7 +78,7 @@ function NavLink({ href, active, children }: { href: string; active: boolean; ch
 }
 
 /**
- * Menú de la app. La fila activa lleva el tinte de la marca y su ícono el color pleno. Las opciones con
+ * Menú de la app, sobre el Verde noche. La fila activa se aclara y su ícono va en Menta. Las opciones con
  * funciones de admin general llevan un escudo, solo para quien lo es; los contadores, solo en lo que
  * hay que atender (mensajes sin leer, notificaciones).
  */
@@ -97,7 +97,7 @@ export function Nav({
     <nav className="flex flex-col gap-5 py-1" aria-label="Principal">
       {SECTIONS.map((section, i) => (
         <div key={i}>
-          {section.title && <p className="mb-1.5 px-2 text-[11px] font-semibold tracking-[0.08em] text-[var(--ink-soft)] uppercase">{section.title}</p>}
+          {section.title && <p className="mb-1.5 px-2 text-[11px] font-semibold tracking-[0.08em] text-[var(--mint)]/70 uppercase">{section.title}</p>}
           <ul className="space-y-0.5">
             {section.items.map((item) => {
               const active = "exact" in item && item.exact ? pathname === item.href : pathname.startsWith(item.href);
@@ -106,13 +106,13 @@ export function Nav({
               return (
                 <li key={item.href}>
                   <NavLink href={item.href} active={active}>
-                    {/* El ícono del activo va en un cuadrito neutro, como en la referencia. */}
-                    <span className={clsx("grid size-7 shrink-0 place-items-center rounded-lg", active ? "bg-brand-100 text-brand-700" : "text-slate-500 group-hover:text-slate-700")}>
+                    {/* El ícono del activo, en Menta sobre el Verde noche. */}
+                    <span className={clsx("grid size-7 shrink-0 place-items-center rounded-lg", active ? "text-[var(--mint)]" : "text-[var(--ground)]/55 group-hover:text-[var(--ground)]/80")}>
                       <item.icon className="size-4" strokeWidth={1.75} />
                     </span>
                     <span className="flex-1 truncate">{item.label}</span>
                     {adminHint && (
-                      <span title={adminHint} aria-label={adminHint} className="text-amber-700">
+                      <span title={adminHint} aria-label={adminHint} className="text-amber-300">
                         <ShieldCheck className="size-3.5" />
                       </span>
                     )}
@@ -128,7 +128,7 @@ export function Nav({
       ))}
       <div>
         <NavLink href="/app/configuracion" active={pathname.startsWith("/app/configuracion")}>
-          <span className={clsx("grid size-7 shrink-0 place-items-center rounded-lg", pathname.startsWith("/app/configuracion") ? "bg-brand-100 text-brand-700" : "text-slate-500")}>
+          <span className={clsx("grid size-7 shrink-0 place-items-center rounded-lg", pathname.startsWith("/app/configuracion") ? "text-[var(--mint)]" : "text-[var(--ground)]/55 group-hover:text-[var(--ground)]/80")}>
             <Settings className="size-4" strokeWidth={1.75} />
           </span>
           Configuración

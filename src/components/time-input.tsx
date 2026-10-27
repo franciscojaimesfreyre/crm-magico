@@ -62,12 +62,12 @@ export function TimeInput({
   return (
     <div className={clsx("relative", className)}>
       <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger id={id} aria-label={ariaLabel} className={clsx("field flex items-center gap-2 text-left tabular-nums", !current && "text-[#6e6b66]")}>
+        <PopoverTrigger id={id} aria-label={ariaLabel} className={clsx("field flex items-center gap-2 text-left tabular-nums", !current && "text-[#5c6b67]")}>
           <Clock className={clsx("size-4 shrink-0", current ? "text-brand-600" : "text-slate-500")} />
           <span>{current || placeholder}</span>
         </PopoverTrigger>
         <PopoverContent align="start" className="w-48 p-2">
-          <div className="grid grid-cols-2 gap-1 text-[11px] font-semibold tracking-[0.06em] text-[var(--ink-soft)] uppercase">
+          <div className="grid grid-cols-2 gap-1 text-[12px] font-semibold tracking-[0.06em] text-[var(--ink-soft)] uppercase">
             <span className="text-center">Hora</span>
             <span className="text-center">Min</span>
           </div>

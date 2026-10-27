@@ -124,7 +124,7 @@ export function DateInput({
           className={clsx(
             "field flex items-center gap-2 text-left",
             size === "sm" && "min-h-0 py-1 text-xs",
-            !selected && "text-[#6e6b66]",
+            !selected && "text-[#5c6b67]",
           )}
         >
           <CalendarDays

@@ -91,7 +91,7 @@ export function TripHeader({ booking: b, actions }: { booking: LoadedBooking; ac
       {/* Las fechas del viaje mandan: primero y más grandes. Cuánto falta y quiénes viajan, al lado y más chicos. */}
       <Card className="mt-5 grid grid-cols-2 divide-[var(--rule)] sm:grid-cols-[2fr_1fr_1fr] sm:divide-x">
         <div className="col-span-2 min-w-0 p-5 max-sm:border-b max-sm:border-[var(--rule)] sm:col-span-1">
-          <p className="text-[11px] font-semibold tracking-[0.06em] text-[var(--ink-soft)] uppercase">Fechas del viaje</p>
+          <p className="text-[12px] font-semibold tracking-[0.06em] text-[var(--ink-soft)] uppercase">Fechas del viaje</p>
           <p className="figure mt-1.5 text-[28px] leading-tight text-slate-900 sm:text-[32px]">
             {dates ?? "A definir"}
             {years && <span className="text-slate-500"> {years}</span>}
@@ -130,7 +130,7 @@ export function TripHeader({ booking: b, actions }: { booking: LoadedBooking; ac
 function Fact({ label, hint, className, children }: { label: string; hint?: string; className?: string; children: ReactNode }) {
   return (
     <div className={clsx("min-w-0 p-5", className)}>
-      <p className="text-[11px] font-semibold tracking-[0.06em] text-[var(--ink-soft)] uppercase">{label}</p>
+      <p className="text-[12px] font-semibold tracking-[0.06em] text-[var(--ink-soft)] uppercase">{label}</p>
       <p className="figure mt-1.5 truncate text-[22px] leading-tight sm:text-2xl">{children}</p>
       {hint && <p className="mt-0.5 truncate text-[13px] text-[var(--ink-soft)]">{hint}</p>}
     </div>

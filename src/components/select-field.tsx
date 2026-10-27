@@ -98,7 +98,7 @@ export function SelectField({
           className={clsx(
             "field flex items-center justify-between gap-2 text-left data-popup-open:border-brand-500 data-popup-open:ring-3 data-popup-open:ring-brand-100",
             size === "sm" && "min-h-0 py-1 text-xs",
-            current === "" && placeholder !== undefined && "text-[#6e6b66]",
+            current === "" && placeholder !== undefined && "text-[#5c6b67]",
             triggerClassName,
           )}
         >

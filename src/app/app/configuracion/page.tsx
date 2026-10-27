@@ -145,7 +145,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             </Card>
             <Card>
               <CardHeader
-                title="¿Tu agencia usa CRM Mágico?"
+                title="¿Tu agencia usa Yorno?"
                 description="Ingresá el código que te pasó. Va a poder ver tus ventas y comisiones, pero no tus clientes, y no puede modificar nada."
               />
               <ActionForm action={joinAgencyWithCode} className="flex flex-wrap items-end gap-3 p-5">
@@ -240,7 +240,7 @@ async function AvatarGallery({ organizationId }: { organizationId: string }) {
         <div className="space-y-5 p-5">
           {AVATAR_SET.map((g) => (
             <section key={g.group}>
-              <h3 className="mb-2 text-[11px] font-semibold tracking-[0.06em] text-[var(--ink-soft)] uppercase">{g.group}</h3>
+              <h3 className="mb-2 text-[12px] font-semibold tracking-[0.06em] text-[var(--ink-soft)] uppercase">{g.group}</h3>
               <ul className="grid grid-cols-4 gap-3 sm:grid-cols-8">
                 {g.items.map((it) => (
                   <li key={it.id} className="flex flex-col items-center gap-1 text-center">

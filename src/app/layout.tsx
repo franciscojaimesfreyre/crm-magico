@@ -15,9 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: { default: "Yorno", template: "%s · Yorno" },
+  title: { default: "Yiorno", template: "%s · Yiorno" },
   description: "El CRM para agentes de viaje que venden paquetes a parques temáticos y destinos de entretenimiento.",
-  applicationName: "Yorno",
+  applicationName: "Yiorno",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

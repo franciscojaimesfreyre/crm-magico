@@ -145,7 +145,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             </Card>
             <Card>
               <CardHeader
-                title="¿Tu agencia usa Yorno?"
+                title="¿Tu agencia usa Yiorno?"
                 description="Ingresá el código que te pasó. Va a poder ver tus ventas y comisiones, pero no tus clientes, y no puede modificar nada."
               />
               <ActionForm action={joinAgencyWithCode} className="flex flex-wrap items-end gap-3 p-5">

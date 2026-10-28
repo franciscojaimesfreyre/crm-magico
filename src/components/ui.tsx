@@ -9,7 +9,7 @@ import { SelectField } from "@/components/select-field";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger" | "magic";
 
-// Botones del manual de Yorno: rectángulos redondeados (10 px, como los campos). El principal en Verde Yorno, solo
+// Botones del manual de Yiorno: rectángulos redondeados (10 px, como los campos). El principal en Verde Yiorno, solo
 // para la acción principal; el secundario blanco con borde; el resto, texto. Las acciones de IA ("magic") van en
 // el verde pálido de los datos, nunca con degradado.
 const VARIANTS: Record<Variant, string> = {

@@ -1,4 +1,4 @@
-// Yorno — modelo de datos.
+// Yiorno — modelo de datos.
 // Inquilino (tenant) = Organization: el negocio de un agente. Sus datos son solo suyos.
 // Agency: la agencia que le paga las comisiones al agente (una por agente, opcional).
 

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Bell, LogOut, Mail, Search, ShieldCheck } from "lucide-react";
 import { MobileMenu } from "./mobile-menu";
-import { YornoLogo } from "@/components/brand";
+import { YiornoLogo } from "@/components/brand";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Avatar } from "@/components/ui";
@@ -27,8 +27,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const nav = <Nav unreadMessages={unreadMessages} isPlatformAdmin={user.isPlatformAdmin} />;
   // El logotipo en crema sobre el Verde noche del menú, con aire alrededor (área de respeto).
   const product = (
-    <Link href="/app" aria-label="Yorno, inicio" className="inline-flex rounded-lg px-3 py-2 text-[var(--ground)]">
-      <YornoLogo className="h-8" title={null} />
+    <Link href="/app" aria-label="Yiorno, inicio" className="inline-flex rounded-lg px-3 py-2 text-[var(--ground)]">
+      <YiornoLogo className="h-10" title={null} />
     </Link>
   );
   const iconButton = "relative grid size-9 place-items-center rounded-full border border-[var(--border)] bg-white text-slate-600 hover:text-slate-900";
@@ -94,8 +94,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               {logoutButton}
             </div>
           </MobileMenu>
-          <Link href="/app" aria-label="Yorno, inicio" className="text-[var(--night)]">
-            <YornoLogo className="h-6" title={null} />
+          <Link href="/app" aria-label="Yiorno, inicio" className="text-[var(--night)]">
+            <YiornoLogo className="h-8" title={null} />
           </Link>
           <Link href="/app/notificaciones" className={iconButton} aria-label="Notificaciones">
             <Bell className="size-4" strokeWidth={1.75} />

@@ -1,0 +1,134 @@
+/*
+ * Portada de Yiorno. Colores y tipografía del manual (globals.css); acá viven los tamaños de la portada y
+ * su movimiento: los días que caen y se apilan en el primer pantallazo, el camino que se dibuja con el
+ * scroll y las entradas de cada sección. Solo transform, opacidad y el trazo del camino; con "reducir
+ * movimiento" todo queda en su lugar.
+ */
+.landing {
+  --t-display: clamp(35px, 9vw, 140px);
+  --t-h2: clamp(34px, 4.2vw, 64px);
+  --t-h3: clamp(24px, 2vw, 30px);
+  --t-lead: clamp(19px, 1.5vw, 22px);
+  --gutter: clamp(20px, 4vw, 64px);
+  --ease-out-strong: cubic-bezier(0.16, 1, 0.3, 1);
+  font-size: 18px;
+  line-height: 1.55;
+  color: var(--night);
+  background: var(--ground);
+}
+.landing h1,
+.landing h2,
+.landing h3 {
+  letter-spacing: -0.03em;
+}
+
+/* Los días caen y se apilan como piezas (cada uno con su --delay). */
+@media (prefers-reduced-motion: no-preference) {
+  .landing .tile {
+    animation: l-drop 900ms cubic-bezier(0.34, 1.2, 0.64, 1) both;
+    animation-delay: var(--delay, 0ms);
+  }
+  .landing .rise {
+    animation: l-rise 900ms var(--ease-out-strong) both;
+    animation-delay: var(--delay, 0ms);
+  }
+}
+@keyframes l-drop {
+  from {
+    transform: translateY(-115vh);
+  }
+}
+@keyframes l-rise {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+}
+
+/* Entrada de las partes de cada sección, una vez, al aparecer. Solo con script (clase reveal-ready). */
+@media (prefers-reduced-motion: no-preference) {
+  .reveal-ready [data-reveal]:not(.is-in) {
+    opacity: 0;
+    transform: translateY(32px);
+  }
+  .reveal-ready [data-reveal] {
+    transition:
+      opacity 800ms var(--ease-out-strong),
+      transform 800ms var(--ease-out-strong);
+    transition-delay: calc(var(--d, 0) * 90ms);
+  }
+}
+
+/* Los personajes del camino flotan apenas. */
+@media (prefers-reduced-motion: no-preference) {
+  .landing .bob {
+    animation: l-bob 5s ease-in-out infinite alternate;
+  }
+}
+@keyframes l-bob {
+  to {
+    transform: translateY(-10px) rotate(var(--r, 0deg));
+  }
+}
+
+/* Las capturas del bloque fijo se cruzan al cambiar de función. */
+.landing .shot {
+  transition:
+    opacity 500ms ease,
+    transform 700ms var(--ease-out-strong);
+}
+
+.landing .press {
+  transition:
+    transform 140ms var(--ease-out-strong),
+    background-color 160ms ease,
+    color 160ms ease;
+}
+.landing .press:active {
+  transform: scale(0.97);
+}
+.landing .lift {
+  transition: transform 400ms var(--ease-out-strong);
+}
+.landing .lift:hover {
+  transform: translateY(-6px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing .press:active,
+  .landing .lift:hover {
+    transform: none;
+  }
+}
+
+/* El acordeón: el signo más se vuelve menos girando una barra. */
+.landing details[open] .plus-v {
+  transform: rotate(90deg);
+}
+.landing .plus-v {
+  transition: transform 260ms var(--ease-out-strong);
+}
+.landing details > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Las novedades pasan solas, en dos filas opuestas; al pasar el mouse se frenan. */
+@media (prefers-reduced-motion: no-preference) {
+  .landing .ticker {
+    overflow: hidden;
+  }
+  .landing .ticker-track {
+    animation: l-ticker 60s linear infinite;
+  }
+  .landing .ticker-reverse {
+    animation-direction: reverse;
+    animation-duration: 70s;
+  }
+  .landing .ticker:hover .ticker-track {
+    animation-play-state: paused;
+  }
+}
+@keyframes l-ticker {
+  to {
+    transform: translateX(-50%);
+  }
+}

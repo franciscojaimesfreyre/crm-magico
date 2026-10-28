@@ -7,10 +7,10 @@ import { signup, signupAgency } from "../actions";
 
 export const metadata = { title: "Crear cuenta" };
 
-export default async function SignupPage({ searchParams }: { searchParams: Promise<{ tipo?: string; agencia?: string }> }) {
+export default async function SignupPage({ searchParams }: { searchParams: Promise<{ tipo?: string; agencia?: string; negocio?: string }> }) {
   const sp = await searchParams;
   const isAgency = sp.tipo === "agencia";
-  // Link de invitación de una agencia: /registro?agencia=CODIGO
+  // Link de invitación de una agencia: /registro?agencia=CODIGO. Desde la portada llega ?negocio=… ya escrito.
   const invitedBy = !isAgency && sp.agencia ? await findAgencyByCode(sp.agencia) : null;
 
   return (
@@ -18,13 +18,13 @@ export default async function SignupPage({ searchParams }: { searchParams: Promi
       <h1 className="text-xl font-semibold text-slate-900">Creá tu cuenta</h1>
       <div className="mt-4 mb-6 grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1 text-sm font-medium">
         <Link
-          href={sp.agencia ? `/registro?agencia=${encodeURIComponent(sp.agencia)}` : "/registro"}
+          href={sp.agencia ? `/registro?agencia=${encodeURIComponent(sp.agencia)}` : sp.negocio ? `/registro?negocio=${encodeURIComponent(sp.negocio)}` : "/registro"}
           className={clsx("rounded-md px-3 py-1.5 text-center", !isAgency ? "bg-white text-slate-900" : "text-slate-500 hover:text-slate-800")}
         >
           Soy agente
         </Link>
         <Link
-          href="/registro?tipo=agencia"
+          href={`/registro?tipo=agencia${sp.negocio ? `&negocio=${encodeURIComponent(sp.negocio)}` : ""}`}
           className={clsx("rounded-md px-3 py-1.5 text-center", isAgency ? "bg-white text-slate-900" : "text-slate-500 hover:text-slate-800")}
         >
           Soy una agencia
@@ -38,7 +38,7 @@ export default async function SignupPage({ searchParams }: { searchParams: Promi
           </p>
           <ActionForm action={signupAgency} className="space-y-4">
             <Field label="Nombre de la agencia">
-              <Input name="businessName" placeholder="Ej: Agencia Madre Travel" required />
+              <Input name="businessName" placeholder="Ej: Agencia Madre Travel" defaultValue={sp.negocio} required />
             </Field>
             <Field label="Tu nombre">
               <Input name="name" autoComplete="name" required />
@@ -67,7 +67,7 @@ export default async function SignupPage({ searchParams }: { searchParams: Promi
           </p>
           <ActionForm action={signup} className="space-y-4">
             <Field label="Nombre de tu negocio">
-              <Input name="businessName" placeholder="Ej: Viajes Encantados" required />
+              <Input name="businessName" placeholder="Ej: Viajes Encantados" defaultValue={sp.negocio} required />
             </Field>
             <Field label="Tu nombre">
               <Input name="name" autoComplete="name" required />
@@ -81,7 +81,7 @@ export default async function SignupPage({ searchParams }: { searchParams: Promi
             {invitedBy ? (
               <input type="hidden" name="agencyCode" value={invitedBy.inviteCode ?? ""} />
             ) : (
-              <Field label="Código de tu agencia (opcional)" hint="Si tu agencia usa Yorno, te lo pasa ella. Lo podés cargar después.">
+              <Field label="Código de tu agencia (opcional)" hint="Si tu agencia usa Yiorno, te lo pasa ella. Lo podés cargar después.">
                 <Input name="agencyCode" className="uppercase" autoComplete="off" />
               </Field>
             )}

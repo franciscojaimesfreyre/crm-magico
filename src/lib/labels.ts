@@ -84,7 +84,7 @@ export const PIPELINE: BookingStatus[] = [
   "COMPLETED",
 ];
 
-// Colores funcionales del manual: Cotizando en Menta, Confirmado (reservado) en Verde Yorno pleno.
+// Colores funcionales del manual: Cotizando en Menta, Confirmado (reservado) en Verde Yiorno pleno.
 export const BOOKING_STATUS_COLOR: Record<BookingStatus, string> = {
   INQUIRY: "bg-sky-100 text-sky-800",
   QUOTED: "bg-brand-200 text-brand-900",

@@ -7,8 +7,8 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
- * Yorno — sistema visual (manual de marca v1, octubre 2026).
- * Mucho crema y aire; el Verde noche para leer; el Verde Yorno para lo que se toca o se destaca.
+ * Yiorno — sistema visual (manual de marca v1, octubre 2026).
+ * Mucho crema y aire; el Verde noche para leer; el Verde Yiorno para lo que se toca o se destaca.
  * El menú lateral va en Verde noche con el logotipo en crema; el trabajo, sobre el crema, en tarjetas
  * blancas. Texto e interfaz en Outfit (el logotipo es un SVG, nunca se escribe con una tipografía).
  * Los colores funcionales (confirmado, pago pendiente, vencido) son solo del producto. Solo modo claro.
@@ -19,7 +19,7 @@
   --font-heading: var(--font-display);
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
-  /* Verde Yorno (600): acciones, vínculos y lo activo. 200 es la Menta (apoyo, resaltados). */
+  /* Verde Yiorno (600): acciones, vínculos y lo activo. 200 es la Menta (apoyo, resaltados). */
   --color-brand-50: #edf7f4;
   --color-brand-100: #d6eee8;
   --color-brand-200: #a9d8cf;

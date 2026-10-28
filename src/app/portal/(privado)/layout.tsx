@@ -6,7 +6,7 @@ import { requireClientAccount } from "@/lib/auth";
 import { logoutPortal } from "../actions";
 import { portalPersona } from "@/lib/avatars-server";
 import { TravelerAvatar } from "@/components/traveler-avatar";
-import { MadeWithYorno } from "@/components/brand";
+import { MadeWithYiorno } from "@/components/brand";
 
 // En el portal manda la marca de la agencia: la pestaña dice "Mis viajes · Viajes Encantados".
 export async function generateMetadata(): Promise<Metadata> {
@@ -68,7 +68,7 @@ export default async function PortalLayout({ children }: { children: React.React
           {org.contactPhone && ` · ${org.contactPhone}`}
           {org.contactEmail && ` · ${org.contactEmail}`}
         </p>
-        <MadeWithYorno />
+        <MadeWithYiorno />
       </footer>
     </div>
   );

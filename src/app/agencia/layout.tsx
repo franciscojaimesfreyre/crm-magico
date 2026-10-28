@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { LogOut } from "lucide-react";
-import { YornoMonogram } from "@/components/brand";
+import { YiornoMonogram } from "@/components/brand";
 import { requireAgencyUser } from "@/lib/auth";
 import { Avatar } from "@/components/ui";
 import { logout } from "@/app/(auth)/actions";
@@ -13,7 +13,7 @@ export default async function AgencyLayout({ children }: { children: React.React
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-5">
             <Link href="/agencia" className="flex shrink-0 items-center gap-2 font-semibold text-slate-900">
-              <YornoMonogram className="h-8 text-brand-600" />
+              <YiornoMonogram className="h-8 text-brand-600" />
               <span className="hidden truncate sm:inline">{user.agency.name}</span>
             </Link>
             <nav className="flex gap-4 text-sm font-medium text-slate-600">

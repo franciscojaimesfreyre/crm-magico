@@ -58,3 +58,6 @@ next-env.d.ts
 # Imágenes originales (personajes y banners): se optimizan con npm run media y se sirven desde R2
 /images
 /storage/media-build
+
+# Capturas de la app para el sitio y videos (datos de demo)
+/capturas

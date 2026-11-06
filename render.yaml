@@ -7,6 +7,9 @@
 #   si no se pasa a un plan pago. No tiene backups.
 # - El disco es temporal: los archivos van a Cloudflare R2 (variables R2_*).
 
+# La base de Render quedó bloqueada el 2026-11-05 al vencer el plan gratis. Se deja declarada a propósito:
+# sacarla de este archivo podría hacer que Render la borre, y sus datos se pueden recuperar pasándola a un
+# plan pago hasta el 2026-11-19. Mientras tanto la app usa una base en Neon (ver DATABASE_URL abajo).
 databases:
   - name: crm-magico-db
     plan: free
@@ -29,10 +32,10 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "22"
+      # Por ahora, la base en Neon: se carga a mano en Render con la URL directa de Neon (sin "-pooler"),
+      # porque las migraciones corren al arrancar. Para volver a la base de Render, cambiar este valor.
       - key: DATABASE_URL
-        fromDatabase:
-          name: crm-magico-db
-          property: connectionString
+        sync: false
       # Secretos generados por Render (base64 de 256 bits; ENCRYPTION_KEY necesita justo ese formato).
       # No cambiar ENCRYPTION_KEY una vez que haya accesos de clientes guardados: quedarían ilegibles.
       - key: SESSION_SECRET

@@ -1,6 +1,6 @@
 /*
  * Portada de Yiorno. Colores y tipografía del manual (globals.css); acá viven los tamaños de la portada y
- * su movimiento: los días que caen y se apilan en el primer pantallazo, el camino que se dibuja con el
+ * su movimiento: el camino de los días que se dibuja en el primer pantallazo, el camino que se dibuja con el
  * scroll y las entradas de cada sección. Solo transform, opacidad y el trazo del camino; con "reducir
  * movimiento" todo queda en su lugar.
  */
@@ -22,10 +22,17 @@
   letter-spacing: -0.03em;
 }
 
-/* Los días caen y se apilan como piezas (cada uno con su --delay). */
+/* El camino de los días: la cinta se dibuja de izquierda a derecha, la línea punteada avanza sin parar y cada
+   parada aparece cuando la cinta llega a ella (cada una con su --delay). */
 @media (prefers-reduced-motion: no-preference) {
-  .landing .tile {
-    animation: l-drop 900ms cubic-bezier(0.34, 1.2, 0.64, 1) both;
+  .landing .trail-line {
+    animation: l-draw 1700ms var(--ease-out-strong) 350ms both;
+  }
+  .landing .trail-dash {
+    animation: l-march 1.6s linear infinite;
+  }
+  .landing .trail-stop {
+    animation: l-pop 700ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
     animation-delay: var(--delay, 0ms);
   }
   .landing .rise {
@@ -33,9 +40,23 @@
     animation-delay: var(--delay, 0ms);
   }
 }
-@keyframes l-drop {
+@keyframes l-draw {
   from {
-    transform: translateY(-115vh);
+    clip-path: inset(-20% 100% -20% -2%);
+  }
+  to {
+    clip-path: inset(-20% -2% -20% -2%);
+  }
+}
+@keyframes l-march {
+  to {
+    stroke-dashoffset: -16;
+  }
+}
+@keyframes l-pop {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.6);
   }
 }
 @keyframes l-rise {
@@ -68,6 +89,18 @@
 @keyframes l-bob {
   to {
     transform: translateY(-10px) rotate(var(--r, 0deg));
+  }
+}
+
+/* La flecha del bloque fijo baja y sube apenas, para invitar a seguir. */
+@media (prefers-reduced-motion: no-preference) {
+  .landing .nudge {
+    animation: l-nudge 1.6s ease-in-out infinite;
+  }
+}
+@keyframes l-nudge {
+  50% {
+    transform: translateY(4px);
   }
 }
 

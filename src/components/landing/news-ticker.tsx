@@ -12,7 +12,7 @@ const TONE = {
   Evento: "bg-[var(--mint)] text-slate-900",
   Apertura: "bg-white text-slate-900",
   Promoción: "bg-[var(--night)] text-white",
-  Volvió: "bg-sky-100 text-sky-900",
+  Reabrió: "bg-sky-100 text-sky-900",
 } as const;
 
 type Item = { kind: keyof typeof TONE; text: string };
@@ -24,7 +24,7 @@ const ROWS: Item[][] = [
     { kind: "Remodelación", text: "Tiana's Bayou Adventure desde el 2/11" },
     { kind: "Apertura", text: "The Magic of Disney Animation en Hollywood Studios" },
     { kind: "Promoción", text: "4-Park Magic 2027 para Latinoamérica" },
-    { kind: "Volvió", text: "Skull Island: Reign of Kong ya opera" },
+    { kind: "Reabrió", text: "Skull Island: Reign of Kong ya opera" },
   ],
   [
     { kind: "Evento", text: "EPCOT Festival of the Holidays 2026" },

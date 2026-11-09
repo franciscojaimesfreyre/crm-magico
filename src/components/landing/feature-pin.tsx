@@ -8,7 +8,9 @@ export type Feature = { title: string; text: string; image: string; alt: string 
 /**
  * Las funciones de Yiorno en un bloque que queda fijo mientras se baja: a la izquierda la lista se abre de
  * a una, a la derecha cambia la captura de la app. En el teléfono (y sin script) es una lista común, cada
- * función con su captura.
+ * función con su captura. Debajo de la lista, una barra y un contador muestran cuánto falta del recorrido
+ * (mientras el bloque está fijo, el scroll cambia la captura y no parece avanzar); en la última, una flecha
+ * lleva a la sección siguiente. Los títulos funcionan como pestañas.
  */
 export function FeaturePin({ features }: { features: Feature[] }) {
   const box = useRef<HTMLDivElement>(null);
@@ -47,11 +49,18 @@ export function FeaturePin({ features }: { features: Feature[] }) {
     window.scrollTo({ top: el.offsetTop + (span * (i + 0.5)) / features.length, behavior: "smooth" });
   };
 
+  // La flecha lleva justo después del bloque, a la sección que sigue.
+  const next = () => {
+    const el = box.current;
+    if (el) window.scrollTo({ top: el.offsetTop + el.offsetHeight, behavior: "smooth" });
+  };
+
   return (
-    <div ref={box} className="lg:h-[calc(var(--n)*60svh+100svh)]" style={{ "--n": features.length } as React.CSSProperties}>
+    <div ref={box} className="lg:h-[calc(var(--n)*30svh+100svh)]" style={{ "--n": features.length } as React.CSSProperties}>
       <div className="lg:sticky lg:top-0 lg:flex lg:h-svh lg:items-center">
         <div className="grid w-full gap-10 lg:grid-cols-12 lg:gap-12">
-          <ol className="lg:col-span-5">
+          <div className="lg:col-span-5">
+            <ol>
             {features.map((f, i) => {
               const on = active === i;
               return (
@@ -74,7 +83,34 @@ export function FeaturePin({ features }: { features: Feature[] }) {
                 </li>
               );
             })}
-          </ol>
+            </ol>
+            {/* Cuánto falta del recorrido y la flecha que invita a seguir bajando. Solo con el bloque fijo. */}
+            <div className="mt-8 hidden h-10 items-center gap-5 lg:flex">
+              <div className="flex gap-1.5" aria-hidden>
+                {features.map((f, i) => (
+                  <span
+                    key={f.title}
+                    className={clsx("h-1.5 rounded-full transition-all duration-500", i === active ? "w-10 bg-[var(--mint)]" : i < active ? "w-5 bg-[var(--mint)]/60" : "w-5 bg-[var(--ground)]/20")}
+                  />
+                ))}
+              </div>
+              <p className="text-[15px] font-semibold text-[var(--ground)]/80 tabular-nums" aria-live="polite">
+                {active + 1} de {features.length}
+              </p>
+              {active === features.length - 1 && (
+                <button
+                  type="button"
+                  onClick={next}
+                  className="press ml-auto inline-flex items-center gap-2 rounded-[10px] px-3 py-2 text-[15px] font-semibold text-[var(--ground)]/80 hover:bg-[var(--ground)]/10 hover:text-[var(--ground)]"
+                >
+                  Ver lo que sigue
+                  <svg aria-hidden viewBox="0 0 16 16" className="nudge size-4" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M8 2.5v11M3.5 9 8 13.5 12.5 9" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
           {/* Las capturas van en un marco crema (el fondo de la app): así el menú Verde noche de la app no se funde con el de la sección. */}
           <div className="hidden rounded-[28px] bg-[var(--ground)] p-3 lg:col-span-7 lg:block">
           <div className="relative aspect-[1600/1000] overflow-hidden rounded-[18px]">

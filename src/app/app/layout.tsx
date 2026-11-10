@@ -7,10 +7,11 @@ import { db } from "@/lib/db";
 import { Avatar } from "@/components/ui";
 import { logout } from "@/app/(auth)/actions";
 import { Nav } from "./nav";
+import { overdueBalancesCount } from "@/lib/agenda";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
-  const [unreadNotifications, unreadMessages] = await Promise.all([
+  const [unreadNotifications, unreadMessages, overdueBalances] = await Promise.all([
     db.notification.count({
       where: {
         organizationId: user.organizationId,
@@ -22,9 +23,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     db.message.count({
       where: { client: { organizationId: user.organizationId }, senderType: "CLIENT", readByAgentAt: null },
     }),
+    overdueBalancesCount(user.organizationId),
   ]);
 
-  const nav = <Nav unreadMessages={unreadMessages} isPlatformAdmin={user.isPlatformAdmin} />;
+  const nav = <Nav unreadMessages={unreadMessages} overdueBalances={overdueBalances} isPlatformAdmin={user.isPlatformAdmin} />;
   // El logotipo en crema sobre el Verde noche del menú, con aire alrededor (área de respeto).
   const product = (
     <Link href="/app" aria-label="Yiorno, inicio" className="inline-flex rounded-lg px-3 py-2 text-[var(--ground)]">

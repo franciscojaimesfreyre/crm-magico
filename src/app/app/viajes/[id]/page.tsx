@@ -51,10 +51,10 @@ export default async function BookingPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; pagar?: string }>;
 }) {
   const { id } = await params;
-  const { tab = "resumen" } = await searchParams;
+  const { tab = "resumen", pagar } = await searchParams;
   const user = await requireUser();
   const b = await loadBooking(id, user.organizationId);
   if (!b) notFound();
@@ -130,7 +130,7 @@ export default async function BookingPage({
         </>
       )}
 
-      {tab === "reservas" && <Items booking={b} defaultRate={defaultRate} eventWarnings={await eventWarnings(b.items)} />}
+      {tab === "reservas" && <Items booking={b} defaultRate={defaultRate} eventWarnings={await eventWarnings(b.items)} payItemId={pagar} />}
       {tab === "cotizaciones" && <Quotes booking={b} defaultRate={defaultRate} />}
       {tab === "itinerario" && <ItineraryTab bookingId={b.id} shareToken={b.shareToken} baseUrl={baseUrl} />}
       {tab === "documentos" && <DocumentsTab bookingId={b.id} organizationId={user.organizationId} />}
@@ -207,7 +207,8 @@ async function ItineraryTab({ bookingId, shareToken, baseUrl }: { bookingId: str
 async function DocumentsTab({ bookingId, organizationId }: { bookingId: string; organizationId: string }) {
   const [docs, library] = await Promise.all([
     db.document.findMany({
-      where: { bookingId },
+      // Los adjuntos de cotizaciones todavía no aceptadas se ven en la cotización, no acá.
+      where: { bookingId, NOT: { quoteItemId: { not: null }, bookingItemId: null } },
       orderBy: { createdAt: "desc" },
       include: { uploadedBy: { select: { name: true } }, bookingItem: { select: { type: true, description: true } } },
     }),

@@ -4,13 +4,14 @@ import clsx from "clsx";
 import { AlertTriangle, CalendarClock, Inbox, Plus, Wallet } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { Avatar, Badge, Card, CardHeader, LinkButton, StatCard, StatStrip } from "@/components/ui";
+import { Avatar, Card, CardHeader, LinkButton, StatCard, StatStrip } from "@/components/ui";
 import { TripTicket } from "@/components/trip-ticket";
 import { TaskList } from "@/components/task-list";
 import { CopyText } from "@/app/app/clientes/[id]/client-widgets";
-import { BOOKING_STATUS_COLOR, BOOKING_STATUS_LABEL, DESTINATION_LABEL, DESTINATION_TONE, urgencyTone } from "@/lib/labels";
+import { BOOKING_STATUS_COLOR, BOOKING_STATUS_LABEL, DESTINATION_LABEL, DESTINATION_TONE } from "@/lib/labels";
 import { addDays, daysBetween, formatDate, formatRange, money, todayUTC, toNumber } from "@/lib/format";
-import { computeKeyDates } from "@/lib/key-dates";
+import { agenda, defaultScope } from "@/lib/agenda";
+import { AgendaRows } from "./calendario/agenda-ui";
 import { runDateWorkflowsIfDue } from "@/lib/automations";
 import { syncThemeParksIfDue } from "@/lib/themeparks-sync";
 import { appUrl } from "@/lib/app-url";
@@ -84,14 +85,25 @@ export default async function Dashboard() {
     knowledgeHighlights(orgId),
   ]);
 
-  // Fechas clave de los próximos 30 días de todos los viajes.
-  const allKeyDates = upcoming
-    .flatMap((b) => computeKeyDates(b).map((k) => ({ ...k, booking: b })))
-    .filter((k) => k.date >= today && k.date <= addDays(today, 30) && !["checkout", "stay-out", "dropoff"].includes(k.kind))
-    .sort((a, b) => a.date.getTime() - b.date.getTime());
-  const keyDates = allKeyDates.slice(0, 10);
-  // Saldos que los clientes tienen que pagar a sus proveedores en los próximos 30 días.
-  const balancesDue = allKeyDates.filter((k) => k.kind === "payment");
+  // Fechas clave: lo vencido y los próximos 30 días, de la misma agenda que el calendario.
+  const scope = await defaultScope(orgId);
+  const allKeyDates = await agenda({
+    organizationId: orgId,
+    userId: user.id,
+    from: today,
+    to: addDays(today, 30),
+    scope,
+    withOverdue: true,
+    kinds: ["payment", "window", "trip", "logistics"],
+  });
+  // Primero lo vencido (la plata), después las ventanas abiertas y lo que viene.
+  const keyDates = [...allKeyDates.filter((k) => k.overdue), ...allKeyDates.filter((k) => k.open), ...allKeyDates.filter((k) => !k.overdue && !k.open)].slice(0, 10);
+  // Saldos que los clientes tienen que pagar a sus proveedores: los vencidos primero, con cuánto suman.
+  const overdueList = allKeyDates.filter((k) => k.kind === "payment" && k.overdue);
+  const overdueBalances = overdueList.length;
+  const overdueCurrencies = [...new Set(overdueList.map((k) => k.currency))];
+  const overdueTotal = overdueCurrencies.length === 1 ? money(overdueList.reduce((sum, k) => sum + (k.amount ?? 0), 0), overdueCurrencies[0]) : null;
+  const balancesDue = allKeyDates.filter((k) => k.kind === "payment" && !k.overdue && !k.tentative);
   const nextTrips = upcoming.filter((b) => b.startDate && b.startDate >= today).slice(0, 6);
 
   const hour = Number(new Intl.DateTimeFormat("es-AR", { hour: "numeric", hour12: false, timeZone: "America/Argentina/Buenos_Aires" }).format(new Date()));
@@ -100,12 +112,12 @@ export default async function Dashboard() {
   const todayLabel = new Intl.DateTimeFormat("es-AR", { weekday: "long", day: "numeric", month: "long", timeZone: "America/Argentina/Buenos_Aires" }).format(new Date());
 
   // Lo que vence o pasa en los próximos 7 días y las tareas atrasadas (la fila "Necesita tu atención").
-  const thisWeek = allKeyDates.filter((k) => k.date <= in7).length;
+  const thisWeek = allKeyDates.filter((k) => !k.overdue && !k.open && k.date <= in7).length;
   const overdueTasks = tasks.filter((t) => t.dueDate && t.dueDate < today).length;
   const toCollect = toNumber(commissionToCollect._sum.commissionAmount);
 
   const featured = nextTrips[0];
-  const featuredNext = featured ? keyDates.find((k) => k.booking.id === featured.id) : undefined;
+  const featuredNext = featured ? keyDates.find((k) => !k.overdue && !k.open && k.booking?.id === featured.id) : undefined;
   const ticketOf = (b: (typeof nextTrips)[number], size: "sm" | "md") => (
     <TripTicket
       key={b.id}
@@ -146,6 +158,25 @@ export default async function Dashboard() {
 
       {/* Lo primero que se lee: lo que necesita atención, en color según la urgencia. */}
       <section aria-label="Necesita tu atención" className="mb-7 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {overdueBalances > 0 ? (
+          <Attention
+            href="/app/calendario?tipo=payment#vencido"
+            tone="rose"
+            icon={Wallet}
+            count={overdueBalances}
+            label={`${overdueBalances === 1 ? "saldo vencido sin pagar" : "saldos vencidos sin pagar"}${overdueTotal ? ` · ${overdueTotal}` : ""}`}
+            zero=""
+          />
+        ) : (
+          <Attention
+            href="/app/calendario?tipo=payment"
+            tone="sky"
+            icon={Wallet}
+            count={balancesDue.length}
+            label={balancesDue.length === 1 ? "saldo de cliente vence en 30 días" : "saldos de clientes vencen en 30 días"}
+            zero="Sin saldos por vencer"
+          />
+        )}
         <Attention
           href="/app/tareas"
           tone="rose"
@@ -154,15 +185,7 @@ export default async function Dashboard() {
           label={overdueTasks === 1 ? "tarea atrasada" : "tareas atrasadas"}
           zero="Sin tareas atrasadas"
         />
-        <Attention href="/app/calendario" tone="amber" icon={CalendarClock} count={thisWeek} label={thisWeek === 1 ? "fecha clave esta semana" : "fechas clave esta semana"} zero="Nada en los próximos 7 días" />
-        <Attention
-          href="/app/calendario"
-          tone="sky"
-          icon={Wallet}
-          count={balancesDue.length}
-          label={balancesDue.length === 1 ? "saldo de cliente vence en 30 días" : "saldos de clientes vencen en 30 días"}
-          zero="Sin saldos por vencer"
-        />
+        <Attention href="/app/calendario#semana" tone="amber" icon={CalendarClock} count={thisWeek} label={thisWeek === 1 ? "fecha clave esta semana" : "fechas clave esta semana"} zero="Nada en los próximos 7 días" />
         <Attention href="/app/viajes?estado=INQUIRY" tone="brand" icon={Inbox} count={inquiries} label={inquiries === 1 ? "consulta nueva para cotizar" : "consultas nuevas para cotizar"} zero="Sin consultas pendientes" />
       </section>
 
@@ -195,39 +218,19 @@ export default async function Dashboard() {
           <Card>
             <CardHeader
               title="Fechas clave"
-              description="Los próximos 30 días de tus viajes: restaurantes, Lightning Lane, saldos y salidas."
+              description="Lo vencido y los próximos 30 días de tus viajes: saldos, lo que hay que reservar y las salidas."
               actions={
                 <LinkButton href="/app/calendario" variant="secondary" size="sm">
-                  Calendario
+                  Ver la agenda
                 </LinkButton>
               }
             />
             {keyDates.length === 0 ? (
-              <p className="px-5 py-6 text-sm text-[var(--ink-soft)]">Nada en los próximos 30 días. Las fechas se calculan solas a partir de las reservas de cada viaje.</p>
+              <p className="px-5 py-6 text-sm text-[var(--ink-soft)]">Nada vencido ni en los próximos 30 días. Las fechas se calculan solas a partir de las reservas de cada viaje.</p>
             ) : (
-              <ul className="space-y-1 p-2">
-                {keyDates.map((k, i) => {
-                  const diff = daysBetween(today, k.date);
-                  const who = `${k.booking.client.firstName} ${k.booking.client.lastName}`;
-                  return (
-                    <li key={i}>
-                      <Link href={`/app/viajes/${k.booking.id}`} className="flex items-center gap-4 rounded-xl px-3 py-2.5 hover:bg-[var(--raised)]">
-                        <span className={clsx("flex w-12 shrink-0 flex-col items-center rounded-xl py-1.5", urgencyTone(diff).soft, urgencyTone(diff).ink)}>
-                          <span className="text-[12px] font-semibold tracking-[0.06em] uppercase opacity-80">{formatDate(k.date, { month: "short", day: undefined, year: undefined }).replace(".", "")}</span>
-                          <span className="figure text-xl leading-none">{k.date.getUTCDate()}</span>
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold text-slate-900">{k.label}</p>
-                          <p className="truncate text-[13px] text-[var(--ink-soft)]">
-                            {who} · {k.booking.title}
-                          </p>
-                        </div>
-                        <Badge className={clsx(urgencyTone(diff).soft, urgencyTone(diff).ink)}>{urgencyTone(diff).label}</Badge>
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
+              <div className="p-2">
+                <AgendaRows entries={keyDates} />
+              </div>
             )}
           </Card>
 

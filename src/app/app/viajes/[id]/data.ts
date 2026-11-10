@@ -22,9 +22,9 @@ export async function loadBooking(id: string, organizationId: string) {
       flightLegs: true,
       quotes: {
         orderBy: { createdAt: "desc" },
-        include: { options: { orderBy: { position: "asc" }, include: { items: { orderBy: { position: "asc" }, include: { reservations: { select: { id: true, status: true, balancePaidAt: true, price: true } } } } } } },
+        include: { options: { orderBy: { position: "asc" }, include: { items: { orderBy: { position: "asc" }, include: { reservations: { select: { id: true, status: true, balancePaidAt: true, price: true } }, documents: { orderBy: { createdAt: "asc" }, select: { id: true, name: true, storageKey: true, url: true, mimeType: true } } } } } } },
       },
-      _count: { select: { days: true, documents: true, messages: true, tasks: { where: { completedAt: null } } } },
+      _count: { select: { days: true, documents: { where: { NOT: { quoteItemId: { not: null }, bookingItemId: null } } }, messages: true, tasks: { where: { completedAt: null } } } },
     },
   });
 }

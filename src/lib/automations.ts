@@ -7,6 +7,7 @@ import { renderTemplate } from "@/lib/templating";
 import { buildTemplateVars } from "@/lib/template-context";
 import { sendEmail } from "@/lib/email";
 import { logActivity, notifyStaff } from "@/lib/events";
+import { notifyOpeningWindows } from "@/lib/agenda";
 
 // ─── Tipos de configuración guardados como JSON ──────────────────────────────
 
@@ -269,6 +270,9 @@ export async function runDateWorkflows(organizationId: string) {
       }
     }
   }
+
+  // Avisos propios del calendario: cuando se abre una ventana para reservar de un viaje reservado.
+  executed += await notifyOpeningWindows(organizationId);
 
   await db.organization.update({ where: { id: organizationId }, data: { automationsRunAt: new Date() } });
   return executed;

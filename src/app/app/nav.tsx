@@ -25,7 +25,7 @@ import {
   Workflow,
 } from "lucide-react";
 
-type BadgeKey = "messages" | "notifications";
+type BadgeKey = "messages" | "notifications" | "calendar";
 
 const SECTIONS = [
   {
@@ -35,7 +35,7 @@ const SECTIONS = [
       { href: "/app/clientes", label: "Clientes", icon: Users },
       { href: "/app/viajes", label: "Viajes", icon: Briefcase },
       { href: "/app/grupos", label: "Grupos", icon: UsersRound },
-      { href: "/app/calendario", label: "Calendario", icon: CalendarDays },
+      { href: "/app/calendario", label: "Calendario", icon: CalendarDays, badgeKey: "calendar" as BadgeKey },
       { href: "/app/tareas", label: "Tareas", icon: CheckSquare },
       { href: "/app/mensajes", label: "Mensajes", icon: MessageCircle, badgeKey: "messages" as BadgeKey },
     ],
@@ -80,19 +80,22 @@ function NavLink({ href, active, children }: { href: string; active: boolean; ch
 /**
  * Menú de la app, sobre el Verde noche. La fila activa se aclara y su ícono va en Menta. Las opciones con
  * funciones de admin general llevan un escudo, solo para quien lo es; los contadores, solo en lo que
- * hay que atender (mensajes sin leer, notificaciones).
+ * hay que atender (mensajes sin leer, notificaciones, saldos vencidos).
  */
 export function Nav({
   unreadMessages,
   unreadNotifications = 0,
+  overdueBalances = 0,
   isPlatformAdmin = false,
 }: {
   unreadMessages: number;
   unreadNotifications?: number;
+  /** Saldos vencidos sin pagar: el aviso rojo de Calendario. */
+  overdueBalances?: number;
   isPlatformAdmin?: boolean;
 }) {
   const pathname = usePathname();
-  const counts: Record<BadgeKey, number> = { messages: unreadMessages, notifications: unreadNotifications };
+  const counts: Record<BadgeKey, number> = { messages: unreadMessages, notifications: unreadNotifications, calendar: overdueBalances };
   return (
     <nav className="flex flex-col gap-5 py-1" aria-label="Principal">
       {SECTIONS.map((section, i) => (

@@ -24,6 +24,9 @@ import { QuoteMessageEditor } from "./quote-message";
 import type { LoadedBooking } from "./data";
 import { commissionFor } from "@/lib/trips";
 import { DateInput } from "@/components/date-input";
+import { MultiFileUpload } from "@/components/file-upload";
+import { AttachmentChips } from "@/components/attachment-chips";
+import { storageMode } from "@/lib/storage";
 
 type LoadedQuote = LoadedBooking["quotes"][number];
 
@@ -249,6 +252,7 @@ function OptionBlock({
   editable: boolean;
   canDelete: boolean;
 }) {
+  const directUpload = storageMode() === "r2";
   const total = o.items.reduce((s, i) => s + toNumber(i.price), 0);
   const commission = o.items.reduce((s, i) => s + commissionFor(i, defaultRate), 0);
   const accepted = q.acceptedOptionId === o.id;
@@ -293,6 +297,7 @@ function OptionBlock({
                         .filter(Boolean)
                         .join(" · ")}
                     </p>
+                    <AttachmentChips docs={i.documents} removable={editable} />
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
                     {accepted && reservation && <Badge className={reservationStage(reservation).color}>{reservationStage(reservation).label}</Badge>}
@@ -313,6 +318,10 @@ function OptionBlock({
                     </summary>
                     <ActionForm action={updateQuoteItem.bind(null, i.id)} className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-4">
                       <ItemFields item={i} defaultRate={defaultRate} currency={b.currency} withConfirmation={false} withDetails />
+                      <div className="sm:col-span-4">
+                        <span className="label">Adjuntos (PDF o imagen, los ve el cliente)</span>
+                        <MultiFileUpload direct={directUpload} />
+                      </div>
                       <div className="flex items-end">
                         <SubmitButton size="sm">Guardar</SubmitButton>
                       </div>
@@ -333,6 +342,10 @@ function OptionBlock({
             </summary>
             <ActionForm action={addQuoteItem.bind(null, o.id)} resetOnSuccess className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-4">
               <ItemFields defaultRate={defaultRate} currency={b.currency} withConfirmation={false} withDetails />
+              <div className="sm:col-span-4">
+                <span className="label">Adjuntos (PDF o imagen, los ve el cliente)</span>
+                <MultiFileUpload direct={directUpload} />
+              </div>
               <div className="flex items-end">
                 <SubmitButton size="sm">Agregar</SubmitButton>
               </div>

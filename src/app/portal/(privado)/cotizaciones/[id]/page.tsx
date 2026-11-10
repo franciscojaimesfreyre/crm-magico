@@ -1,3 +1,4 @@
+import { AttachmentChips } from "@/components/attachment-chips";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import clsx from "clsx";
@@ -20,7 +21,15 @@ export default async function PortalQuote({ params }: { params: Promise<{ id: st
     where: { id, booking: { clientId: account.clientId }, status: { in: ["SENT", "ACCEPTED", "REJECTED", "EXPIRED"] } },
     include: {
       booking: { include: { agent: true } },
-      options: { orderBy: { position: "asc" }, include: { items: { orderBy: { position: "asc" } } } },
+      options: {
+        orderBy: { position: "asc" },
+        include: {
+          items: {
+            orderBy: { position: "asc" },
+            include: { documents: { where: { visibleToClient: true }, orderBy: { createdAt: "asc" }, select: { id: true, name: true, storageKey: true, url: true, mimeType: true } } },
+          },
+        },
+      },
     },
   });
   if (!quote) notFound();
@@ -84,6 +93,7 @@ export default async function PortalQuote({ params }: { params: Promise<{ id: st
                           <span className="text-xs text-slate-500">{ITEM_TYPE_LABEL[i.type]} · </span>
                           {i.description}
                           {i.startDate && <span className="text-xs text-slate-500"> ({formatRange(i.startDate, i.endDate)})</span>}
+                          <AttachmentChips docs={i.documents} />
                         </span>
                         <span className="whitespace-nowrap text-slate-600">{money(i.price, b.currency)}</span>
                       </li>

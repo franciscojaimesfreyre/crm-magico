@@ -259,7 +259,11 @@ async function PortalItinerary({ bookingId, groupId }: { bookingId: string; grou
 }
 
 async function PortalDocuments({ bookingId }: { bookingId: string }) {
-  const docs = await db.document.findMany({ where: { bookingId, visibleToClient: true }, orderBy: { createdAt: "desc" } });
+  const docs = await db.document.findMany({
+    // Los adjuntos de cotizaciones todavía no aceptadas se ven en la cotización.
+    where: { bookingId, visibleToClient: true, NOT: { quoteItemId: { not: null }, bookingItemId: null } },
+    orderBy: { createdAt: "desc" },
+  });
   if (docs.length === 0) return <p className="rounded-2xl bg-white p-8 text-center text-sm text-slate-500">Todavía no hay documentos.</p>;
   return (
     <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white border border-[var(--border)]">

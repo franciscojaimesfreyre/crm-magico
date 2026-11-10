@@ -25,6 +25,10 @@ export type KeyDate = {
     | "flight"
     | "park";
   hint?: string;
+  /** Reserva de la que sale (las del viaje y los vuelos no tienen). */
+  itemId?: string;
+  /** Sale de una reserva todavía por reservar: puede no pasar. */
+  tentative?: boolean;
 };
 
 // Ventanas configurables: si Disney, Universal o las navieras las cambian, se ajustan acá.
@@ -36,6 +40,7 @@ export const FLIGHT_ONLINE_CHECKIN_DAYS = 1;
 type Num = number | string | { toString(): string } | null | undefined;
 
 type ReservationInput = {
+  id?: string;
   type: string;
   description: string;
   supplier: string | null;
@@ -146,7 +151,8 @@ function reservationKeyDates(i: ReservationInput, currency: string): KeyDate[] {
       hint: price > 0 ? `Resta ${money(price - paid, currency)}${i.supplier ? ` · ${i.supplier}` : ""}` : (i.supplier ?? undefined),
     });
   }
-  return out;
+  const tentative = i.status === "PENDING";
+  return out.map((k) => ({ ...k, itemId: i.id, tentative }));
 }
 
 /** En un mismo día, el comienzo del viaje va primero y el fin del viaje último (después del check-out, etc.). */

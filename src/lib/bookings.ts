@@ -79,11 +79,38 @@ const RANK: Record<string, number> = { INQUIRY: 0, QUOTED: 1, BOOKED: 2, PAID_IN
  * queda ninguna cotización enviada ni aceptada (se rechazó o se borró).
  */
 export async function syncBookingStatus(bookingId: string, userId?: string | null) {
+  await closeResolvedTasks(bookingId);
   const { status, target } = await autoStatus(bookingId);
   if (!AUTO_STATUSES.includes(status) || target === status) return;
   const forward = RANK[target] > RANK[status];
   const allowedBack = !forward && (status === "BOOKED" || status === "PAID_IN_FULL" || status === "QUOTED");
   if (forward || allowedBack) await changeBookingStatus({ bookingId, status: target, userId });
+}
+
+/**
+ * Cierra las tareas automáticas que ya se cumplieron, para que no queden vencidas tapando lo real:
+ * "Armar cotización" cuando el viaje ya tiene una cotización enviada (o reservas confirmadas), y
+ * "Confirmar con …" cuando ya no queda ninguna reserva por reservar.
+ */
+async function closeResolvedTasks(bookingId: string) {
+  const booking = await db.booking.findUnique({
+    where: { id: bookingId },
+    select: {
+      items: { select: { status: true } },
+      _count: { select: { quotes: { where: { status: { in: ["SENT", "ACCEPTED"] } } } } },
+    },
+  });
+  if (!booking) return;
+  const active = booking.items.filter((i) => i.status !== "CANCELLED");
+  const confirmed = active.some((i) => i.status === "CONFIRMED");
+  const prefixes: string[] = [];
+  if (booking._count.quotes > 0 || confirmed) prefixes.push("Armar cotización");
+  if (confirmed && !active.some((i) => i.status === "PENDING")) prefixes.push("Confirmar con ");
+  if (prefixes.length === 0) return;
+  await db.task.updateMany({
+    where: { bookingId, automated: true, completedAt: null, OR: prefixes.map((p) => ({ title: { startsWith: p } })) },
+    data: { completedAt: new Date() },
+  });
 }
 
 /** La etapa que corresponde según lo que pasó en el viaje (ver syncBookingStatus). */

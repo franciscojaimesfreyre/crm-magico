@@ -41,9 +41,12 @@ export function Items({
   booking: b,
   defaultRate,
   eventWarnings = {},
+  payItemId,
 }: {
   booking: LoadedBooking;
   defaultRate: number;
+  /** Reserva con el formulario de pago abierto (viene de "Registrar pago" en el calendario). */
+  payItemId?: string;
   /** Por reserva: el aviso si el evento especial no figura en esa fecha entre las cargadas en su ficha. */
   eventWarnings?: Record<string, string>;
 }) {
@@ -67,6 +70,7 @@ export function Items({
       warning={eventWarnings[item.id]}
       travelerOptions={travelerOptions}
       directUpload={directUpload}
+      openPay={item.id === payItemId}
     />
   );
 
@@ -138,6 +142,7 @@ function ItemCard({
   warning,
   travelerOptions,
   directUpload,
+  openPay = false,
 }: {
   item: LoadedItem;
   booking: LoadedBooking;
@@ -145,12 +150,13 @@ function ItemCard({
   warning?: string;
   travelerOptions: TravelerOption[];
   directUpload: boolean;
+  openPay?: boolean;
 }) {
   const Icon = ICON[ITEM_TYPE_BASE[item.type]] ?? Package;
   const stage = reservationStage(item);
   const source = item.quoteItem?.option;
   return (
-    <Card className={clsx(item.status === "CANCELLED" && "opacity-60")}>
+    <Card id={`reserva-${item.id}`} className={clsx("scroll-mt-6", item.status === "CANCELLED" && "opacity-60")}>
       <div className="flex flex-wrap items-start gap-4 p-4">
         <span className="flex size-6 shrink-0 items-center justify-center text-slate-500">
           <Icon className="size-5" />
@@ -173,7 +179,7 @@ function ItemCard({
               <AlertTriangle className="mt-px size-3.5 shrink-0" /> {warning} Revisá la fecha de la reserva.
             </p>
           )}
-          <ReservationPayments item={item} currency={b.currency} />
+          <ReservationPayments item={item} currency={b.currency} open={openPay} />
         </div>
         <div className="ml-14 sm:ml-0 sm:text-right">
           <p className="font-semibold text-slate-900">{money(item.price, b.currency)}</p>

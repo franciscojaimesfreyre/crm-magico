@@ -309,16 +309,17 @@ model Booking {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  items      BookingItem[]
-  flightLegs FlightLeg[] // vuelos de ida y vuelta (dato de referencia)
-  travelers  BookingTraveler[]
-  quotes     Quote[]
-  days       ItineraryDay[]
-  messages   Message[]
-  documents  Document[]
-  tasks      Task[]
-  activities Activity[]
-  contracts  Contract[]
+  items        BookingItem[]
+  flightLegs   FlightLeg[] // vuelos de ida y vuelta (dato de referencia)
+  travelers    BookingTraveler[]
+  quotes       Quote[]
+  days         ItineraryDay[]
+  messages     Message[]
+  documents    Document[]
+  tasks        Task[]
+  activities   Activity[]
+  contracts    Contract[]
+  keyDatesDone KeyDateDone[]
 
   @@unique([organizationId, code])
   @@index([organizationId, status])
@@ -524,6 +525,7 @@ model QuoteItem {
   sourceItem   BookingItem?  @relation("QuoteItemFromReservation", fields: [sourceItemId], references: [id], onDelete: SetNull)
   /// Reservas que salieron de este servicio al aceptarse la cotización.
   reservations BookingItem[] @relation("ReservationFromQuote")
+  documents    Document[]
 }
 
 // ─── Itinerarios ─────────────────────────────────────────────────────────────
@@ -779,6 +781,10 @@ model Document {
   booking         Booking?     @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   bookingItemId   String? // reserva del viaje a la que corresponde (voucher, recibo…)
   bookingItem     BookingItem? @relation(fields: [bookingItemId], references: [id], onDelete: SetNull)
+  /// Adjunto de un servicio de una cotización (folleto, PDF del proveedor, foto del hotel). Lo ve el cliente
+  /// en la cotización; si la acepta, pasa a la reserva que se crea.
+  quoteItemId     String?
+  quoteItem       QuoteItem?   @relation(fields: [quoteItemId], references: [id], onDelete: SetNull)
   clientId        String?
   client          Client?      @relation(fields: [clientId], references: [id], onDelete: Cascade)
   name            String
@@ -811,6 +817,19 @@ enum TaskPriority {
   LOW
   MEDIUM
   HIGH
+}
+
+/// Fecha clave que el agente ya resolvió (reservó restaurantes, avisó el check-in online…): sale de la agenda.
+/// `key` es tipo:fecha (y la reserva, si sale de una), así que si cambia la fecha vuelve a aparecer.
+model KeyDateDone {
+  id        String   @id @default(cuid())
+  bookingId String
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  key       String
+  userId    String?
+  createdAt DateTime @default(now())
+
+  @@unique([bookingId, key])
 }
 
 model Task {

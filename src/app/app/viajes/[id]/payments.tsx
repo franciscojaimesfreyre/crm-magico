@@ -14,7 +14,7 @@ type Item = LoadedBooking["items"][number];
  * Pagos de una reserva: el cliente le paga directo al proveedor el depósito y después
  * lo que quiera, siempre que quede saldada antes de la fecha límite.
  */
-export function ReservationPayments({ item, currency }: { item: Item; currency: string }) {
+export function ReservationPayments({ item, currency, open = false }: { item: Item; currency: string; open?: boolean }) {
   const p = paymentProgress(item);
   const today = todayUTC();
   const dueIn = item.balanceDue && !p.settled ? daysBetween(today, item.balanceDue) : null;
@@ -72,12 +72,21 @@ export function ReservationPayments({ item, currency }: { item: Item; currency: 
       )}
 
       {!cancelled && !p.settled && (
-        <details className="mt-2">
+        <details className="mt-2" open={open}>
           <summary className="cursor-pointer list-none font-medium text-brand-700">+ Registrar pago</summary>
           <ActionForm action={addReservationPayment.bind(null, item.id)} resetOnSuccess className="mt-2 flex flex-wrap items-end gap-2">
             <label className="w-32">
               <span className="label">Monto</span>
-              <Input type="number" step="0.01" min={0.01} name="amount" required placeholder={p.remaining ? String(p.remaining) : undefined} />
+              <Input
+                type="number"
+                step="0.01"
+                min={0.01}
+                name="amount"
+                required
+                autoFocus={open}
+                defaultValue={open && p.remaining > 0 ? p.remaining : undefined}
+                placeholder={p.remaining ? String(p.remaining) : undefined}
+              />
             </label>
             <label className="w-40">
               <span className="label">Fecha</span>

@@ -13,6 +13,8 @@ import type { ItemType } from "@/generated/prisma/enums";
 import { appUrl } from "@/lib/app-url";
 import { commissionFromForm } from "@/lib/trips";
 import { acceptQuoteOption } from "@/lib/quotes";
+import { incomingFiles, type StoredFile } from "@/lib/incoming-files";
+import { duplicateUpload, removeUpload } from "@/lib/storage";
 
 async function ownQuote(quoteId: string) {
   const user = await requireUser();
@@ -26,6 +28,33 @@ async function ownQuote(quoteId: string) {
 
 function path(bookingId: string) {
   return `/app/viajes/${bookingId}`;
+}
+
+/** Adjuntos de un servicio (PDF del proveedor, folleto, foto): el cliente los ve en la cotización. */
+async function saveQuoteItemFiles(files: StoredFile[], ctx: { organizationId: string; userId: string; bookingId: string; clientId: string; quoteItemId: string }) {
+  if (files.length === 0) return;
+  await db.document.createMany({
+    data: files.map((f) => ({
+      organizationId: ctx.organizationId,
+      bookingId: ctx.bookingId,
+      clientId: ctx.clientId,
+      quoteItemId: ctx.quoteItemId,
+      name: f.name,
+      storageKey: f.stored.key,
+      size: f.stored.size,
+      mimeType: f.stored.mimeType,
+      visibleToClient: true,
+      uploadedById: ctx.userId,
+    })),
+  });
+}
+
+/** Borra los adjuntos de servicios que se eliminan (los que ya pasaron a una reserva se quedan con ella). */
+async function removeQuoteItemFiles(quoteItemIds: string[]) {
+  const docs = await db.document.findMany({ where: { quoteItemId: { in: quoteItemIds }, bookingItemId: null } });
+  if (docs.length === 0) return;
+  await db.document.deleteMany({ where: { id: { in: docs.map((d) => d.id) } } });
+  for (const d of docs) if (d.storageKey) await removeUpload(d.storageKey);
 }
 
 export async function createQuote(bookingId: string) {
@@ -90,6 +119,8 @@ export async function updateQuote(quoteId: string, _: ActionState, formData: For
 
 export async function deleteQuote(quoteId: string) {
   const { user, quote } = await ownQuote(quoteId);
+  const items = await db.quoteItem.findMany({ where: { option: { quoteId } }, select: { id: true } });
+  await removeQuoteItemFiles(items.map((i) => i.id));
   await db.quote.delete({ where: { id: quoteId } });
   // Si era la única cotización activa, el viaje vuelve a Consulta.
   await syncBookingStatus(quote.bookingId, user.id);
@@ -98,38 +129,54 @@ export async function deleteQuote(quoteId: string) {
 
 /** Copia una cotización (opciones y servicios) como borrador nuevo, para armar una variante sin empezar de cero. */
 export async function duplicateQuote(quoteId: string) {
-  const { quote } = await ownQuote(quoteId);
-  const options = await db.quoteOption.findMany({ where: { quoteId }, orderBy: { position: "asc" }, include: { items: { orderBy: { position: "asc" } } } });
-  await db.quote.create({
-    data: {
-      bookingId: quote.bookingId,
-      title: `${quote.title} (copia)`,
-      message: quote.message,
-      options: {
-        create: options.map((o) => ({
-          name: o.name,
-          description: o.description,
-          position: o.position,
-          items: {
-            create: o.items.map((i) => ({
-              type: i.type,
-              description: i.description,
-              supplier: i.supplier,
-              startDate: i.startDate,
-              endDate: i.endDate,
-              price: i.price,
-              commissionRate: i.commissionRate,
-              commissionFixed: i.commissionFixed,
-              depositAmount: i.depositAmount,
-              notes: i.notes,
-              sourceItemId: i.sourceItemId,
-              position: i.position,
-            })),
-          },
-        })),
-      },
-    },
+  const { user, quote } = await ownQuote(quoteId);
+  const options = await db.quoteOption.findMany({
+    where: { quoteId },
+    orderBy: { position: "asc" },
+    include: { items: { orderBy: { position: "asc" }, include: { documents: true } } },
   });
+  const copy = await db.quote.create({ data: { bookingId: quote.bookingId, title: `${quote.title} (copia)`, message: quote.message } });
+  for (const o of options) {
+    const option = await db.quoteOption.create({ data: { quoteId: copy.id, name: o.name, description: o.description, position: o.position } });
+    for (const i of o.items) {
+      const item = await db.quoteItem.create({
+        data: {
+          optionId: option.id,
+          type: i.type,
+          description: i.description,
+          supplier: i.supplier,
+          startDate: i.startDate,
+          endDate: i.endDate,
+          price: i.price,
+          commissionRate: i.commissionRate,
+          commissionFixed: i.commissionFixed,
+          depositAmount: i.depositAmount,
+          notes: i.notes,
+          sourceItemId: i.sourceItemId,
+          position: i.position,
+        },
+      });
+      // Los adjuntos se copian: borrar la cotización original no deja a la copia sin ellos.
+      for (const d of i.documents) {
+        const key = d.storageKey ? await duplicateUpload(d.storageKey, user.organizationId) : null;
+        await db.document.create({
+          data: {
+            organizationId: d.organizationId,
+            bookingId: d.bookingId,
+            clientId: d.clientId,
+            quoteItemId: item.id,
+            name: d.name,
+            storageKey: key,
+            url: d.url,
+            size: d.size,
+            mimeType: d.mimeType,
+            visibleToClient: true,
+            uploadedById: user.id,
+          },
+        });
+      }
+    }
+  }
   revalidatePath(path(quote.bookingId));
 }
 
@@ -152,6 +199,8 @@ export async function deleteQuoteOption(optionId: string) {
     include: { quote: true },
   });
   if (!option) return;
+  const items = await db.quoteItem.findMany({ where: { optionId }, select: { id: true } });
+  await removeQuoteItemFiles(items.map((i) => i.id));
   await db.quoteOption.delete({ where: { id: optionId } });
   revalidatePath(path(option.quote.bookingId));
 }
@@ -187,14 +236,17 @@ export async function addQuoteItem(optionId: string, _: ActionState, formData: F
   const user = await requireUser();
   const option = await db.quoteOption.findFirst({
     where: { id: optionId, quote: { booking: { organizationId: user.organizationId } } },
-    include: { quote: true },
+    include: { quote: { include: { booking: { select: { clientId: true } } } } },
   });
   if (!option) return { error: "Opción no encontrada" };
   const data = quoteItemFields(formData);
   const invalid = checkQuoteItem(data);
   if (invalid) return { error: invalid };
+  const files = await incomingFiles(formData, user.organizationId);
+  if ("error" in files) return { error: files.error };
   const position = await db.quoteItem.count({ where: { optionId } });
-  await db.quoteItem.create({ data: { optionId, ...data, position } });
+  const item = await db.quoteItem.create({ data: { optionId, ...data, position } });
+  await saveQuoteItemFiles(files, { organizationId: user.organizationId, userId: user.id, bookingId: option.quote.bookingId, clientId: option.quote.booking.clientId, quoteItemId: item.id });
   revalidatePath(path(option.quote.bookingId));
   return { ok: "Servicio agregado" };
 }
@@ -204,14 +256,23 @@ export async function updateQuoteItem(itemId: string, _: ActionState, formData: 
   const user = await requireUser();
   const item = await db.quoteItem.findFirst({
     where: { id: itemId, option: { quote: { booking: { organizationId: user.organizationId } } } },
-    include: { option: { include: { quote: true } } },
+    include: { option: { include: { quote: { include: { booking: { select: { clientId: true } } } } } } },
   });
   if (!item) return { error: "Servicio no encontrado" };
   if (!["DRAFT", "SENT"].includes(item.option.quote.status)) return { error: "La cotización ya fue respondida: los cambios van en las reservas." };
   const data = quoteItemFields(formData);
   const invalid = checkQuoteItem(data);
   if (invalid) return { error: invalid };
+  const files = await incomingFiles(formData, user.organizationId);
+  if ("error" in files) return { error: files.error };
   await db.quoteItem.update({ where: { id: itemId }, data });
+  await saveQuoteItemFiles(files, {
+    organizationId: user.organizationId,
+    userId: user.id,
+    bookingId: item.option.quote.bookingId,
+    clientId: item.option.quote.booking.clientId,
+    quoteItemId: itemId,
+  });
   revalidatePath(path(item.option.quote.bookingId));
   return { ok: "Servicio actualizado" };
 }
@@ -223,6 +284,7 @@ export async function deleteQuoteItem(itemId: string) {
     include: { option: { include: { quote: true } } },
   });
   if (!item) return;
+  await removeQuoteItemFiles([itemId]);
   await db.quoteItem.delete({ where: { id: itemId } });
   revalidatePath(path(item.option.quote.bookingId));
 }

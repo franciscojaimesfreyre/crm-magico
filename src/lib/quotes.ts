@@ -99,6 +99,7 @@ export async function acceptQuoteOption({ quoteId, optionId, via, comment, userI
         } else {
           await tx.bookingItem.update({ where: { id: source.id }, data: { quoteItemId: i.id } });
         }
+        await tx.document.updateMany({ where: { quoteItemId: i.id, bookingItemId: null }, data: { bookingItemId: source.id } });
         continue;
       }
       const created = await tx.bookingItem.create({
@@ -110,6 +111,8 @@ export async function acceptQuoteOption({ quoteId, optionId, via, comment, userI
           position: position++,
         },
       });
+      // Los adjuntos del servicio pasan a la reserva (y a los documentos del viaje).
+      await tx.document.updateMany({ where: { quoteItemId: i.id, bookingItemId: null }, data: { bookingItemId: created.id } });
       if (travelerIds.length > 0) {
         await tx.bookingItemTraveler.createMany({ data: travelerIds.map((travelerId) => ({ bookingItemId: created.id, travelerId })) });
       }
@@ -136,18 +139,42 @@ export async function acceptQuoteOption({ quoteId, optionId, via, comment, userI
       link: `/portal/cotizaciones/${quoteId}`,
     });
   }
-  await db.task.create({
-    data: {
-      organizationId: booking.organizationId,
-      assigneeId: booking.agentId ?? userId ?? null,
-      bookingId: booking.id,
-      clientId: booking.clientId,
-      title: `Confirmar con los proveedores las reservas de "${option.name}"`,
-      priority: "HIGH",
-      dueDate: todayUTC(),
-      automated: true,
-    },
+  // Una sola tarea abierta por viaje para confirmar con los proveedores: si ya hay una, se actualiza.
+  const suppliers = [...new Set(option.items.map((i) => i.supplier?.trim()).filter((x): x is string => !!x))];
+  const surname = booking.client.lastName || booking.client.firstName;
+  const title =
+    option.items.length === 1
+      ? `Confirmar con ${suppliers[0] ?? "el proveedor"}: ${option.items[0].description} — ${surname}`
+      : `Confirmar con ${suppliers.length ? suppliers.join(" y ") : "los proveedores"} las ${option.items.length} reservas — ${surname}`;
+  const task = {
+    title,
+    description: option.items.map((i) => `• ${i.description}${i.supplier ? ` (${i.supplier})` : ""}`).join("\n"),
+    priority: "HIGH" as const,
+    dueDate: todayUTC(),
+  };
+  const open = await db.task.findFirst({
+    where: { bookingId: booking.id, automated: true, completedAt: null, title: { startsWith: "Confirmar con " } },
   });
+  if (open) {
+    // Si se suma a lo que ya había (no lo reemplaza), la tarea junta las dos listas.
+    const lines = replace ? task.description : [...new Set([...(open.description ?? "").split("\n"), ...task.description.split("\n")].filter(Boolean))].join("\n");
+    const merged = !replace && lines !== task.description;
+    await db.task.update({
+      where: { id: open.id },
+      data: { ...task, description: lines, title: merged ? `Confirmar con los proveedores las reservas — ${surname}` : task.title },
+    });
+  } else {
+    await db.task.create({
+      data: {
+        organizationId: booking.organizationId,
+        assigneeId: booking.agentId ?? userId ?? null,
+        bookingId: booking.id,
+        clientId: booking.clientId,
+        automated: true,
+        ...task,
+      },
+    });
+  }
   await logActivity({
     organizationId: booking.organizationId,
     clientId: booking.clientId,

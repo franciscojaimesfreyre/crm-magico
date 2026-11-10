@@ -31,10 +31,10 @@ export default async function StatementsPage() {
       <PageHeader
         title="Planillas de comisiones"
         back={{ href: "/app/comisiones", label: "Comisiones" }}
-        actions={<LinkButton href="/app/comisiones">Nueva planilla</LinkButton>}
+        actions={<LinkButton href="/app/comisiones?vista=todas&estado=pendientes&nueva=1">Nueva planilla</LinkButton>}
       />
       {statements.length === 0 ? (
-        <EmptyState title="Todavía no generaste planillas" action={<LinkButton href="/app/comisiones">Generar la primera</LinkButton>} />
+        <EmptyState title="Todavía no generaste planillas" action={<LinkButton href="/app/comisiones?vista=todas&estado=pendientes&nueva=1">Generar la primera</LinkButton>} />
       ) : (
         <Card>
           <Table>

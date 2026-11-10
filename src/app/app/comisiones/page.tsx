@@ -22,9 +22,9 @@ const ESTADOS = [
   { value: "todas", label: "Todas" },
 ];
 
-export default async function CommissionsPage({ searchParams }: { searchParams: Promise<CommissionFilters & { error?: string; vista?: string }> }) {
+export default async function CommissionsPage({ searchParams }: { searchParams: Promise<CommissionFilters & { error?: string; vista?: string; nueva?: string }> }) {
   const user = await requireUser();
-  const { vista, ...sp } = await searchParams;
+  const { vista, nueva, ...sp } = await searchParams;
   const agency = user.organization.agency;
   const header = (
     <>
@@ -69,6 +69,11 @@ export default async function CommissionsPage({ searchParams }: { searchParams: 
       {sp.error === "ya-en-planilla" && (
         <div className="mb-4">
           <Alert tone="error">Las ventas elegidas ya están en otra planilla: cada venta se reclama una sola vez.</Alert>
+        </div>
+      )}
+      {nueva && (
+        <div className="mb-4">
+          <Alert tone="info">Nueva planilla: tildá las ventas que querés incluir y tocá «Generar planilla». Las que ya están en otra planilla quedan afuera solas.</Alert>
         </div>
       )}
       {sp.error === "sin-seleccion" && (

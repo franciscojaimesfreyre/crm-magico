@@ -20,8 +20,6 @@ export async function CommissionsOverview({ organizationId, agency }: { organiza
   const [{ rows, totals }, statements] = await Promise.all([commissionOverview(organizationId), openStatements(organizationId)]);
   const term = agency?.paymentTermDays ?? DEFAULT_PAYMENT_TERM_DAYS;
   const ready = rows.filter((r) => r.stage === "ready");
-  const upcoming = rows.filter((r) => r.stage === "upcoming");
-  const paid = rows.filter((r) => r.stage === "paid").sort((a, b) => (b.item.commissionPaidAt?.getTime() ?? 0) - (a.item.commissionPaidAt?.getTime() ?? 0));
   const [mainCurrency, main] = [...totals.entries()].sort((a, b) => b[1].earned - a[1].earned)[0] ?? ["USD", { earned: 0, received: 0, owed: 0, ready: 0, waiting: 0 }];
 
   // Cuándo se espera cobrar: planillas enviadas (envío + plazo), lo listo para pedir (hoy + plazo) y lo que
@@ -140,41 +138,6 @@ export async function CommissionsOverview({ organizationId, agency }: { organiza
             ))}
           </ul>
         </Card>
-      )}
-
-      {upcoming.length > 0 && (
-        <details className="rounded-2xl border border-[var(--border)] bg-white">
-          <summary className="cursor-pointer px-5 py-4 text-sm font-medium text-slate-800">
-            Todavía no se pueden presentar · {upcoming.length} (el viaje no terminó) · {money(upcoming.filter((r) => r.currency === mainCurrency).reduce((t, r) => t + r.owed, 0), mainCurrency)}
-          </summary>
-          <p className="px-5 text-xs text-slate-500">Si tu agencia paga al vender y no después del viaje, podés incluirlas en una planilla igual.</p>
-          <SelectableRows rows={upcoming} today={today} submitLabel="Generar planilla con las elegidas" />
-        </details>
-      )}
-
-      {paid.length > 0 && (
-        <details className="rounded-2xl border border-[var(--border)] bg-white">
-          <summary className="cursor-pointer px-5 py-4 text-sm font-medium text-slate-800">
-            Cobradas · {paid.length} · {money(paid.filter((r) => r.currency === mainCurrency).reduce((t, r) => t + r.received, 0), mainCurrency)}
-          </summary>
-          <ul className="divide-y divide-slate-100 pb-2">
-            {paid.slice(0, 30).map((r) => (
-              <li key={r.item.id} className="flex flex-wrap items-center justify-between gap-2 px-5 py-2 text-sm">
-                <span className="min-w-0">
-                  <span className="font-medium text-slate-800">
-                    {r.item.booking.client.firstName} {r.item.booking.client.lastName}
-                  </span>
-                  <span className="text-slate-500"> · {r.item.description}</span>
-                </span>
-                <span className="text-xs text-slate-500">
-                  {r.item.commissionPaidAt && `el ${formatDate(r.item.commissionPaidAt)} · `}
-                  <span className="font-medium text-emerald-700">{money(r.received, r.currency)}</span>
-                  {r.received + 0.005 < r.expected && <span className="text-amber-700"> (faltan {money(r.expected - r.received, r.currency)})</span>}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </details>
       )}
 
       <p className="text-sm">

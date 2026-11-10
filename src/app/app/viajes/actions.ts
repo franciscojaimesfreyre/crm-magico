@@ -1,5 +1,6 @@
 "use server";
 
+import { onReservationCancelled } from "@/lib/commissions";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
@@ -12,7 +13,7 @@ import { incomingFiles, type StoredFile } from "@/lib/incoming-files";
 import { runEventWorkflows } from "@/lib/automations";
 import { DESTINATION_LABEL, RESERVATION_STATUS_LABEL } from "@/lib/labels";
 import type { ActionState } from "@/components/form-controls";
-import type { BookingStatus, CommissionStatus, Destination, ItemType, ReservationStatus } from "@/generated/prisma/enums";
+import type { BookingStatus, Destination, ItemType, ReservationStatus } from "@/generated/prisma/enums";
 import { bannerItem } from "@/lib/media";
 
 async function ownBooking(id: string) {
@@ -125,6 +126,8 @@ export async function cancelBooking(id: string, formData: FormData) {
   const { user, booking } = await ownBooking(id);
   await db.booking.update({ where: { id }, data: { cancelReason: str(formData, "cancelReason") } });
   await changeBookingStatus({ bookingId: id, status: "CANCELLED", userId: user.id });
+  // Las comisiones de un viaje cancelado salen de sus planillas (y se avisa si ya se habían cobrado).
+  for (const i of await db.bookingItem.findMany({ where: { bookingId: id }, select: { id: true } })) await onReservationCancelled(i.id, user.id);
   revalidatePath(`/app/viajes/${booking.id}`);
 }
 
@@ -138,7 +141,6 @@ export async function deleteBooking(id: string) {
 
 function itemFields(formData: FormData) {
   const status = (str(formData, "status") ?? "PENDING") as ReservationStatus;
-  const commissionStatus = (str(formData, "commissionStatus") ?? "PENDING") as CommissionStatus;
   const saleDate = parseDateInput(formData.get("saleDate"));
   return {
     type: (str(formData, "type") ?? "OTHER") as ItemType,
@@ -155,10 +157,8 @@ function itemFields(formData: FormData) {
     balanceDue: parseDateInput(formData.get("balanceDue")),
     // Al confirmarla con el proveedor queda registrada la venta (para la planilla de comisiones).
     saleDate: saleDate ?? (status === "CONFIRMED" ? todayUTC() : null),
+    // El estado del cobro no se edita acá: se registra en Comisiones.
     ...commissionFromForm(formData),
-    commissionStatus,
-    commissionPaidAt: commissionStatus === "PAID" ? (parseDateInput(formData.get("commissionPaidAt")) ?? todayUTC()) : null,
-    commissionPaidAmount: commissionStatus === "PAID" ? num(formData, "commissionPaidAmount") : null,
     commissionNotes: str(formData, "commissionNotes"),
   };
 }
@@ -308,6 +308,7 @@ export async function updateBookingItem(itemId: string, _: ActionState, formData
     itemId,
     description: data.description,
   });
+  if (item.status !== "CANCELLED" && data.status === "CANCELLED") await onReservationCancelled(itemId, user.id);
   if (item.status !== data.status) {
     await logActivity({
       organizationId: user.organizationId,
@@ -350,6 +351,7 @@ export async function quickItemAction(itemId: string, action: "confirm" | "cance
     data.balanceDue = balanceDue ?? item.balanceDue ?? suggestedBalanceDue(item.type, startDate ?? item.startDate ?? item.booking.startDate);
   }
   await db.bookingItem.update({ where: { id: itemId }, data });
+  if (action === "cancel") await onReservationCancelled(itemId, user.id);
   const label = action === "confirm" ? "confirmada" : "cancelada";
   await logActivity({ organizationId: user.organizationId, clientId: item.booking.clientId, bookingId: item.bookingId, userId: user.id, type: "item", description: `Reserva ${label}: ${item.description}` });
   await afterItemChange(item.bookingId, user.id);

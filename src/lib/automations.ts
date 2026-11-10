@@ -9,6 +9,7 @@ import { sendEmail } from "@/lib/email";
 import { logActivity, notifyStaff } from "@/lib/events";
 import { notifyOpeningWindows } from "@/lib/agenda";
 import { createFormRequest, remindFormRequests, seedFormWorkflows } from "@/lib/form-answers";
+import { remindOverdueStatements } from "@/lib/commissions";
 
 // ─── Tipos de configuración guardados como JSON ──────────────────────────────
 
@@ -289,6 +290,8 @@ export async function runDateWorkflows(organizationId: string) {
   executed += await notifyOpeningWindows(organizationId);
   // Formularios pedidos que siguen sin respuesta: un recordatorio a los 5 días.
   executed += await remindFormRequests(organizationId);
+  // Planillas de comisiones que pasaron el plazo de pago: una tarea para reclamarlas.
+  executed += await remindOverdueStatements(organizationId);
 
   await db.organization.update({ where: { id: organizationId }, data: { automationsRunAt: new Date() } });
   return executed;

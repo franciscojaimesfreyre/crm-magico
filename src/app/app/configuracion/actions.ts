@@ -56,6 +56,7 @@ export async function saveMyAgency(_: ActionState, formData: FormData): Promise<
     contactName: str(formData, "contactName"),
     contactEmail: str(formData, "contactEmail"),
     defaultCommissionRate: rate(formData, "defaultCommissionRate"),
+    paymentTermDays: termDays(formData),
     notes: str(formData, "notes"),
   };
   if (current) await db.agency.update({ where: { id: current.id }, data });
@@ -105,4 +106,10 @@ export async function regenerateIcalToken() {
   await db.organization.update({ where: { id: user.organizationId }, data: { icalToken: randomUUID() } });
   revalidatePath("/app/calendario");
   revalidatePath("/app/configuracion");
+}
+
+/** Días de plazo de pago (vacío = el de siempre). */
+function termDays(formData: FormData) {
+  const n = Number(String(formData.get("paymentTermDays") ?? "").trim());
+  return Number.isInteger(n) && n > 0 && n <= 365 ? n : null;
 }

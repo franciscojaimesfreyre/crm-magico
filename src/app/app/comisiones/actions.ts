@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { parseDateInput, todayUTC, toNumber } from "@/lib/format";
-import { buildStatementWorkbook, loadStatement, refreshStatementStatus, statementFilename } from "@/lib/commissions";
+import { buildStatementWorkbook, loadStatement, refreshStatementStatus, registerStatementPayment, statementFilename } from "@/lib/commissions";
 import { sendEmail } from "@/lib/email";
 import { logActivity } from "@/lib/events";
 import type { ActionState } from "@/components/form-controls";
@@ -60,8 +60,15 @@ async function refreshStatementsFor(itemIds: string[]) {
 
 /** Crea una planilla con las reservas seleccionadas y pasa sus comisiones a "Solicitada". */
 export async function createStatement(formData: FormData) {
-  const { user, items } = await selectedItems(formData);
-  if (items.length === 0) redirect(`${back(formData)}${back(formData).includes("?") ? "&" : "?"}error=sin-seleccion`);
+  const { user, items: selected } = await selectedItems(formData);
+  // Una reserva se reclama en una sola planilla: las que ya están en otra (activa) quedan afuera.
+  const inOther = new Set(
+    (await db.commissionStatementItem.findMany({ where: { bookingItemId: { in: selected.map((i) => i.id) }, cancelledAt: null }, select: { bookingItemId: true } })).map((r) => r.bookingItemId),
+  );
+  const items = selected.filter((i) => !inOther.has(i.id) && i.commissionStatus !== "PAID");
+  const sep = back(formData).includes("?") ? "&" : "?";
+  if (selected.length === 0) redirect(`${back(formData)}${sep}error=sin-seleccion`);
+  if (items.length === 0) redirect(`${back(formData)}${sep}error=ya-en-planilla`);
   const from = parseDateInput(formData.get("desde")) ?? items.map((i) => i.saleDate ?? i.createdAt).sort((a, b) => a.getTime() - b.getTime())[0];
   const to = parseDateInput(formData.get("hasta")) ?? todayUTC();
   const statement = await db.commissionStatement.create({
@@ -75,11 +82,8 @@ export async function createStatement(formData: FormData) {
       items: { create: items.map((i) => ({ bookingItemId: i.id, expectedAmount: i.commissionAmount })) },
     },
   });
-  await db.bookingItem.updateMany({
-    where: { id: { in: items.map((i) => i.id) }, commissionStatus: "PENDING" },
-    data: { commissionStatus: "REQUESTED" },
-  });
-  redirect(`/app/comisiones/planillas/${statement.id}`);
+  // Quedan "Sin cobrar" hasta que la planilla se envía: recién ahí están solicitadas.
+  redirect(`/app/comisiones/planillas/${statement.id}${inOther.size ? "?omitidas=" + inOther.size : ""}`);
 }
 
 export async function updateStatementItem(statementId: string, bookingItemId: string, _: ActionState, formData: FormData): Promise<ActionState> {
@@ -91,34 +95,48 @@ export async function updateStatementItem(statementId: string, bookingItemId: st
   const paid = formData.get("paid") === "on";
   const amountRaw = String(formData.get("amount") ?? "").replace(",", ".");
   const amount = amountRaw ? Number(amountRaw) : toNumber(row.expectedAmount);
+  const s = await db.commissionStatement.findUnique({ where: { id: statementId }, select: { sentAt: true } });
   await db.bookingItem.update({
     where: { id: bookingItemId },
     data: paid
       ? { commissionStatus: "PAID", commissionPaidAt: parseDateInput(formData.get("paidAt")) ?? todayUTC(), commissionPaidAmount: Number.isFinite(amount) ? amount : row.expectedAmount }
-      : { commissionStatus: "REQUESTED", commissionPaidAt: null, commissionPaidAmount: null },
+      : { commissionStatus: s?.sentAt ? "REQUESTED" : "PENDING", commissionPaidAt: null, commissionPaidAmount: null },
   });
   await refreshStatementStatus(statementId);
   revalidatePath(`/app/comisiones/planillas/${statementId}`);
   return { ok: paid ? "Cobrada" : "Pendiente" };
 }
 
-export async function markStatementPaid(statementId: string, formData: FormData) {
+/** Pago recibido de la agencia por la planilla (una transferencia): se reparte entre sus reservas. */
+export async function registerPayment(statementId: string, _: ActionState, formData: FormData): Promise<ActionState> {
   const user = await requireUser();
-  const s = await db.commissionStatement.findFirst({
-    where: { id: statementId, organizationId: user.organizationId },
-    include: { items: { include: { bookingItem: true } } },
+  const amount = Number(String(formData.get("amount") ?? "").replace(",", "."));
+  const result = await registerStatementPayment(statementId, user.organizationId, {
+    amount,
+    paidAt: parseDateInput(formData.get("paidAt")) ?? todayUTC(),
+    reference: String(formData.get("reference") ?? "").trim() || null,
   });
-  if (!s) return;
-  const paidAt = parseDateInput(formData.get("paidAt")) ?? todayUTC();
-  for (const row of s.items) {
-    if (row.bookingItem.commissionStatus === "PAID") continue;
-    await db.bookingItem.update({
-      where: { id: row.bookingItemId },
-      data: { commissionStatus: "PAID", commissionPaidAt: paidAt, commissionPaidAmount: row.expectedAmount },
-    });
-  }
-  await refreshStatementStatus(statementId);
+  if ("error" in result) return { error: result.error };
+  await logActivity({ organizationId: user.organizationId, userId: user.id, type: "commission", description: `Pago de comisiones registrado: ${amount.toFixed(2)}` });
+  revalidatePath("/app/comisiones", "layout");
+  return { ok: "Pago registrado y repartido entre las reservas" };
+}
+
+/** Asigna la agencia actual a una planilla creada sin agencia. */
+export async function setStatementAgency(statementId: string) {
+  const user = await requireUser();
+  if (!user.organization.agencyId) return;
+  await db.commissionStatement.updateMany({ where: { id: statementId, organizationId: user.organizationId }, data: { agencyId: user.organization.agencyId } });
   revalidatePath(`/app/comisiones/planillas/${statementId}`);
+}
+
+/** La planilla salió hacia la agencia: queda la fecha y sus comisiones pasan a "Solicitada". */
+async function markSent(statementId: string) {
+  const s = await db.commissionStatement.findUnique({ where: { id: statementId }, include: { items: { where: { cancelledAt: null }, select: { bookingItemId: true } } } });
+  if (!s) return;
+  if (!s.sentAt) await db.commissionStatement.update({ where: { id: statementId }, data: { sentAt: new Date(), status: s.status === "DRAFT" ? "SENT" : s.status } });
+  await db.bookingItem.updateMany({ where: { id: { in: s.items.map((i) => i.bookingItemId) }, commissionStatus: "PENDING" }, data: { commissionStatus: "REQUESTED" } });
+  await refreshStatementStatus(statementId);
 }
 
 export async function removeStatementItem(statementId: string, bookingItemId: string) {
@@ -170,13 +188,15 @@ export async function emailStatement(statementId: string, _: ActionState, formDa
     attachments: [{ filename: statementFilename(s, "xlsx"), content: buffer, contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }],
   });
   if (result.status === "FAILED") return { error: `No se pudo enviar: ${result.error}` };
-  if (s.status === "DRAFT") await db.commissionStatement.update({ where: { id: statementId }, data: { status: "SENT" } });
-  revalidatePath(`/app/comisiones/planillas/${statementId}`);
+  await markSent(statementId);
+  revalidatePath("/app/comisiones", "layout");
   return { ok: result.status === "SENT" ? "Planilla enviada a la agencia" : "Planilla registrada como enviada (configurá SMTP para que salga el email)" };
 }
 
 export async function markStatementSent(statementId: string) {
   const user = await requireUser();
-  await db.commissionStatement.updateMany({ where: { id: statementId, organizationId: user.organizationId, status: "DRAFT" }, data: { status: "SENT" } });
-  revalidatePath(`/app/comisiones/planillas/${statementId}`);
+  const s = await db.commissionStatement.findFirst({ where: { id: statementId, organizationId: user.organizationId } });
+  if (!s) return;
+  await markSent(statementId);
+  revalidatePath("/app/comisiones", "layout");
 }

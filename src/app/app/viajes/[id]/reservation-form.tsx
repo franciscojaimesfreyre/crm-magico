@@ -1,5 +1,7 @@
 import { ActionForm, SubmitButton, type ActionState } from "@/components/form-controls";
 import { Checkbox, Field, Input, Select, Textarea } from "@/components/ui";
+import Link from "next/link";
+import { formatDate } from "@/lib/format";
 import { COMMISSION_STATUS_LABEL, RESERVATION_STATUSES } from "@/lib/labels";
 import { toDateInput } from "@/lib/format";
 import { CommissionInput } from "@/components/commission-input";
@@ -10,7 +12,6 @@ import { PriceWithTax, ReservationTravelers, TripDatesGuard, type TravelerOption
 import { ItemTypeSelect } from "@/components/item-type-select";
 import { DateInput } from "@/components/date-input";
 
-const COMMISSION_STATUSES = Object.entries(COMMISSION_STATUS_LABEL).map(([value, label]) => ({ value, label }));
 
 /**
  * Formulario completo de una reserva: datos con el proveedor, viajeros incluidos, totales a pagar,
@@ -96,19 +97,17 @@ export function ReservationForm({
           <DateInput name="saleDate" defaultValue={toDateInput(item?.saleDate)} />
         </Field>
         {item ? (
-          <>
-            <Field label="Estado de cobro">
-              <Select name="commissionStatus" options={COMMISSION_STATUSES} defaultValue={item.commissionStatus} />
-            </Field>
-            <Field label="Cobrada el">
-              <DateInput name="commissionPaidAt" defaultValue={toDateInput(item.commissionPaidAt)} />
-            </Field>
-            <Field label="Monto cobrado" hint="Vacío = el esperado">
-              <Input type="number" step="0.01" min={0} name="commissionPaidAmount" defaultValue={n(item.commissionPaidAmount)} />
-            </Field>
-          </>
+          // El cobro se registra en un solo lugar (Comisiones y sus planillas), para que todo cuadre.
+          <div className="self-end pb-2 text-xs text-slate-600 sm:col-span-3">
+            Cobro: <span className="font-medium text-slate-800">{COMMISSION_STATUS_LABEL[item.commissionStatus]}</span>
+            {item.commissionPaidAt && ` el ${formatDate(item.commissionPaidAt)}`}
+            {" · "}
+            <Link href="/app/comisiones" className="font-medium text-brand-700 hover:underline">
+              Se marca en Comisiones
+            </Link>
+          </div>
         ) : (
-          <p className="self-end pb-2 text-xs text-slate-500 sm:col-span-3">La comisión queda pendiente de cobro. Cuando la cobres, lo marcás editando la reserva.</p>
+          <p className="self-end pb-2 text-xs text-slate-500 sm:col-span-3">La comisión queda pendiente de cobro. Cuando la cobres, la registrás en Comisiones.</p>
         )}
         <Field label="Notas de la comisión" className="sm:col-span-5">
           <Input name="commissionNotes" defaultValue={item?.commissionNotes ?? ""} />

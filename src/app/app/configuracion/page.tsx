@@ -105,6 +105,10 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                 <dt className="text-xs text-slate-500">Comisión por defecto</dt>
                 <dd className="text-slate-800">{agency!.defaultCommissionRate !== null ? percent(agency!.defaultCommissionRate) : `${percent(org.defaultCommissionRate)} (la tuya)`}</dd>
               </div>
+              <div>
+                <dt className="text-xs text-slate-500">Plazo de pago</dt>
+                <dd className="text-slate-800">{agency!.paymentTermDays ?? 30} días</dd>
+              </div>
             </dl>
             <div className="border-t border-slate-100 p-5 text-sm text-slate-600">
               <p>
@@ -125,6 +129,9 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
               <ActionForm action={saveMyAgency} className="grid grid-cols-1 gap-3 p-5 sm:grid-cols-2">
                 <Field label="Nombre">
                   <Input name="name" defaultValue={agency?.name} placeholder="Ej: Agencia Madre Travel" required />
+                </Field>
+                <Field label="Plazo de pago (días)" hint="Cuántos días suele tardar en pagar una planilla. Vacío = 30.">
+                  <Input name="paymentTermDays" type="number" min={1} max={365} defaultValue={agency?.paymentTermDays ?? ""} />
                 </Field>
                 <Field label="Comisión por defecto (%)" hint={`Vacío = la tuya (${percent(org.defaultCommissionRate)})`}>
                   <Input name="defaultCommissionRate" type="number" step="0.01" min={0} max={100} defaultValue={agency?.defaultCommissionRate?.toString() ?? ""} />

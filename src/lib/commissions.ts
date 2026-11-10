@@ -48,8 +48,9 @@ export async function loadStatement(id: string, organizationId: string) {
       agency: true,
       agent: true,
       organization: true,
+      payments: { orderBy: { paidAt: "asc" } },
       items: {
-        include: { bookingItem: { include: { booking: { include: { client: true } } } } },
+        include: { bookingItem: { include: { booking: { include: { client: true } }, statementItems: { where: { cancelledAt: null }, select: { statementId: true } } } } },
         orderBy: [{ bookingItem: { saleDate: "asc" } }, { bookingItem: { booking: { code: "asc" } } }],
       },
     },
@@ -58,27 +59,41 @@ export async function loadStatement(id: string, organizationId: string) {
 
 export type LoadedStatement = NonNullable<Awaited<ReturnType<typeof loadStatement>>>;
 
-/** Recalcula el estado de la planilla según cuántas comisiones ya se cobraron. */
+/** Lo cobrado de una reserva: el monto cobrado (aunque sea parcial) o, si está cobrada sin monto, lo esperado. */
+export function receivedOf(item: { commissionStatus: string; commissionPaidAmount: unknown; commissionAmount: unknown }, expected?: number) {
+  if (item.commissionPaidAmount !== null && item.commissionPaidAmount !== undefined) return toNumber(item.commissionPaidAmount as never);
+  return item.commissionStatus === "PAID" ? (expected ?? toNumber(item.commissionAmount as never)) : 0;
+}
+
+/**
+ * Recalcula el estado de la planilla según la plata (no según la cantidad de filas): Borrador hasta que se
+ * envía; Enviada sin cobros; Cobrada en parte mientras falte plata; Cobrada cuando llegó todo lo esperado.
+ * Las reservas canceladas dentro de la planilla no cuentan.
+ */
 export async function refreshStatementStatus(statementId: string) {
   const s = await db.commissionStatement.findUnique({
     where: { id: statementId },
-    include: { items: { include: { bookingItem: { select: { commissionStatus: true } } } } },
+    include: { items: { include: { bookingItem: { select: { commissionStatus: true, commissionPaidAmount: true, commissionAmount: true } } } } },
   });
-  if (!s || s.items.length === 0) return;
-  const paid = s.items.filter((i) => i.bookingItem.commissionStatus === "PAID").length;
-  const status = paid === 0 ? (s.status === "DRAFT" ? "DRAFT" : "SENT") : paid === s.items.length ? "PAID" : "PARTIALLY_PAID";
+  if (!s) return;
+  const rows = s.items.filter((i) => !i.cancelledAt);
+  const expected = rows.reduce((t, r) => t + toNumber(r.expectedAmount), 0);
+  const received = rows.reduce((t, r) => t + receivedOf(r.bookingItem, toNumber(r.expectedAmount)), 0);
+  const status = received <= 0 ? (s.sentAt ? "SENT" : "DRAFT") : received + 0.005 >= expected ? "PAID" : "PARTIALLY_PAID";
   if (status !== s.status) await db.commissionStatement.update({ where: { id: statementId }, data: { status } });
 }
 
 export function statementTotals(s: LoadedStatement) {
   const byCurrency = new Map<string, { expected: number; received: number; pending: number }>();
   for (const row of s.items) {
+    if (row.cancelledAt) continue;
     const cur = row.bookingItem.booking.currency;
     const t = byCurrency.get(cur) ?? { expected: 0, received: 0, pending: 0 };
     const expected = toNumber(row.expectedAmount);
+    const received = receivedOf(row.bookingItem, expected);
     t.expected += expected;
-    if (row.bookingItem.commissionStatus === "PAID") t.received += toNumber(row.bookingItem.commissionPaidAmount ?? expected);
-    else t.pending += expected;
+    t.received += received;
+    t.pending += Math.max(0, expected - received);
     byCurrency.set(cur, t);
   }
   return [...byCurrency.entries()].map(([currency, t]) => ({ currency, ...t }));
@@ -161,4 +176,173 @@ export async function buildStatementWorkbook(s: LoadedStatement) {
   ws.getColumn(12).numFmt = "0.0%";
 
   return Buffer.from(await wb.xlsx.writeBuffer());
+}
+
+
+// ─── Qué hacer con las comisiones ────────────────────────────────────────────
+
+/** Días que la agencia tarda en pagar por defecto, si no se cargó otro. */
+export const DEFAULT_PAYMENT_TERM_DAYS = 30;
+
+export type CommissionStage = "ready" | "upcoming" | "draft" | "waiting" | "paid";
+
+/**
+ * Todas las ventas con comisión (reservas confirmadas de viajes no cancelados) clasificadas en lo que hay que
+ * hacer: para pedir (el viaje ya terminó y no está en ninguna planilla), todavía no (el viaje no terminó),
+ * en una planilla sin enviar, esperando el pago (planilla enviada) o cobradas.
+ */
+export async function commissionOverview(organizationId: string) {
+  const today = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate()));
+  const items = await db.bookingItem.findMany({
+    where: { status: "CONFIRMED", booking: { organizationId, status: { not: "CANCELLED" } } },
+    include: {
+      booking: { include: { client: { select: { firstName: true, lastName: true } } } },
+      statementItems: { where: { cancelledAt: null }, include: { statement: { select: { id: true, status: true, sentAt: true, createdAt: true, agency: { select: { name: true } } } } } },
+    },
+    orderBy: [{ booking: { endDate: { sort: "asc", nulls: "last" } } }, { position: "asc" }],
+  });
+  const rows = items.map((i) => {
+    const statement = i.statementItems.map((x) => x.statement).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0] ?? null;
+    const expected = toNumber(i.commissionAmount);
+    const received = receivedOf(i, expected);
+    const ended = !!i.booking.endDate && i.booking.endDate < today;
+    const stage: CommissionStage =
+      i.commissionStatus === "PAID" ? "paid" : statement ? (statement.sentAt ? "waiting" : "draft") : ended ? "ready" : "upcoming";
+    return { item: i, statement, expected, received, owed: Math.max(0, expected - received), ended, stage, currency: i.booking.currency };
+  });
+  const totals = new Map<string, { earned: number; received: number; owed: number; ready: number; waiting: number }>();
+  for (const r of rows) {
+    const t = totals.get(r.currency) ?? { earned: 0, received: 0, owed: 0, ready: 0, waiting: 0 };
+    t.earned += r.expected;
+    t.received += r.received;
+    t.owed += r.owed;
+    if (r.stage === "ready") t.ready += r.owed;
+    if (r.stage === "waiting" || r.stage === "draft") t.waiting += r.owed;
+    totals.set(r.currency, t);
+  }
+  return { rows, totals };
+}
+
+/** Planillas que todavía esperan plata, con cuántos días llevan y cuándo se espera el pago. */
+export async function openStatements(organizationId: string) {
+  const list = await db.commissionStatement.findMany({
+    where: { organizationId, status: { not: "PAID" } },
+    include: {
+      agency: true,
+      items: {
+        include: {
+          bookingItem: { include: { booking: { select: { currency: true } }, statementItems: { where: { cancelledAt: null }, select: { statementId: true } } } },
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+  return list.map((s) => {
+    const rows = s.items.filter((i) => !i.cancelledAt);
+    // Reservas que también están en otra planilla (se reclamarían dos veces).
+    const repeated = rows.filter((r) => r.bookingItem.statementItems.some((x) => x.statementId !== s.id)).length;
+    const currency = rows[0]?.bookingItem.booking.currency ?? "USD";
+    const expected = rows.reduce((t, r) => t + toNumber(r.expectedAmount), 0);
+    const received = rows.reduce((t, r) => t + receivedOf(r.bookingItem, toNumber(r.expectedAmount)), 0);
+    const term = s.agency?.paymentTermDays ?? DEFAULT_PAYMENT_TERM_DAYS;
+    const days = s.sentAt ? Math.floor((Date.now() - s.sentAt.getTime()) / 86400_000) : null;
+    const dueAt = s.sentAt ? new Date(s.sentAt.getTime() + term * 86400_000) : null;
+    return { statement: s, count: rows.length, repeated, currency, expected, received, owed: Math.max(0, expected - received), days, term, dueAt, late: days !== null && days > term };
+  });
+}
+
+/**
+ * Registra un pago de la agencia por una planilla y lo reparte entre sus reservas, en orden: cada una se
+ * completa hasta su comisión esperada; si alcanza, queda cobrada; si no, queda con lo parcial. Lo que falte
+ * queda como diferencia a reclamar.
+ */
+export async function registerStatementPayment(statementId: string, organizationId: string, input: { amount: number; paidAt: Date; reference: string | null }) {
+  const s = await db.commissionStatement.findFirst({
+    where: { id: statementId, organizationId },
+    include: { items: { where: { cancelledAt: null }, include: { bookingItem: true }, orderBy: { bookingItem: { saleDate: "asc" } } } },
+  });
+  if (!s) return { error: "Planilla no encontrada" };
+  if (!(input.amount > 0)) return { error: "Indicá cuánto pagó la agencia" };
+  await db.statementPayment.create({ data: { statementId, amount: input.amount, paidAt: input.paidAt, reference: input.reference } });
+  let left = input.amount;
+  for (const row of s.items) {
+    if (left <= 0.004) break;
+    const expected = toNumber(row.expectedAmount);
+    const already = receivedOf(row.bookingItem, expected);
+    if (row.bookingItem.commissionStatus === "PAID" && already + 0.005 >= expected) continue;
+    const give = Math.min(left, expected - already);
+    if (give <= 0) continue;
+    const total = Math.round((already + give) * 100) / 100;
+    const full = total + 0.005 >= expected;
+    await db.bookingItem.update({
+      where: { id: row.bookingItemId },
+      data: { commissionStatus: full ? "PAID" : "REQUESTED", commissionPaidAmount: total, commissionPaidAt: input.paidAt },
+    });
+    left -= give;
+  }
+  // Si pagó de más, el excedente queda en la última reserva (se ve como diferencia a favor).
+  if (left > 0.004 && s.items.length) {
+    const last = s.items[s.items.length - 1];
+    const fresh = await db.bookingItem.findUniqueOrThrow({ where: { id: last.bookingItemId } });
+    await db.bookingItem.update({ where: { id: last.bookingItemId }, data: { commissionPaidAmount: Math.round((receivedOf(fresh) + left) * 100) / 100, commissionStatus: "PAID", commissionPaidAt: input.paidAt } });
+  }
+  if (!s.sentAt) await db.commissionStatement.update({ where: { id: statementId }, data: { sentAt: input.paidAt } });
+  await refreshStatementStatus(statementId);
+  return { ok: true as const };
+}
+
+/**
+ * Una reserva se canceló: sale de sus planillas. Si la agencia ya la había pagado, queda marcada para
+ * devolver y se crea una tarea; si no, simplemente deja de contar.
+ */
+export async function onReservationCancelled(bookingItemId: string, userId?: string | null) {
+  const rows = await db.commissionStatementItem.findMany({
+    where: { bookingItemId, cancelledAt: null },
+    include: { statement: { include: { agency: true } }, bookingItem: { include: { booking: { include: { client: true } } } } },
+  });
+  for (const row of rows) {
+    await db.commissionStatementItem.update({ where: { id: row.id }, data: { cancelledAt: new Date() } });
+    const i = row.bookingItem;
+    const received = receivedOf(i, toNumber(row.expectedAmount));
+    if (received > 0) {
+      await db.task.create({
+        data: {
+          organizationId: row.statement.organizationId,
+          assigneeId: i.booking.agentId ?? userId ?? null,
+          bookingId: i.bookingId,
+          clientId: i.booking.clientId,
+          title: `Devolver a ${row.statement.agency?.name ?? "la agencia"} la comisión de ${i.description} (cancelada)`,
+          description: `Ya se había cobrado ${received.toFixed(2)} ${i.booking.currency}. Descontalo de la próxima planilla o devolvelo.`,
+          priority: "HIGH",
+          dueDate: new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate())),
+          automated: true,
+        },
+      });
+    }
+    await refreshStatementStatus(row.statementId);
+  }
+}
+
+/** Planillas enviadas que pasaron el plazo de pago sin cobrarse: una tarea para reclamar (cada 14 días como mucho). */
+export async function remindOverdueStatements(organizationId: string) {
+  let n = 0;
+  for (const o of await openStatements(organizationId)) {
+    if (!o.late || o.owed <= 0) continue;
+    const s = o.statement;
+    if (s.remindedAt && Date.now() - s.remindedAt.getTime() < 14 * 86400_000) continue;
+    await db.task.create({
+      data: {
+        organizationId,
+        assigneeId: s.agentId,
+        title: `Reclamar a ${s.agency?.name ?? "la agencia"} la planilla del ${formatDate(s.periodFrom)} al ${formatDate(s.periodTo)}: ${o.days} días sin pago`,
+        description: `Falta cobrar ${o.owed.toFixed(2)} ${o.currency}.`,
+        priority: "HIGH",
+        dueDate: new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate())),
+        automated: true,
+      },
+    });
+    await db.commissionStatement.update({ where: { id: s.id }, data: { remindedAt: new Date() } });
+    n++;
+  }
+  return n;
 }

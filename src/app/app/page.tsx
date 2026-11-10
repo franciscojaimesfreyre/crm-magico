@@ -11,6 +11,7 @@ import { CopyText } from "@/app/app/clientes/[id]/client-widgets";
 import { BOOKING_STATUS_COLOR, BOOKING_STATUS_LABEL, DESTINATION_LABEL, DESTINATION_TONE } from "@/lib/labels";
 import { addDays, daysBetween, formatDate, formatRange, money, todayUTC, toNumber } from "@/lib/format";
 import { agenda, defaultScope } from "@/lib/agenda";
+import { receivedOf } from "@/lib/commissions";
 import { AgendaRows } from "./calendario/agenda-ui";
 import { runDateWorkflowsIfDue } from "@/lib/automations";
 import { syncThemeParksIfDue } from "@/lib/themeparks-sync";
@@ -59,22 +60,18 @@ export default async function Dashboard() {
     }),
     // Ventas = reservas confirmadas con un proveedor (un viaje puede tener varias).
     db.bookingItem.aggregate({
-      where: { status: "CONFIRMED", saleDate: { gte: last30 }, booking: { organizationId: orgId, status: { not: "CANCELLED" } } },
+      where: { status: "CONFIRMED", saleDate: { gte: last30 }, booking: { organizationId: orgId, status: { not: "CANCELLED" }, currency } },
       _sum: { price: true, commissionAmount: true },
       _count: true,
     }),
     db.bookingItem.aggregate({
-      where: { status: "CONFIRMED", saleDate: { gte: yearStart }, booking: { organizationId: orgId, status: { not: "CANCELLED" } } },
+      where: { status: "CONFIRMED", saleDate: { gte: yearStart }, booking: { organizationId: orgId, status: { not: "CANCELLED" }, currency } },
       _sum: { price: true, commissionAmount: true },
     }),
-    db.bookingItem.aggregate({
-      where: {
-        status: "CONFIRMED",
-        commissionStatus: { not: "PAID" },
-        booking: { organizationId: orgId, status: { in: ["TRAVELED", "COMPLETED"] } },
-      },
-      _sum: { commissionAmount: true },
-      _count: true,
+    // Por cobrar: lo mismo que en Comisiones, de los viajes que ya terminaron (sin depender del estado manual).
+    db.bookingItem.findMany({
+      where: { status: "CONFIRMED", commissionStatus: { not: "PAID" }, booking: { organizationId: orgId, status: { not: "CANCELLED" }, endDate: { lt: today }, currency } },
+      select: { commissionAmount: true, commissionPaidAmount: true, commissionStatus: true },
     }),
     db.booking.findMany({
       where: { organizationId: orgId, status: "INQUIRY" },
@@ -114,7 +111,7 @@ export default async function Dashboard() {
   // Lo que vence o pasa en los próximos 7 días y las tareas atrasadas (la fila "Necesita tu atención").
   const thisWeek = allKeyDates.filter((k) => !k.overdue && !k.open && k.date <= in7).length;
   const overdueTasks = tasks.filter((t) => t.dueDate && t.dueDate < today).length;
-  const toCollect = toNumber(commissionToCollect._sum.commissionAmount);
+  const toCollect = commissionToCollect.reduce((t, i) => t + Math.max(0, toNumber(i.commissionAmount) - receivedOf(i)), 0);
 
   const featured = nextTrips[0];
   const featuredNext = featured ? keyDates.find((k) => !k.overdue && !k.open && k.booking?.id === featured.id) : undefined;
@@ -198,7 +195,7 @@ export default async function Dashboard() {
           value={money(toCollect, currency)}
           hint={
             <Link href="/app/comisiones" className="font-semibold text-brand-700 hover:underline">
-              {commissionToCollect._count} {commissionToCollect._count === 1 ? "reserva de viaje realizado" : "reservas de viajes realizados"} →
+              {commissionToCollect.length} {commissionToCollect.length === 1 ? "reserva de viaje que ya terminó" : "reservas de viajes que ya terminaron"} →
             </Link>
           }
         />

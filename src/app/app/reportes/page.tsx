@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { receivedOf } from "@/lib/commissions";
 import { Card, CardHeader, PageHeader, StatCard, StatStrip, Table, Td, buttonClass } from "@/components/ui";
 import { BarList, ColumnChart } from "@/components/charts";
 import { BOOKING_STATUS_LABEL, DESTINATION_LABEL, ITEM_TYPE_LABEL, PIPELINE } from "@/lib/labels";
@@ -22,7 +23,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const from = new Date(Date.UTC(year, 0, 1));
   const to = new Date(Date.UTC(year, 11, 31));
 
-  const [soldItems, created, clientsNew, allClients, currencies] = await Promise.all([
+  const [soldItems, created, clientsNew, allClients, currencies, paidItems] = await Promise.all([
     // Ventas = reservas confirmadas con un proveedor, por fecha de venta.
     db.bookingItem.findMany({
       where: {
@@ -42,7 +43,17 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       include: { bookings: { select: { createdAt: true, status: true, totalPrice: true } } },
     }),
     db.booking.findMany({ where: { organizationId: user.organizationId }, distinct: ["currency"], select: { currency: true } }),
+    // Lo cobrado (lo que entró) va por la fecha de cobro, no por la de venta.
+    db.bookingItem.findMany({
+      where: { commissionPaidAt: { gte: from, lt: new Date(Date.UTC(year + 1, 0, 1)) }, booking: { organizationId: user.organizationId, currency } },
+      select: { commissionPaidAt: true, commissionPaidAmount: true, commissionAmount: true, commissionStatus: true },
+    }),
   ]);
+  const collected = paidItems.reduce((t, i) => t + receivedOf(i), 0);
+  const collectedByMonth = MONTHS.map((label, m) => {
+    const value = paidItems.filter((i) => i.commissionPaidAt!.getUTCMonth() === m).reduce((t, i) => t + receivedOf(i), 0);
+    return { label, value, display: money(value, currency) };
+  });
 
   const sold = soldItems.map((i) => ({
     bookingId: i.bookingId,
@@ -110,7 +121,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
       <StatStrip className="mb-6">
         <StatCard label="Vendido" value={money(revenue, currency)} hint={`${sold.length} reservas en ${trips} viajes`} />
-        <StatCard label="Comisión" value={money(commission, currency)} tone="good" />
+        <StatCard label="Comisión ganada" value={money(commission, currency)} tone="good" hint={`Cobrado en ${year}: ${money(collected, currency)}`} />
         <StatCard label="Promedio por viaje" value={money(trips ? revenue / trips : 0, currency)} />
         <StatCard label="Conversión" value={`${conversion}%`} hint={`${converted} de ${createdActive.length} consultas del año`} />
         <StatCard label="Clientes nuevos" value={clientsNew} />
@@ -118,9 +129,15 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card className="lg:col-span-2">
-          <CardHeader title="Comisión por mes" description="Pasá el mouse por cada columna para ver el monto." />
+          <CardHeader title="Comisión ganada por mes" description="Por fecha de venta. Pasá el mouse por cada columna para ver el monto." />
           <div className="p-5">
             <ColumnChart data={byMonth} title={`Comisión por mes ${year}`} />
+          </div>
+        </Card>
+        <Card className="lg:col-span-2">
+          <CardHeader title="Comisión cobrada por mes" description="Lo que efectivamente pagó la agencia, por fecha de cobro." />
+          <div className="p-5">
+            <ColumnChart data={collectedByMonth} title={`Comisión cobrada por mes ${year}`} />
           </div>
         </Card>
 

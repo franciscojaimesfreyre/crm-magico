@@ -20,6 +20,9 @@ export default async function AgencyLayout({ children }: { children: React.React
               <Link href="/agencia" className="hover:text-brand-700">
                 Resumen
               </Link>
+              <Link href="/agencia/planillas" className="hover:text-brand-700">
+                Planillas
+              </Link>
               <Link href="/agencia/configuracion" className="hover:text-brand-700">
                 Configuración
               </Link>

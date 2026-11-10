@@ -73,6 +73,9 @@ export default async function AgencySettingsPage() {
           <Field label="Comisión por defecto (%)" hint="La que pagás en general. Cada agente puede ajustarla por servicio.">
             <Input name="defaultCommissionRate" type="number" step="0.01" min={0} max={100} defaultValue={agency.defaultCommissionRate?.toString() ?? ""} />
           </Field>
+          <Field label="Plazo de pago (días)" hint="Cuántos días tardás en pagar una planilla. Los agentes lo usan para saber cuándo cobran. Vacío = 30.">
+            <Input name="paymentTermDays" type="number" min={1} max={365} defaultValue={agency.paymentTermDays ?? ""} />
+          </Field>
           <Field label="Contacto">
             <Input name="contactName" defaultValue={agency.contactName ?? ""} />
           </Field>

@@ -100,6 +100,8 @@ model Agency {
   contactName           String?
   contactEmail          String?
   defaultCommissionRate Decimal? @db.Decimal(5, 2)
+  /// Días que suele tardar en pagar después de recibir la planilla (para el pronóstico y los recordatorios).
+  paymentTermDays       Int?
   notes                 String?
   inviteCode            String?  @unique // solo agencias de la plataforma
   createdAt             DateTime @default(now())
@@ -306,14 +308,14 @@ model Booking {
   totalPrice       Decimal @default(0) @db.Decimal(12, 2)
   commissionAmount Decimal @default(0) @db.Decimal(12, 2)
 
-  notes        String? // internas: notas libres del agente, la IA las usa para el itinerario
-  clientNotes  String? // visibles para el cliente
-  shareToken   String   @unique @default(cuid())
-  cancelReason String?
+  notes                 String? // internas: notas libres del agente, la IA las usa para el itinerario
+  clientNotes           String? // visibles para el cliente
+  shareToken            String   @unique @default(cuid())
+  cancelReason          String?
   /// Aviso de datos de viajeros descartado por el agente: guarda qué faltaba (si cambia, vuelve a aparecer).
   travelerGapsDismissed String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   items        BookingItem[]
   flightLegs   FlightLeg[] // vuelos de ida y vuelta (dato de referencia)
@@ -1049,11 +1051,27 @@ model CommissionStatement {
   periodTo       DateTime        @db.Date
   dateBasis      String          @default("SALE") // SALE | TRAVEL_END
   status         StatementStatus @default(DRAFT)
+  /// Cuándo se le mandó a la agencia: recién ahí las comisiones quedan "Solicitadas".
+  sentAt         DateTime?
+  /// Último recordatorio de pago (para no repetirlo).
+  remindedAt     DateTime?
   notes          String?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
-  items CommissionStatementItem[]
+  items    CommissionStatementItem[]
+  payments StatementPayment[]
+}
+
+/// Un pago que hizo la agencia por una planilla (una transferencia): se reparte entre sus reservas.
+model StatementPayment {
+  id          String              @id @default(cuid())
+  statementId String
+  statement   CommissionStatement @relation(fields: [statementId], references: [id], onDelete: Cascade)
+  amount      Decimal             @db.Decimal(12, 2)
+  paidAt      DateTime            @db.Date
+  reference   String?
+  createdAt   DateTime            @default(now())
 }
 
 /// Una reserva incluida en una planilla de comisiones.
@@ -1064,6 +1082,8 @@ model CommissionStatementItem {
   bookingItemId  String
   bookingItem    BookingItem         @relation(fields: [bookingItemId], references: [id], onDelete: Cascade)
   expectedAmount Decimal             @db.Decimal(12, 2)
+  /// La reserva se canceló después de entrar en la planilla (si ya se había cobrado, hay que devolverlo).
+  cancelledAt    DateTime?
 
   @@unique([statementId, bookingItemId])
 }

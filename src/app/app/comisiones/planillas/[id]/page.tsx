@@ -4,14 +4,15 @@ import clsx from "clsx";
 import { Download, Trash2 } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { ActionForm, ConfirmButton, SubmitButton } from "@/components/form-controls";
-import { Badge, Card, CardHeader, Field, Input, PageHeader, Table, Td, Textarea, Th, buttonClass } from "@/components/ui";
+import { Alert, Badge, Card, CardHeader, Field, Input, PageHeader, Table, Td, Textarea, Th, buttonClass } from "@/components/ui";
 import { DESTINATION_LABEL, ITEM_TYPE_LABEL, STATEMENT_STATUS_LABEL } from "@/lib/labels";
 import { formatDate, formatRange, money, toDateInput, toNumber } from "@/lib/format";
 import { loadStatement, statementTotals } from "@/lib/commissions";
 import {
   deleteStatement,
   emailStatement,
-  markStatementPaid,
+  registerPayment,
+  setStatementAgency,
   markStatementSent,
   removeStatementItem,
   updateStatementItem,
@@ -22,8 +23,9 @@ import { DateInput } from "@/components/date-input";
 
 export const metadata = { title: "Planilla de comisiones" };
 
-export default async function StatementPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function StatementPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ omitidas?: string }> }) {
   const { id } = await params;
+  const { omitidas } = await searchParams;
   const user = await requireUser();
   const s = await loadStatement(id, user.organizationId);
   if (!s) notFound();
@@ -44,7 +46,7 @@ ${user.organization.name}`;
         <PageHeader
           back={{ href: "/app/comisiones/planillas", label: "Planillas" }}
           title={`Planilla — ${s.agency?.name ?? "Sin agencia"}`}
-          description={`${formatDate(s.periodFrom)} al ${formatDate(s.periodTo)} · por ${basis} · ${s.items.length} reservas`}
+          description={`${formatDate(s.periodFrom)} al ${formatDate(s.periodTo)} · por ${basis} · ${s.items.filter((i) => !i.cancelledAt).length} reservas · ${s.sentAt ? `enviada el ${formatDate(s.sentAt)}` : "todavía no enviada"}`}
           actions={
             <>
               <Badge className="bg-brand-100 text-brand-700">{STATEMENT_STATUS_LABEL[s.status]}</Badge>
@@ -68,12 +70,35 @@ ${user.organization.name}`;
         </p>
       </div>
 
+      <div className="mb-4 space-y-3 print:hidden">
+        {omitidas && (
+          <Alert tone="info">
+            {omitidas === "1" ? "1 reserva elegida ya estaba" : `${omitidas} reservas elegidas ya estaban`} en otra planilla y {omitidas === "1" ? "quedó" : "quedaron"} afuera: cada venta se reclama una sola vez.
+          </Alert>
+        )}
+        {!s.agency && (
+          <Alert tone="warn">
+            Esta planilla no tiene agencia.{" "}
+            {user.organization.agency ? (
+              <form action={setStatementAgency.bind(null, s.id)} className="inline">
+                <button className="font-medium underline">Asignarla a {user.organization.agency.name}</button>
+              </form>
+            ) : (
+              <Link href="/app/configuracion?tab=agencia" className="font-medium underline">
+                Cargá tu agencia en Configuración
+              </Link>
+            )}
+          </Alert>
+        )}
+        {!s.sentAt && <Alert tone="warn">Todavía no la enviaste: las comisiones quedan sin solicitar hasta que la mandes a la agencia.</Alert>}
+      </div>
+
       <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
         {totals.map((t) => (
           <Card key={t.currency} className="p-4 sm:col-span-3">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div>
-                <p className="text-xs text-slate-500">Comisión total ({t.currency})</p>
+                <p className="text-xs text-slate-500">Comisión reclamada ({t.currency})</p>
                 <p className="text-2xl font-semibold">{money(t.expected, t.currency)}</p>
               </div>
               <div>
@@ -81,8 +106,10 @@ ${user.organization.name}`;
                 <p className="text-2xl font-semibold text-emerald-700">{money(t.received, t.currency)}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-500">Pendiente</p>
-                <p className={clsx("text-2xl font-semibold", t.pending > 0 ? "text-amber-700" : "text-slate-500")}>{money(t.pending, t.currency)}</p>
+                <p className="text-xs text-slate-500">{t.received > t.expected + 0.005 ? "Pagó de más" : "Diferencia a reclamar"}</p>
+                <p className={clsx("text-2xl font-semibold", t.pending > 0 ? "text-amber-700" : "text-slate-500")}>
+                  {money(t.received > t.expected ? t.received - t.expected : t.pending, t.currency)}
+                </p>
               </div>
             </div>
           </Card>
@@ -109,8 +136,9 @@ ${user.organization.name}`;
               const r = item.bookingItem;
               const b = r.booking;
               const paid = r.commissionStatus === "PAID";
+              const partial = !paid && r.commissionPaidAmount !== null;
               return (
-                <tr key={item.id} className={clsx("align-top", paid && "bg-emerald-50/50")}>
+                <tr key={item.id} className={clsx("align-top", paid && "bg-emerald-50/50", item.cancelledAt && "opacity-60")}>
                   <Td className="min-w-40">
                     <Link href={`/app/viajes/${b.id}?tab=reservas`} className="font-medium text-slate-900 hover:text-brand-700">
                       {b.client.firstName} {b.client.lastName}
@@ -126,7 +154,16 @@ ${user.organization.name}`;
                   <Td className="text-xs">{formatDate(r.saleDate)}</Td>
                   <Td className="text-xs whitespace-nowrap">{formatRange(b.startDate, b.endDate)}</Td>
                   <Td className="text-right whitespace-nowrap">{money(r.price, b.currency)}</Td>
-                  <Td className="text-right font-medium whitespace-nowrap">{money(item.expectedAmount, b.currency)}</Td>
+                  <Td className="text-right font-medium whitespace-nowrap">
+                    <span className={clsx(item.cancelledAt && "line-through")}>{money(item.expectedAmount, b.currency)}</span>
+                    {item.cancelledAt && <p className="text-[11px] font-normal text-rose-700">{paid || partial ? "Cancelada: a devolver" : "Cancelada: no cuenta"}</p>}
+                    {partial && !item.cancelledAt && <p className="text-[11px] font-normal text-amber-700">Cobrado {money(r.commissionPaidAmount, b.currency)}</p>}
+                    {!item.cancelledAt && r.statementItems.some((x) => x.statementId !== s.id) && (
+                      <Link href={`/app/comisiones/planillas/${r.statementItems.find((x) => x.statementId !== s.id)!.statementId}`} className="block text-[11px] font-normal text-rose-700 hover:underline">
+                        También en otra planilla
+                      </Link>
+                    )}
+                  </Td>
                   <Td className="print:hidden">
                     <ActionForm action={updateStatementItem.bind(null, s.id, r.id)} className="flex flex-wrap items-center gap-2">
                       <label className="flex items-center gap-1.5 text-xs">
@@ -189,12 +226,40 @@ ${user.organization.name}`;
                 </form>
               )}
               {s.status !== "PAID" && (
-                <form action={markStatementPaid.bind(null, s.id)} className="flex flex-wrap items-end gap-2">
-                  <Field label="Fecha de cobro">
-                    <DateInput name="paidAt" />
-                  </Field>
-                  <SubmitButton>Marcar toda la planilla como cobrada</SubmitButton>
-                </form>
+                <div>
+                  <p className="mb-2 text-sm font-medium text-slate-800">Registrar pago recibido</p>
+                  <p className="mb-3 text-xs text-slate-500">Lo que transfirió la agencia. Se reparte entre las reservas en orden y lo que falte queda como diferencia a reclamar.</p>
+                  <ActionForm action={registerPayment.bind(null, s.id)} className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    <Field label="Monto">
+                      <Input type="number" step="0.01" min={0.01} name="amount" defaultValue={totals[0] ? totals[0].pending.toFixed(2) : ""} required />
+                    </Field>
+                    <Field label="Fecha">
+                      <DateInput name="paidAt" />
+                    </Field>
+                    <Field label="Referencia">
+                      <Input name="reference" placeholder="N° de transferencia" />
+                    </Field>
+                    <div className="sm:col-span-3">
+                      <SubmitButton>Registrar pago</SubmitButton>
+                    </div>
+                  </ActionForm>
+                </div>
+              )}
+              {s.payments.length > 0 && (
+                <div>
+                  <p className="mb-1 text-sm font-medium text-slate-800">Pagos recibidos</p>
+                  <ul className="divide-y divide-slate-100 text-sm">
+                    {s.payments.map((pay) => (
+                      <li key={pay.id} className="flex justify-between gap-3 py-1.5">
+                        <span className="text-slate-600">
+                          {formatDate(pay.paidAt)}
+                          {pay.reference && ` · ${pay.reference}`}
+                        </span>
+                        <span className="font-medium text-emerald-700 tabular-nums">{money(pay.amount, totals[0]?.currency ?? "USD")}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
               <form action={deleteStatement.bind(null, s.id)}>
                 <ConfirmButton message="¿Eliminar la planilla? Las ventas vuelven a quedar pendientes de solicitar.">

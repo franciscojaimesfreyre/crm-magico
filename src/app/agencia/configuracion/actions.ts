@@ -22,6 +22,7 @@ export async function updateAgency(_: ActionState, formData: FormData): Promise<
       contactName: str(formData, "contactName"),
       contactEmail: str(formData, "contactEmail"),
       defaultCommissionRate: rate,
+      paymentTermDays: termDays(formData),
       notes: str(formData, "notes"),
     },
   });
@@ -60,4 +61,10 @@ export async function updateAgencyAccount(_: ActionState, formData: FormData): P
   await db.user.update({ where: { id: user.id }, data });
   revalidatePath("/agencia", "layout");
   return { ok: next ? "Datos y contraseña actualizados" : "Datos actualizados" };
+}
+
+/** Días de plazo de pago (vacío = el de siempre). */
+function termDays(formData: FormData) {
+  const n = Number(String(formData.get("paymentTermDays") ?? "").trim());
+  return Number.isInteger(n) && n > 0 && n <= 365 ? n : null;
 }

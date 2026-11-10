@@ -17,6 +17,7 @@ const ACTION_LABEL: Record<WorkflowAction["type"], string> = {
   SEND_EMAIL: "Envía email",
   SEND_MESSAGE: "Mensaje al portal",
   NOTIFY: "Notifica",
+  SEND_FORM: "Envía formulario",
 };
 
 function describeTrigger(trigger: keyof typeof WORKFLOW_TRIGGER_LABEL, config: TriggerConfig) {

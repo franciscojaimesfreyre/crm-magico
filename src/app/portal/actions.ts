@@ -223,6 +223,8 @@ export async function updatePortalProfile(_: ActionState, formData: FormData): P
       data: {
         birthDate: parseDateInput(formData.get(`birth-${t.id}`)) ?? t.birthDate,
         heightCm: Number.isFinite(height) && height > 0 ? Math.round(height) : t.heightCm,
+        // Del pasaporte se guarda solo el vencimiento (lo usan los avisos).
+        passportExpiry: parseDateInput(formData.get(`passport-${t.id}`)) ?? t.passportExpiry,
         avatar,
       },
     });

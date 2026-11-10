@@ -8,6 +8,7 @@ import { buildTemplateVars } from "@/lib/template-context";
 import { sendEmail } from "@/lib/email";
 import { logActivity, notifyStaff } from "@/lib/events";
 import { notifyOpeningWindows } from "@/lib/agenda";
+import { createFormRequest, remindFormRequests, seedFormWorkflows } from "@/lib/form-answers";
 
 // ─── Tipos de configuración guardados como JSON ──────────────────────────────
 
@@ -17,7 +18,8 @@ export type WorkflowAction =
   | { type: "CREATE_TASK"; title: string; priority?: TaskPriority; dueInDays?: number }
   | { type: "SEND_EMAIL"; templateId: string }
   | { type: "SEND_MESSAGE"; body: string }
-  | { type: "NOTIFY"; title: string };
+  | { type: "NOTIFY"; title: string }
+  | { type: "SEND_FORM"; formId: string };
 
 export const DATE_TRIGGERS: WorkflowTrigger[] = [
   "DAYS_BEFORE_TRAVEL",
@@ -95,6 +97,16 @@ async function executeActions(w: Workflow, target: Target) {
           },
         });
         break;
+      case "SEND_FORM": {
+        // Link personal al cliente (y al viaje), por el portal y por email si tiene.
+        const form = await db.form.findFirst({ where: { id: action.formId, organizationId: w.organizationId, active: true } });
+        if (!form) throw new Error("El formulario ya no existe o está cerrado");
+        const already = await db.formRequest.findFirst({
+          where: { formId: form.id, clientId: client.id, bookingId: target.bookingId ?? null, status: { not: "ANSWERED" } },
+        });
+        if (!already) await createFormRequest({ organizationId: w.organizationId, formId: form.id, clientId: client.id, bookingId: target.bookingId, userId: null, email: !!client.email });
+        break;
+      }
       case "NOTIFY":
         await notifyStaff({
           organizationId: w.organizationId,
@@ -179,6 +191,8 @@ export async function runEventWorkflows(input: {
 const ACTIVE_STATUSES: BookingStatus[] = ["INQUIRY", "QUOTED", "BOOKED", "PAID_IN_FULL"];
 
 export async function runDateWorkflows(organizationId: string) {
+  // Las automatizaciones de formularios por defecto (una sola vez por agencia).
+  await seedFormWorkflows(organizationId);
   const today = todayUTC();
   const workflows = await db.workflow.findMany({
     where: { organizationId, active: true, trigger: { in: DATE_TRIGGERS } },
@@ -273,6 +287,8 @@ export async function runDateWorkflows(organizationId: string) {
 
   // Avisos propios del calendario: cuando se abre una ventana para reservar de un viaje reservado.
   executed += await notifyOpeningWindows(organizationId);
+  // Formularios pedidos que siguen sin respuesta: un recordatorio a los 5 días.
+  executed += await remindFormRequests(organizationId);
 
   await db.organization.update({ where: { id: organizationId }, data: { automationsRunAt: new Date() } });
   return executed;

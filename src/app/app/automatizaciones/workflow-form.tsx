@@ -1,6 +1,7 @@
 import { ActionForm, SubmitButton, type ActionState } from "@/components/form-controls";
 import { Card, CardHeader, Checkbox, Field, Input, Select } from "@/components/ui";
-import { BOOKING_STATUSES, DESTINATIONS, TASK_PRIORITIES, WORKFLOW_TRIGGERS } from "@/lib/labels";
+import { BOOKING_STATUSES, DESTINATIONS, WORKFLOW_TRIGGERS } from "@/lib/labels";
+import { ActionRow } from "./action-row";
 import { TEMPLATE_VARIABLES } from "@/lib/templating";
 import type { Workflow } from "@/generated/prisma/client";
 import type { TriggerConfig, WorkflowAction } from "@/lib/automations";
@@ -10,6 +11,7 @@ const ACTION_TYPES = [
   { value: "SEND_EMAIL", label: "Enviar un email al cliente" },
   { value: "SEND_MESSAGE", label: "Enviar un mensaje al portal" },
   { value: "NOTIFY", label: "Notificar al agente" },
+  { value: "SEND_FORM", label: "Enviar un formulario al cliente" },
 ];
 
 const MAX_ACTIONS = 3;
@@ -18,10 +20,13 @@ export function WorkflowForm({
   action,
   workflow,
   templates,
+  forms = [],
 }: {
   action: (s: ActionState, f: FormData) => Promise<ActionState>;
   workflow?: Workflow;
   templates: { value: string; label: string }[];
+  /** Formularios activos, para la acción "Enviar un formulario". */
+  forms?: { value: string; label: string }[];
 }) {
   const config = (workflow?.triggerConfig ?? {}) as TriggerConfig;
   const actions = (workflow?.actions ?? []) as WorkflowAction[];
@@ -66,31 +71,9 @@ export function WorkflowForm({
           description={`Hasta ${MAX_ACTIONS} acciones. Podés usar variables como ${TEMPLATE_VARIABLES.slice(0, 3).map((v) => `{{${v.key}}}`).join(", ")}.`}
         />
         <div className="divide-y divide-slate-100">
-          {Array.from({ length: MAX_ACTIONS }, (_, i) => {
-            const a = actions[i];
-            return (
-              <div key={i} className="grid grid-cols-1 gap-3 p-5 sm:grid-cols-4">
-                <Field label={`Acción ${i + 1}`}>
-                  <Select name={`a${i}_type`} options={ACTION_TYPES} defaultValue={a?.type ?? ""} placeholder="—" />
-                </Field>
-                <Field label="Título (tarea / notificación)" className="sm:col-span-3">
-                  <Input name={`a${i}_title`} defaultValue={a && "title" in a ? a.title : ""} placeholder="Ej: Reservar restaurantes para {{clientFullName}}" />
-                </Field>
-                <Field label="Prioridad (tarea)">
-                  <Select name={`a${i}_priority`} options={TASK_PRIORITIES} defaultValue={a?.type === "CREATE_TASK" ? (a.priority ?? "MEDIUM") : "MEDIUM"} />
-                </Field>
-                <Field label="Vence en días (tarea)">
-                  <Input type="number" name={`a${i}_due`} min={0} defaultValue={a?.type === "CREATE_TASK" ? (a.dueInDays ?? 0) : 0} />
-                </Field>
-                <Field label="Plantilla (email)" className="sm:col-span-2">
-                  <Select name={`a${i}_template`} options={templates} defaultValue={a?.type === "SEND_EMAIL" ? a.templateId : ""} placeholder="—" />
-                </Field>
-                <Field label="Mensaje (portal)" className="sm:col-span-4">
-                  <Input name={`a${i}_body`} defaultValue={a?.type === "SEND_MESSAGE" ? a.body : ""} />
-                </Field>
-              </div>
-            );
-          })}
+          {Array.from({ length: MAX_ACTIONS }, (_, i) => (
+            <ActionRow key={i} index={i} initial={actions[i]} types={ACTION_TYPES} templates={templates} forms={forms} />
+          ))}
         </div>
       </Card>
       <SubmitButton>Guardar automatización</SubmitButton>

@@ -1,3 +1,4 @@
+import { FormRequestsPanel, TravelerDataStrip } from "@/app/app/formularios/requests-panel";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft, ExternalLink, FileText, Link2, Pencil, Trash2, Wand2 } from "lucide-react";
@@ -113,7 +114,11 @@ export default async function BookingPage({
 
       {tab === "resumen" && (
         <>
+          <TravelerDataStrip bookingId={b.id} />
           <Summary booking={b} alerts={await tripKnowledgeAlerts(b)} gallery={await avatarImages(user.organizationId)} />
+          <div className="mt-6">
+            <FormRequestsPanel organizationId={user.organizationId} clientId={b.clientId} bookingId={b.id} />
+          </div>
           <div className="mt-8 flex flex-wrap gap-3 border-t border-slate-200 pt-6">
             {b.status !== "CANCELLED" && (
               <form action={cancelBooking.bind(null, b.id)} className="flex items-center gap-2">

@@ -27,6 +27,8 @@ function parse(formData: FormData) {
       actions.push({ type, templateId: str(`a${i}_template`) });
     } else if (type === "SEND_MESSAGE" && str(`a${i}_body`)) {
       actions.push({ type, body: str(`a${i}_body`) });
+    } else if (type === "SEND_FORM" && str(`a${i}_form`)) {
+      actions.push({ type, formId: str(`a${i}_form`) });
     } else if (type === "NOTIFY" && str(`a${i}_title`)) {
       actions.push({ type, title: str(`a${i}_title`) });
     }

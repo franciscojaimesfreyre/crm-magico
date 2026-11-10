@@ -12,9 +12,10 @@ export const metadata = { title: "Editar automatización" };
 export default async function EditWorkflow({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await requireUser();
-  const [workflow, templates] = await Promise.all([
+  const [workflow, templates, forms] = await Promise.all([
     db.workflow.findFirst({ where: { id, organizationId: user.organizationId } }),
     db.emailTemplate.findMany({ where: { organizationId: user.organizationId }, orderBy: { name: "asc" } }),
+    db.form.findMany({ where: { organizationId: user.organizationId, active: true }, orderBy: { title: "asc" } }),
   ]);
   if (!workflow) notFound();
   return (
@@ -30,7 +31,7 @@ export default async function EditWorkflow({ params }: { params: Promise<{ id: s
           </form>
         }
       />
-      <WorkflowForm action={saveWorkflow.bind(null, id)} workflow={workflow} templates={templates.map((t) => ({ value: t.id, label: t.name }))} />
+      <WorkflowForm action={saveWorkflow.bind(null, id)} workflow={workflow} templates={templates.map((t) => ({ value: t.id, label: t.name }))} forms={forms.map((f) => ({ value: f.id, label: f.title }))} />
     </div>
   );
 }

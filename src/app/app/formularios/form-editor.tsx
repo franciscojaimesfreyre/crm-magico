@@ -8,15 +8,15 @@ import { saveForm } from "./actions";
 import { SelectField } from "@/components/select-field";
 
 const MAP_OPTIONS: { value: NonNullable<FormField["mapTo"]> | ""; label: string }[] = [
-  { value: "", label: "No guardar en la ficha" },
-  { value: "firstName", label: "Nombre" },
-  { value: "lastName", label: "Apellido" },
-  { value: "email", label: "Email" },
-  { value: "phone", label: "Teléfono" },
-  { value: "city", label: "Ciudad" },
-  { value: "dietaryNotes", label: "Alimentación" },
-  { value: "accessibilityNotes", label: "Accesibilidad" },
-  { value: "preferenceNotes", label: "Preferencias" },
+  { value: "", label: "Solo como respuesta" },
+  { value: "firstName", label: "Va a la ficha: nombre" },
+  { value: "lastName", label: "Va a la ficha: apellido" },
+  { value: "email", label: "Va a la ficha: email" },
+  { value: "phone", label: "Va a la ficha: teléfono" },
+  { value: "city", label: "Va a la ficha: ciudad" },
+  { value: "dietaryNotes", label: "Va a la ficha: alimentación" },
+  { value: "accessibilityNotes", label: "Va a la ficha: accesibilidad" },
+  { value: "preferenceNotes", label: "Va a la ficha: gustos" },
 ];
 
 export function FormEditor({
@@ -72,7 +72,11 @@ export function FormEditor({
                 <label className="flex items-center gap-1.5 text-xs text-slate-600">
                   <input type="checkbox" checked={f.required} onChange={(e) => patch(i, { required: e.target.checked })} className="rounded border-slate-300" /> Obligatorio
                 </label>
+                {f.type === "travelers" ? (
+                  <span className="text-xs text-slate-500">Va a los viajeros del cliente</span>
+                ) : (
                 <SelectField size="sm" value={f.mapTo ?? ""} onValueChange={(v) => patch(i, { mapTo: (v || undefined) as FormField["mapTo"] })} options={MAP_OPTIONS} aria-label="Guardar en" />
+                )}
               </div>
               <div className="flex gap-1 text-slate-500">
                 <button type="button" onClick={() => move(i, -1)} className="hover:text-slate-700" title="Subir">

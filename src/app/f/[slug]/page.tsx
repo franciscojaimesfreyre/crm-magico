@@ -1,56 +1,30 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
-import { ActionForm, SubmitButton } from "@/components/form-controls";
-import type { FormField } from "@/lib/forms";
+import { isPersonalForm, type FormField } from "@/lib/forms";
+import { FormRenderer } from "@/components/form-renderer";
+import { FormShell } from "@/components/form-shell";
 import { submitForm } from "./actions";
-import { SelectField } from "@/components/select-field";
 
-export const metadata = { robots: { index: false } };
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
+  const form = await db.form.findUnique({ where: { slug }, include: { organization: { select: { name: true } } } });
+  return { title: form ? `${form.title} · ${form.organization.name}` : "Formulario", robots: { index: false } };
+}
 
 export default async function PublicForm({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const form = await db.form.findUnique({ where: { slug }, include: { organization: true } });
   if (!form) notFound();
-  const fields = form.fields as FormField[];
   return (
-    <div className="min-h-screen bg-[var(--ground)] px-4 py-10">
-      <div className="mx-auto max-w-xl">
-        <p className="mb-2 text-center text-sm text-slate-500">{form.organization.name}</p>
-        <div className="rounded-2xl bg-white p-6 border border-[var(--border)]">
-          <h1 className="text-xl font-semibold text-slate-900">{form.title}</h1>
-          {form.description && <p className="mt-1 mb-5 text-sm text-slate-500">{form.description}</p>}
-          {!form.active ? (
-            <p className="text-sm text-slate-500">Este formulario ya no recibe respuestas.</p>
-          ) : (
-            <ActionForm action={submitForm.bind(null, slug)} resetOnSuccess className="space-y-4">
-              <input type="text" name="website" tabIndex={-1} autoComplete="off" className="hidden" aria-hidden />
-              {fields.map((f) =>
-                f.type === "checkbox" ? (
-                  <label key={f.id} className="flex items-center gap-2 text-sm text-slate-700">
-                    <input type="checkbox" name={f.id} className="size-4 rounded border-slate-300" /> {f.label}
-                  </label>
-                ) : (
-                  <label key={f.id} className="block">
-                    <span className="label">
-                      {f.label} {f.required && "*"}
-                    </span>
-                    {f.type === "textarea" ? (
-                      <textarea name={f.id} rows={3} required={f.required} className="field" />
-                    ) : f.type === "select" ? (
-                      <SelectField name={f.id} required={f.required} placeholder="Elegí una opción" options={(f.options ?? []).map((o) => ({ value: o, label: o }))} />
-                    ) : (
-                      <input name={f.id} required={f.required} type={f.type === "phone" ? "tel" : f.type} className="field" />
-                    )}
-                  </label>
-                ),
-              )}
-              <SubmitButton className="w-full py-3" pendingText="Enviando…">
-                Enviar
-              </SubmitButton>
-            </ActionForm>
-          )}
-        </div>
-      </div>
-    </div>
+    <FormShell org={form.organization} title={form.title} description={form.description}>
+      {!form.active ? (
+        <p className="text-[15px] text-slate-600">Este formulario ya no recibe respuestas.</p>
+      ) : isPersonalForm(form.fields as FormField[]) ? (
+        <p className="text-[15px] text-slate-600">Este formulario se completa con el link personal que te mandó tu agente. Si no lo tenés, pedíselo.</p>
+      ) : (
+        <FormRenderer fields={form.fields as FormField[]} action={submitForm.bind(null, slug)} />
+      )}
+    </FormShell>
   );
 }

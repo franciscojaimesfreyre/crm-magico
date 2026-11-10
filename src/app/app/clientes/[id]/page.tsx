@@ -34,11 +34,13 @@ import { appUrl } from "@/lib/app-url";
 import { TravelerAvatar } from "@/components/traveler-avatar";
 import { resolveAvatar } from "@/lib/avatars";
 import { avatarImages } from "@/lib/avatars-server";
+import { FormRequestsPanel } from "@/app/app/formularios/requests-panel";
 
 const TABS = [
   { key: "viajes", label: "Viajes" },
   { key: "viajeros", label: "Viajeros" },
   { key: "accesos", label: "Accesos" },
+  { key: "formularios", label: "Formularios" },
   { key: "email", label: "Enviar email" },
   { key: "actividad", label: "Actividad" },
 ];
@@ -284,6 +286,8 @@ export default async function ClientPage({
               </ActionForm>
             </Card>
           )}
+
+          {tab === "formularios" && <FormRequestsPanel organizationId={user.organizationId} clientId={client.id} />}
 
           {tab === "actividad" && (
             <Card>

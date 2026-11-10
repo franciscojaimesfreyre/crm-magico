@@ -45,6 +45,9 @@ export default async function PortalProfile() {
               <Field label="Altura (cm)">
                 <Input type="number" name={`height-${t.id}`} defaultValue={t.heightCm ?? ""} min={30} max={250} />
               </Field>
+              <Field label="Vence el pasaporte" className="col-span-2 sm:col-start-2">
+                <DateInput name={`passport-${t.id}`} defaultValue={toDateInput(t.passportExpiry)} />
+              </Field>
             </div>
           ))}
           <div className="grid grid-cols-2 items-end gap-x-3 gap-y-2 border-t border-dashed border-slate-200 pt-4 sm:grid-cols-[minmax(0,1fr)_11rem_7rem]">

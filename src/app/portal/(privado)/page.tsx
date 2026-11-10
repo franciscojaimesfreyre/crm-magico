@@ -1,6 +1,6 @@
 import Link from "next/link";
 import CountUp from "@/components/CountUp";
-import { CalendarDays, ChevronRight, FileText, MessageCircle, Plus, Sparkles } from "lucide-react";
+import { CalendarDays, ChevronRight, ClipboardList, FileText, MessageCircle, Plus, Sparkles } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireClientAccount } from "@/lib/auth";
 import { Avatar, buttonClass } from "@/components/ui";
@@ -20,7 +20,7 @@ export default async function PortalHome() {
   const account = await requireClientAccount();
   const client = account.client;
   const today = todayUTC();
-  const [bookings, pendingQuotes] = await Promise.all([
+  const [bookings, pendingQuotes, pendingForms] = await Promise.all([
     db.booking.findMany({
       where: { clientId: client.id, status: { not: "CANCELLED" } },
       include: { items: { select: { type: true, status: true, description: true }, orderBy: { position: "asc" } } },
@@ -29,6 +29,11 @@ export default async function PortalHome() {
     db.quote.findMany({
       where: { booking: { clientId: client.id }, status: "SENT" },
       include: { booking: true },
+      orderBy: { sentAt: "desc" },
+    }),
+    db.formRequest.findMany({
+      where: { clientId: client.id, status: { not: "ANSWERED" } },
+      include: { form: { select: { title: true } }, booking: { select: { title: true } } },
       orderBy: { sentAt: "desc" },
     }),
   ]);
@@ -55,6 +60,22 @@ export default async function PortalHome() {
             <p className="font-semibold">Tenés una cotización nueva</p>
             <p className="truncate text-sm text-white/90">
               {q.title} · {DESTINATION_LABEL[q.booking.destination]}
+            </p>
+          </div>
+          <ChevronRight className="size-5" />
+        </Link>
+      ))}
+
+      {pendingForms.map((r) => (
+        <Link key={r.id} href={`/formulario/${r.token}`} className="flex items-center gap-4 rounded-2xl bg-sky-100 p-4 text-sky-950">
+          <span className="flex size-11 items-center justify-center rounded-xl bg-white/50">
+            <ClipboardList className="size-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold">Tenés un formulario para completar</p>
+            <p className="truncate text-sm opacity-80">
+              {r.form.title}
+              {r.booking && ` · ${r.booking.title}`}
             </p>
           </div>
           <ChevronRight className="size-5" />

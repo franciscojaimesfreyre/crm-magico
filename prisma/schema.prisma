@@ -21,6 +21,8 @@ model Organization {
   tagline               String?
   bio                   String?
   logoUrl               String?
+  /// Cuándo se crearon las automatizaciones de formularios por defecto (una sola vez: si se borran, no vuelven).
+  formWorkflowsSeededAt DateTime?
   primaryColor          String    @default("#0e7c70")
   contactEmail          String?
   contactPhone          String?
@@ -54,6 +56,7 @@ model Organization {
   commissionStatements CommissionStatement[]
   forms                Form[]
   avatarImages         AvatarImage[]
+  formRequests         FormRequest[]
 }
 
 enum UserRole {
@@ -176,6 +179,7 @@ model Client {
   activities      Activity[]
   contracts       Contract[]
   organizedGroups Group[]
+  formRequests    FormRequest[]
 
   @@index([organizationId])
 }
@@ -306,6 +310,8 @@ model Booking {
   clientNotes  String? // visibles para el cliente
   shareToken   String   @unique @default(cuid())
   cancelReason String?
+  /// Aviso de datos de viajeros descartado por el agente: guarda qué faltaba (si cambia, vuelve a aparecer).
+  travelerGapsDismissed String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -320,6 +326,8 @@ model Booking {
   activities   Activity[]
   contracts    Contract[]
   keyDatesDone KeyDateDone[]
+  formRequests FormRequest[]
+  formAnswers  FormSubmission[]
 
   @@unique([organizationId, code])
   @@index([organizationId, status])
@@ -1076,13 +1084,52 @@ model Form {
   updatedAt      DateTime     @updatedAt
 
   submissions FormSubmission[]
+  requests    FormRequest[]
 }
 
 model FormSubmission {
-  id        String   @id @default(cuid())
+  id        String       @id @default(cuid())
   formId    String
-  form      Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
+  form      Form         @relation(fields: [formId], references: [id], onDelete: Cascade)
   data      Json
   clientId  String?
-  createdAt DateTime @default(now())
+  /// Viaje al que corresponde (si se pidió desde un viaje).
+  bookingId String?
+  booking   Booking?     @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  /// Pedido personal del que salió (vacío si se respondió por el link público).
+  requestId String?      @unique
+  request   FormRequest? @relation(fields: [requestId], references: [id], onDelete: SetNull)
+  /// Cuándo el agente pasó las respuestas a la ficha y a los viajeros (no se aplican solas).
+  appliedAt DateTime?
+  createdAt DateTime     @default(now())
+}
+
+enum FormRequestStatus {
+  SENT
+  OPENED
+  ANSWERED
+}
+
+/// Un formulario pedido a un cliente puntual (y a un viaje, si corresponde), con su link personal.
+model FormRequest {
+  id             String            @id @default(cuid())
+  organizationId String
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  formId         String
+  form           Form              @relation(fields: [formId], references: [id], onDelete: Cascade)
+  clientId       String
+  client         Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  bookingId      String?
+  booking        Booking?          @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  token          String            @unique @default(cuid())
+  status         FormRequestStatus @default(SENT)
+  sentById       String?
+  sentAt         DateTime          @default(now())
+  openedAt       DateTime?
+  answeredAt     DateTime?
+  remindedAt     DateTime?
+  submission     FormSubmission?
+
+  @@index([clientId])
+  @@index([bookingId])
 }

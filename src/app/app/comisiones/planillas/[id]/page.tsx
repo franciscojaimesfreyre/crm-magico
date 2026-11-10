@@ -6,11 +6,12 @@ import { requireUser } from "@/lib/auth";
 import { ActionForm, ConfirmButton, SubmitButton } from "@/components/form-controls";
 import { Alert, Badge, Card, CardHeader, Field, Input, PageHeader, Table, Td, Textarea, Th, buttonClass } from "@/components/ui";
 import { DESTINATION_LABEL, ITEM_TYPE_LABEL, STATEMENT_STATUS_LABEL } from "@/lib/labels";
-import { formatDate, formatRange, money, toDateInput, toNumber } from "@/lib/format";
+import { formatDate, formatRange, money, toNumber } from "@/lib/format";
 import { loadStatement, statementTotals } from "@/lib/commissions";
 import {
   deleteStatement,
   emailStatement,
+  markStatementPaid,
   registerPayment,
   setStatementAgency,
   markStatementSent,
@@ -122,7 +123,6 @@ ${user.organization.name}`;
             <tr>
               <Th>Venta</Th>
               <Th>Reserva</Th>
-              <Th>Fecha de venta</Th>
               <Th>Viaje</Th>
               <Th className="text-right">Importe</Th>
               <Th className="text-right">Comisión</Th>
@@ -147,11 +147,11 @@ ${user.organization.name}`;
                       {b.code} · {DESTINATION_LABEL[b.destination]}
                     </p>
                   </Td>
-                  <Td className="min-w-64 text-xs">
+                  <Td className="min-w-52 text-xs">
                     <p className="text-sm text-slate-800">{r.description}</p>
                     <p className="text-slate-500">{[ITEM_TYPE_LABEL[r.type], r.supplier, r.confirmationNumber && `Conf. ${r.confirmationNumber}`].filter(Boolean).join(" · ")}</p>
+                    {r.saleDate && <p className="text-slate-500">Vendida el {formatDate(r.saleDate)}</p>}
                   </Td>
-                  <Td className="text-xs">{formatDate(r.saleDate)}</Td>
                   <Td className="text-xs whitespace-nowrap">{formatRange(b.startDate, b.endDate)}</Td>
                   <Td className="text-right whitespace-nowrap">{money(r.price, b.currency)}</Td>
                   <Td className="text-right font-medium whitespace-nowrap">
@@ -165,25 +165,34 @@ ${user.organization.name}`;
                     )}
                   </Td>
                   <Td className="print:hidden">
-                    <ActionForm action={updateStatementItem.bind(null, s.id, r.id)} className="flex flex-wrap items-center gap-2">
-                      <label className="flex items-center gap-1.5 text-xs">
-                        <input type="checkbox" name="paid" defaultChecked={paid} className="size-4 rounded border-slate-300 text-emerald-700" />
-                        Cobrada
-                      </label>
-                      <DateInput name="paidAt" defaultValue={toDateInput(r.commissionPaidAt)} className="w-36" size="sm" />
-                      <input
-                        type="number"
-                        step="0.01"
-                        name="amount"
-                        defaultValue={r.commissionPaidAmount?.toString() ?? ""}
-                        placeholder={toNumber(item.expectedAmount).toFixed(2)}
-                        className="field w-28 py-1 text-xs"
-                        title="Monto cobrado (vacío = el esperado)"
-                      />
-                      <SubmitButton size="sm" variant="secondary" pendingText="…">
-                        OK
-                      </SubmitButton>
-                    </ActionForm>
+                    {item.cancelledAt ? (
+                      <span className="text-xs text-slate-500">—</span>
+                    ) : paid ? (
+                      // Cobrada: se ve cuándo y cuánto, y se puede deshacer.
+                      <ActionForm action={updateStatementItem.bind(null, s.id, r.id)} className="flex flex-wrap items-center gap-2 text-xs">
+                        <span className="text-emerald-800">
+                          Cobrada el {formatDate(r.commissionPaidAt)} · {money(r.commissionPaidAmount ?? item.expectedAmount, b.currency)}
+                        </span>
+                        <SubmitButton size="sm" variant="ghost" pendingText="…">
+                          Deshacer
+                        </SubmitButton>
+                      </ActionForm>
+                    ) : (
+                      // Un solo botón: marca cobrada por lo esperado y hoy; otro monto o fecha, plegado.
+                      <ActionForm action={updateStatementItem.bind(null, s.id, r.id)} className="flex min-w-36 flex-col items-start gap-1.5">
+                        <input type="hidden" name="paid" value="on" />
+                        <SubmitButton size="sm" variant="secondary" pendingText="…" className="whitespace-nowrap">
+                          Marcar cobrada
+                        </SubmitButton>
+                        <details className="text-xs">
+                          <summary className="cursor-pointer whitespace-nowrap text-brand-700 hover:underline">Otro monto o fecha</summary>
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <DateInput name="paidAt" className="w-36" size="sm" />
+                            <input type="number" step="0.01" name="amount" placeholder={toNumber(item.expectedAmount).toFixed(2)} className="field w-28 py-1 text-xs" title="Monto cobrado (vacío = el esperado)" />
+                          </div>
+                        </details>
+                      </ActionForm>
+                    )}
                   </Td>
                   <Td className="hidden text-xs print:table-cell">{paid ? `Cobrada ${formatDate(r.commissionPaidAt)}` : "Pendiente"}</Td>
                   <Td className="print:hidden">
@@ -244,6 +253,12 @@ ${user.organization.name}`;
                     </div>
                   </ActionForm>
                 </div>
+              )}
+              {s.status !== "PAID" && (
+                <form action={markStatementPaid.bind(null, s.id)} className="border-t border-slate-100 pt-4">
+                  <p className="mb-2 text-xs text-slate-500">Si la agencia pagó todo lo reclamado, marcá la planilla completa de una vez (por el total esperado y con fecha de hoy).</p>
+                  <SubmitButton variant="secondary">Marcar todas las comisiones como cobradas</SubmitButton>
+                </form>
               )}
               {s.payments.length > 0 && (
                 <div>

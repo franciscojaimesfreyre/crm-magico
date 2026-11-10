@@ -30,7 +30,7 @@ export default async function CommissionsPage({ searchParams }: { searchParams: 
     <>
       <PageHeader
         title="Comisiones"
-        description={`Qué podés pedir, qué espera pago y cuándo vas a cobrar${agency ? ` de ${agency.name}` : ""}.`}
+        description={`Qué podés presentar, qué espera pago y cuándo vas a cobrar${agency ? ` de ${agency.name}` : ""}.`}
         actions={
           <div className="flex flex-wrap gap-2">
             <div className="flex rounded-full bg-white p-1 ring-1 ring-[var(--border)]">
@@ -47,9 +47,11 @@ export default async function CommissionsPage({ searchParams }: { searchParams: 
                 </Link>
               ))}
             </div>
-            <LinkButton href="/app/comisiones/planillas" variant="secondary">
-              <History className="size-4" /> Planillas
-            </LinkButton>
+            {vista === "todas" && (
+              <LinkButton href="/app/comisiones/planillas" variant="secondary">
+                <History className="size-4" /> Planillas
+              </LinkButton>
+            )}
           </div>
         }
       />

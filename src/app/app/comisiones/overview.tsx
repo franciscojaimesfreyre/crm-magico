@@ -2,7 +2,7 @@ import Link from "next/link";
 import clsx from "clsx";
 import { AlertTriangle, ChevronRight, FileSpreadsheet } from "lucide-react";
 import { SubmitButton } from "@/components/form-controls";
-import { Badge, Card, CardHeader, StatCard, StatStrip } from "@/components/ui";
+import { Badge, Card, CardHeader, LinkButton, StatCard, StatStrip } from "@/components/ui";
 import { DESTINATION_LABEL } from "@/lib/labels";
 import { daysBetween, formatDate, money, todayUTC } from "@/lib/format";
 import { DEFAULT_PAYMENT_TERM_DAYS, commissionOverview, openStatements } from "@/lib/commissions";
@@ -50,7 +50,7 @@ export async function CommissionsOverview({ organizationId, agency }: { organiza
           label="Por cobrar"
           value={money(main.owed, mainCurrency)}
           tone={main.owed > 0 ? "warn" : "default"}
-          hint={`${money(main.ready, mainCurrency)} para pedir · ${money(main.waiting, mainCurrency)} en planillas`}
+          hint={`${money(main.ready, mainCurrency)} para presentar · ${money(main.waiting, mainCurrency)} en planillas`}
         />
       </StatStrip>
       {totals.size > 1 && (
@@ -65,18 +65,14 @@ export async function CommissionsOverview({ organizationId, agency }: { organiza
 
       <Card>
         <CardHeader
-          title={`Para pedir · ${ready.length}`}
-          description={`Viajes que ya terminaron y todavía no están en ninguna planilla. Generá la planilla${agency ? ` para ${agency.name}` : ""} y mandala.`}
+          title={`Planillas activas · ${statements.length}`}
+          description={`Lo que ya reclamaste (o vas a reclamar) y falta cobrar. ${agency?.name ?? "La agencia"} suele pagar a los ${term} días.`}
+          actions={
+            <LinkButton href="/app/comisiones/planillas" variant="secondary" size="sm">
+              Ver todas las planillas
+            </LinkButton>
+          }
         />
-        {ready.length === 0 ? (
-          <p className="px-5 pb-5 text-sm text-slate-500">No hay nada para pedir ahora.</p>
-        ) : (
-          <SelectableRows rows={ready} today={today} checked submitLabel={`Generar planilla con las elegidas`} />
-        )}
-      </Card>
-
-      <Card>
-        <CardHeader title={`En planillas · ${statements.length}`} description={`Lo que ya reclamaste (o vas a reclamar) y falta cobrar. ${agency?.name ?? "La agencia"} suele pagar a los ${term} días.`} />
         {statements.length === 0 ? (
           <p className="px-5 pb-5 text-sm text-slate-500">No hay planillas esperando pago.</p>
         ) : (
@@ -94,7 +90,7 @@ export async function CommissionsOverview({ organizationId, agency }: { organiza
                     </p>
                     {o.repeated > 0 && (
                       <p className="text-xs font-medium text-rose-700">
-                        {o.repeated} {o.repeated === 1 ? "reserva también está" : "reservas también están"} en otra planilla: quitala{o.repeated === 1 ? "" : "s"} de una
+                        {o.repeated === 1 ? "1 reserva también figura" : `${o.repeated} reservas también figuran`} en otra planilla. Conviene quitar{o.repeated === 1 ? "la" : "las"} de una de las dos para no reclamar{o.repeated === 1 ? "la" : "las"} dos veces.
                       </p>
                     )}
                   </div>
@@ -120,6 +116,18 @@ export async function CommissionsOverview({ organizationId, agency }: { organiza
         )}
       </Card>
 
+      <Card>
+        <CardHeader
+          title={`Comisiones listas para presentar · ${ready.length}`}
+          description={`Viajes que ya terminaron y todavía no están en ninguna planilla. Generá la planilla${agency ? ` para ${agency.name}` : ""} y mandala.`}
+        />
+        {ready.length === 0 ? (
+          <p className="px-5 pb-5 text-sm text-slate-500">No hay comisiones para presentar ahora.</p>
+        ) : (
+          <SelectableRows rows={ready} today={today} checked submitLabel={`Generar planilla con las elegidas`} />
+        )}
+      </Card>
+
       {months.length > 0 && (
         <Card>
           <CardHeader title="Cuándo vas a cobrar" description={`Estimado con el plazo de pago de la agencia (${term} días desde que recibe la planilla o termina el viaje).`} />
@@ -137,7 +145,7 @@ export async function CommissionsOverview({ organizationId, agency }: { organiza
       {upcoming.length > 0 && (
         <details className="rounded-2xl border border-[var(--border)] bg-white">
           <summary className="cursor-pointer px-5 py-4 text-sm font-medium text-slate-800">
-            Todavía no se pueden pedir · {upcoming.length} (el viaje no terminó) · {money(upcoming.filter((r) => r.currency === mainCurrency).reduce((t, r) => t + r.owed, 0), mainCurrency)}
+            Todavía no se pueden presentar · {upcoming.length} (el viaje no terminó) · {money(upcoming.filter((r) => r.currency === mainCurrency).reduce((t, r) => t + r.owed, 0), mainCurrency)}
           </summary>
           <p className="px-5 text-xs text-slate-500">Si tu agencia paga al vender y no después del viaje, podés incluirlas en una planilla igual.</p>
           <SelectableRows rows={upcoming} today={today} submitLabel="Generar planilla con las elegidas" />

@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { parseDateInput, todayUTC, toNumber } from "@/lib/format";
-import { buildStatementWorkbook, loadStatement, refreshStatementStatus, registerStatementPayment, statementFilename } from "@/lib/commissions";
+import { buildStatementWorkbook, loadStatement, refreshStatementStatus, registerStatementPayment, statementFilename, statementTotals } from "@/lib/commissions";
 import { sendEmail } from "@/lib/email";
 import { logActivity } from "@/lib/events";
 import type { ActionState } from "@/components/form-controls";
@@ -120,6 +120,17 @@ export async function registerPayment(statementId: string, _: ActionState, formD
   await logActivity({ organizationId: user.organizationId, userId: user.id, type: "commission", description: `Pago de comisiones registrado: ${amount.toFixed(2)}` });
   revalidatePath("/app/comisiones", "layout");
   return { ok: "Pago registrado y repartido entre las reservas" };
+}
+
+/** La agencia pagó todo lo reclamado: se registra un pago por lo que falta, con fecha de hoy. */
+export async function markStatementPaid(statementId: string) {
+  const user = await requireUser();
+  const s = await loadStatement(statementId, user.organizationId);
+  if (!s) return;
+  const owed = statementTotals(s).reduce((t, x) => t + x.pending, 0);
+  if (owed > 0) await registerStatementPayment(statementId, user.organizationId, { amount: Math.round(owed * 100) / 100, paidAt: todayUTC(), reference: "Marcada como cobrada completa" });
+  await logActivity({ organizationId: user.organizationId, userId: user.id, type: "commission", description: "Planilla de comisiones marcada como cobrada completa" });
+  revalidatePath("/app/comisiones", "layout");
 }
 
 /** Asigna la agencia actual a una planilla creada sin agencia. */

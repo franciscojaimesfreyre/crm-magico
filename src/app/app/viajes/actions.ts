@@ -159,6 +159,8 @@ function itemFields(formData: FormData) {
     saleDate: saleDate ?? (status === "CONFIRMED" ? todayUTC() : null),
     // El estado del cobro no se edita acá: se registra en Comisiones.
     ...commissionFromForm(formData),
+    // Parte del agente para esta reserva (vacío = la de la agencia). Solo llega si la agencia es propia.
+    ...(formData.has("agentSharePercent") ? { agentSharePercent: sharePct(formData.get("agentSharePercent")) } : {}),
     commissionNotes: str(formData, "commissionNotes"),
   };
 }
@@ -482,4 +484,11 @@ export async function saveTripNotes(bookingId: string, _: ActionState, formData:
   await db.booking.update({ where: { id: bookingId }, data: { notes: str(formData, "notes") } });
   revalidatePath(`/app/viajes/${bookingId}`);
   return { ok: "Notas guardadas" };
+}
+
+/** Parte del agente (%) de la comisión del proveedor; vacío = la de la agencia. */
+function sharePct(v: FormDataEntryValue | null) {
+  const raw = String(v ?? "").trim().replace(",", ".");
+  const n = Number(raw);
+  return raw && Number.isFinite(n) && n >= 0 && n <= 100 ? n : null;
 }

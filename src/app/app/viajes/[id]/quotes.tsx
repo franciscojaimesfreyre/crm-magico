@@ -22,7 +22,7 @@ import {
 import { ItemFields } from "./item-fields";
 import { QuoteMessageEditor } from "./quote-message";
 import type { LoadedBooking } from "./data";
-import { commissionFor } from "@/lib/trips";
+import { commissionFor, sharePercentOf } from "@/lib/trips";
 import { DateInput } from "@/components/date-input";
 import { MultiFileUpload } from "@/components/file-upload";
 import { AttachmentChips } from "@/components/attachment-chips";
@@ -254,7 +254,9 @@ function OptionBlock({
 }) {
   const directUpload = storageMode() === "r2";
   const total = o.items.reduce((s, i) => s + toNumber(i.price), 0);
-  const commission = o.items.reduce((s, i) => s + commissionFor(i, defaultRate), 0);
+  // Tu parte de la comisión (si la agencia host retiene un %); la del proveedor, chica.
+  const providerCommission = o.items.reduce((s, i) => s + commissionFor(i, defaultRate), 0);
+  const commission = Math.round(providerCommission * sharePercentOf({}, b.organization.agency?.agentSharePercent)) / 100;
   const accepted = q.acceptedOptionId === o.id;
   const dimmed = q.status === "ACCEPTED" && !accepted;
   const single = q.options.length === 1;
@@ -356,7 +358,10 @@ function OptionBlock({
         )}
         <p className="ml-auto text-right">
           <span className="font-semibold text-slate-900 tabular-nums">{money(total, b.currency)}</span>
-          <span className="block text-xs text-emerald-700">Comisión {money(commission, b.currency)}</span>
+          <span className="block text-xs text-emerald-700">
+            Tu comisión {money(commission, b.currency)}
+            {providerCommission > commission + 0.005 && <span className="text-slate-400"> de {money(providerCommission, b.currency)}</span>}
+          </span>
         </p>
       </div>
     </div>

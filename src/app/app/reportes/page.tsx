@@ -2,6 +2,7 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { receivedOf } from "@/lib/commissions";
+import { agentShareOf } from "@/lib/trips";
 import { Card, CardHeader, PageHeader, StatCard, StatStrip, Table, Td, buttonClass } from "@/components/ui";
 import { BarList, ColumnChart } from "@/components/charts";
 import { BOOKING_STATUS_LABEL, DESTINATION_LABEL, ITEM_TYPE_LABEL, PIPELINE } from "@/lib/labels";
@@ -59,7 +60,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     bookingId: i.bookingId,
     saleDate: i.saleDate!,
     totalPrice: i.price,
-    commissionAmount: i.commissionAmount,
+    // Tu parte (la agencia host puede retener un %); la del proveedor, aparte.
+    commissionAmount: agentShareOf(i, user.organization.agency?.agentSharePercent),
+    providerAmount: i.commissionAmount,
     destination: i.booking.destination,
     client: i.booking.client,
     supplier: i.supplier?.trim() || "Sin proveedor",
@@ -68,6 +71,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const trips = new Set(sold.map((x) => x.bookingId)).size;
   const revenue = sold.reduce((s, b) => s + toNumber(b.totalPrice), 0);
   const commission = sold.reduce((s, b) => s + toNumber(b.commissionAmount), 0);
+  const providerTotal = sold.reduce((s, b) => s + toNumber(b.providerAmount), 0);
   const createdActive = created.filter((b) => b.status !== "CANCELLED");
   const converted = createdActive.filter((b) => SOLD.includes(b.status)).length;
   const conversion = createdActive.length ? Math.round((converted / createdActive.length) * 100) : 0;
@@ -121,7 +125,12 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
       <StatStrip className="mb-6">
         <StatCard label="Vendido" value={money(revenue, currency)} hint={`${sold.length} reservas en ${trips} viajes`} />
-        <StatCard label="Comisión ganada" value={money(commission, currency)} tone="good" hint={`Cobrado en ${year}: ${money(collected, currency)}`} />
+        <StatCard
+          label="Tu comisión ganada"
+          value={money(commission, currency)}
+          tone="good"
+          hint={`Cobrado en ${year}: ${money(collected, currency)}${providerTotal > commission + 0.005 ? ` · proveedores ${money(providerTotal, currency)}` : ""}`}
+        />
         <StatCard label="Promedio por viaje" value={money(trips ? revenue / trips : 0, currency)} />
         <StatCard label="Conversión" value={`${conversion}%`} hint={`${converted} de ${createdActive.length} consultas del año`} />
         <StatCard label="Clientes nuevos" value={clientsNew} />

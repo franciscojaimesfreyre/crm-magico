@@ -10,6 +10,8 @@ import { storageMode } from "@/lib/storage";
 import type { ItemType } from "@/generated/prisma/enums";
 import { addBookingItem, deleteBookingItem, payReservationDeposit, quickItemAction, updateBookingItem } from "../actions";
 import { ReservationForm } from "./reservation-form";
+import { agentShareOf } from "@/lib/trips";
+import { isPlatformAgency } from "@/lib/agencies";
 import { AttachmentChips } from "@/components/attachment-chips";
 import { ReservationPayments } from "./payments";
 import { TripDatesGuard, type TravelerOption } from "./reservation-extras";
@@ -127,6 +129,7 @@ export function Items({
               travelers={travelerOptions}
               selectedTravelers={tripTravelers}
               directUpload={directUpload}
+              agencyShare={{ percent: b.organization.agency?.agentSharePercent ? Number(b.organization.agency.agentSharePercent) : null, editable: !isPlatformAgency(b.organization.agency) }}
               submitLabel="Agregar reserva"
             />
           </div>
@@ -207,7 +210,16 @@ function ItemCard({
         {/* La comisión, plegada: se sigue en Comisiones. */}
         <details className="group ml-auto text-right open:basis-full open:text-left">
           <summary className="cursor-pointer list-none text-xs text-slate-500 hover:text-slate-800">
-            Comisión <span className="font-semibold text-emerald-700">{money(item.commissionAmount, b.currency)}</span> · {COMMISSION_STATUS_LABEL[item.commissionStatus]}
+            {(() => {
+              const mine = agentShareOf(item, b.organization.agency?.agentSharePercent);
+              const provider = Number(item.commissionAmount);
+              return (
+                <>
+                  Tu comisión <span className="font-semibold text-emerald-700">{money(mine, b.currency)}</span>
+                  {provider > mine + 0.005 && <span className="text-slate-400"> de {money(provider, b.currency)}</span>} · {COMMISSION_STATUS_LABEL[item.commissionStatus]}
+                </>
+              );
+            })()}
           </summary>
           <p className="mt-2 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
             {item.commissionFixed !== null ? "Monto fijo" : `${percent(item.commissionRate ?? defaultRate)} sobre el importe${item.taxAmount !== null ? " sin tax" : ""}`}
@@ -231,6 +243,7 @@ function ItemCard({
               travelers={travelerOptions}
               selectedTravelers={item.travelers.map((t) => t.travelerId)}
               directUpload={directUpload}
+              agencyShare={{ percent: b.organization.agency?.agentSharePercent ? Number(b.organization.agency.agentSharePercent) : null, editable: !isPlatformAgency(b.organization.agency) }}
               documents={item.documents}
               submitLabel="Guardar reserva"
             />

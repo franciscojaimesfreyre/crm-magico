@@ -33,12 +33,12 @@ export default async function AgencyDashboard({ searchParams }: { searchParams: 
     );
   }
 
-  const total = summarize(sales);
+  const total = summarize(sales, user.agency.agentSharePercent);
   const byAgent = agents
-    .map((a) => ({ agent: a, ...summarize(sales.filter((s) => s.organizationId === a.id)) }))
+    .map((a) => ({ agent: a, ...summarize(sales.filter((s) => s.organizationId === a.id), user.agency.agentSharePercent) }))
     .sort((a, b) => b.revenue - a.revenue);
   const byMonth = MONTHS.map((label, i) => {
-    const value = summarize(sales.filter((s) => s.saleDate!.getUTCMonth() === i)).revenue;
+    const value = summarize(sales.filter((s) => s.saleDate!.getUTCMonth() === i), user.agency.agentSharePercent).revenue;
     return { label, value, display: money(value, currency) };
   });
   const destinations = new Map<string, number>();
@@ -63,9 +63,9 @@ export default async function AgencyDashboard({ searchParams }: { searchParams: 
 
       <StatStrip className="mb-6">
         <StatCard label="Vendido" value={money(total.revenue, currency)} hint={`${total.count} ventas`} />
-        <StatCard label="Comisiones" value={money(total.commission, currency)} />
-        <StatCard label="Ya pagadas" value={money(total.paid, currency)} tone="good" />
-        <StatCard label="Por pagar" value={money(total.pending, currency)} tone={total.pending > 0 ? "warn" : "default"} />
+        <StatCard label="Comisiones de proveedores" value={money(total.commission, currency)} hint={total.retained > 0.005 ? `Retenés ${money(total.retained, currency)} · a los agentes ${money(total.toAgents, currency)}` : undefined} />
+        <StatCard label="Ya transferido a agentes" value={money(total.paid, currency)} tone="good" />
+        <StatCard label="Falta transferir" value={money(total.pending, currency)} tone={total.pending > 0 ? "warn" : "default"} />
         <StatCard label="Agentes" value={agents.length} hint={`${byAgent.filter((a) => a.count > 0).length} con ventas en ${year}`} />
       </StatStrip>
 
@@ -78,8 +78,9 @@ export default async function AgencyDashboard({ searchParams }: { searchParams: 
               <Th className="text-right">Ventas</Th>
               <Th className="text-right">Vendido</Th>
               <Th className="text-right">Comisión</Th>
-              <Th className="text-right">Pagada</Th>
-              <Th className="text-right">Por pagar</Th>
+              <Th className="text-right">Retenés</Th>
+              <Th className="text-right">Transferido</Th>
+              <Th className="text-right">Falta transferir</Th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -96,6 +97,7 @@ export default async function AgencyDashboard({ searchParams }: { searchParams: 
                 <Td className="text-right tabular-nums">{t.count}</Td>
                 <Td className="text-right tabular-nums">{money(t.revenue, currency)}</Td>
                 <Td className="text-right tabular-nums">{money(t.commission, currency)}</Td>
+                <Td className="text-right tabular-nums text-slate-600">{money(t.retained, currency)}</Td>
                 <Td className="text-right tabular-nums text-emerald-700">{money(t.paid, currency)}</Td>
                 <Td className="text-right tabular-nums">{t.pending > 0 ? <span className="text-amber-700">{money(t.pending, currency)}</span> : "—"}</Td>
               </tr>

@@ -1,3 +1,4 @@
+import { AgentShareField } from "./share-field";
 import { Building2 } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { ActionForm, ConfirmButton, SubmitButton } from "@/components/form-controls";
@@ -106,6 +107,13 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                 <dd className="text-slate-800">{agency!.defaultCommissionRate !== null ? percent(agency!.defaultCommissionRate) : `${percent(org.defaultCommissionRate)} (la tuya)`}</dd>
               </div>
               <div>
+                <dt className="text-xs text-slate-500">Tu parte de la comisión</dt>
+                <dd className="text-slate-800">
+                  {agency!.agentSharePercent !== null ? `${percent(agency!.agentSharePercent)} (la agencia retiene ${100 - Number(agency!.agentSharePercent)} %)` : "100 % (no retiene nada)"}
+                  <span className="block text-xs text-slate-500">Definido por tu agencia</span>
+                </dd>
+              </div>
+              <div>
                 <dt className="text-xs text-slate-500">Plazo de pago</dt>
                 <dd className="text-slate-800">{agency!.paymentTermDays ?? 30} días</dd>
               </div>
@@ -130,6 +138,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                 <Field label="Nombre">
                   <Input name="name" defaultValue={agency?.name} placeholder="Ej: Agencia Madre Travel" required />
                 </Field>
+                <AgentShareField defaultValue={agency?.agentSharePercent?.toString() ?? ""} providerRate={Number(agency?.defaultCommissionRate ?? org.defaultCommissionRate)} />
                 <Field label="Plazo de pago (días)" hint="Cuántos días suele tardar en pagar una planilla. Vacío = 30.">
                   <Input name="paymentTermDays" type="number" min={1} max={365} defaultValue={agency?.paymentTermDays ?? ""} />
                 </Field>

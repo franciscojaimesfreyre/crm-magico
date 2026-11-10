@@ -8,10 +8,12 @@ import { Alert, Badge, Card, CardHeader, Field, Input, PageHeader, Table, Td, Te
 import { DESTINATION_LABEL, ITEM_TYPE_LABEL, STATEMENT_STATUS_LABEL } from "@/lib/labels";
 import { formatDate, formatRange, money, toNumber } from "@/lib/format";
 import { loadStatement, statementTotals } from "@/lib/commissions";
+import { sharePercentOf } from "@/lib/trips";
 import {
   deleteStatement,
   emailStatement,
   markStatementPaid,
+  recalcStatement,
   registerPayment,
   setStatementAgency,
   markStatementSent,
@@ -92,6 +94,14 @@ ${user.organization.name}`;
           </Alert>
         )}
         {!s.sentAt && <Alert tone="warn">Todavía no la enviaste: las comisiones quedan sin solicitar hasta que la mandes a la agencia.</Alert>}
+        {!s.sentAt && s.items.some((i) => !i.cancelledAt && toNumber(i.agentSharePercent ?? 100) !== sharePercentOf(i.bookingItem, user.organization.agency?.agentSharePercent)) && (
+          <Alert tone="info">
+            El reparto con la agencia cambió desde que generaste esta planilla.{" "}
+            <form action={recalcStatement.bind(null, s.id)} className="inline">
+              <button className="font-medium underline">Recalcular con el reparto actual</button>
+            </form>
+          </Alert>
+        )}
       </div>
 
       <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -99,8 +109,13 @@ ${user.organization.name}`;
           <Card key={t.currency} className="p-4 sm:col-span-3">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div>
-                <p className="text-xs text-slate-500">Comisión reclamada ({t.currency})</p>
+                <p className="text-xs text-slate-500">A transferir: tu comisión ({t.currency})</p>
                 <p className="text-2xl font-semibold">{money(t.expected, t.currency)}</p>
+                {t.provider > t.expected + 0.005 && (
+                  <p className="text-xs text-slate-500">
+                    De {money(t.provider, t.currency)} que pagan los proveedores · la agencia retiene {money(t.provider - t.expected, t.currency)}
+                  </p>
+                )}
               </div>
               <div>
                 <p className="text-xs text-slate-500">Cobrado</p>
@@ -125,7 +140,7 @@ ${user.organization.name}`;
               <Th>Reserva</Th>
               <Th>Viaje</Th>
               <Th className="text-right">Importe</Th>
-              <Th className="text-right">Comisión</Th>
+              <Th className="text-right">Tu comisión</Th>
               <Th className="print:hidden">Cobro</Th>
               <Th className="hidden print:table-cell">Estado</Th>
               <Th className="print:hidden" />
@@ -156,6 +171,11 @@ ${user.organization.name}`;
                   <Td className="text-right whitespace-nowrap">{money(r.price, b.currency)}</Td>
                   <Td className="text-right font-medium whitespace-nowrap">
                     <span className={clsx(item.cancelledAt && "line-through")}>{money(item.expectedAmount, b.currency)}</span>
+                    {item.providerAmount && toNumber(item.providerAmount) > toNumber(item.expectedAmount) + 0.005 && (
+                      <p className="text-[11px] font-normal text-slate-500">
+                        {toNumber(item.agentSharePercent ?? 100)} % de {money(item.providerAmount, b.currency)}
+                      </p>
+                    )}
                     {item.cancelledAt && <p className="text-[11px] font-normal text-rose-700">{paid || partial ? "Cancelada: a devolver" : "Cancelada: no cuenta"}</p>}
                     {partial && !item.cancelledAt && <p className="text-[11px] font-normal text-amber-700">Cobrado {money(r.commissionPaidAmount, b.currency)}</p>}
                     {!item.cancelledAt && r.statementItems.some((x) => x.statementId !== s.id) && (

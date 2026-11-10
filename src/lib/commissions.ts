@@ -5,6 +5,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import type { CommissionStatus } from "@/generated/prisma/enums";
 import { COMMISSION_STATUS_LABEL, DESTINATION_LABEL, ITEM_TYPE_LABEL } from "@/lib/labels";
 import { formatDate, parseDateInput, toNumber } from "@/lib/format";
+import { agentShareOf } from "@/lib/trips";
 
 export type CommissionFilters = {
   desde?: string;
@@ -84,12 +85,13 @@ export async function refreshStatementStatus(statementId: string) {
 }
 
 export function statementTotals(s: LoadedStatement) {
-  const byCurrency = new Map<string, { expected: number; received: number; pending: number }>();
+  const byCurrency = new Map<string, { expected: number; received: number; pending: number; provider: number }>();
   for (const row of s.items) {
     if (row.cancelledAt) continue;
     const cur = row.bookingItem.booking.currency;
-    const t = byCurrency.get(cur) ?? { expected: 0, received: 0, pending: 0 };
+    const t = byCurrency.get(cur) ?? { expected: 0, received: 0, pending: 0, provider: 0 };
     const expected = toNumber(row.expectedAmount);
+    t.provider += toNumber(row.providerAmount ?? row.expectedAmount);
     const received = receivedOf(row.bookingItem, expected);
     t.expected += expected;
     t.received += received;
@@ -108,7 +110,7 @@ export function statementFilename(s: LoadedStatement, ext: string) {
 export async function buildStatementWorkbook(s: LoadedStatement) {
   const wb = new ExcelJS.Workbook();
   wb.creator = s.organization.name;
-  const ws = wb.addWorksheet("Comisiones", { views: [{ state: "frozen", ySplit: 7 }] });
+  const ws = wb.addWorksheet("Comisiones", { views: [{ state: "frozen", ySplit: 8 }] });
 
   ws.mergeCells("A1:O1");
   ws.getCell("A1").value = "Planilla de comisiones";
@@ -125,24 +127,32 @@ export async function buildStatementWorkbook(s: LoadedStatement) {
     ws.getCell(`B${i + 2}`).value = v;
   });
 
+  // Reparto con la agencia: comisión del proveedor, % del agente, retención y lo que hay que transferir.
+  const shares = [...new Set(s.items.map((l) => toNumber(l.agentSharePercent ?? 100)))];
+  ws.getCell("A6").value = "Reparto";
+  ws.getCell("A6").font = { bold: true };
+  ws.getCell("B6").value = shares.length === 1 ? `${shares[0]} % agente / ${100 - shares[0]} % agencia` : "Varía por reserva (ver columnas)";
+
   const headers = [
     "Viaje", "Cliente", "Destino", "Reserva", "Proveedor", "Confirmación", "Fecha de venta", "Desde", "Hasta",
-    "Moneda", "Importe", "% comisión", "Comisión", "Estado", "Cobrada el",
+    "Moneda", "Importe", "Comisión del proveedor", "% agente", "Retención agencia", "A transferir", "Estado", "Cobrada el",
   ];
-  const headerRow = ws.getRow(7);
+  const headerRow = ws.getRow(8);
   headerRow.values = headers;
   headerRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
   headerRow.eachCell((c) => {
-    c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF6D28D9" } };
+    c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0A4F48" } };
     c.alignment = { vertical: "middle", wrapText: true };
   });
 
-  let row = 8;
+  let row = 9;
   for (const line of s.items) {
+    if (line.cancelledAt) continue;
     const r = line.bookingItem;
     const b = r.booking;
     const price = toNumber(r.price);
-    const commission = toNumber(line.expectedAmount);
+    const toTransfer = toNumber(line.expectedAmount);
+    const provider = toNumber(line.providerAmount ?? line.expectedAmount);
     ws.getRow(row).values = [
       b.code,
       `${b.client.firstName} ${b.client.lastName}`,
@@ -155,8 +165,10 @@ export async function buildStatementWorkbook(s: LoadedStatement) {
       r.endDate ?? b.endDate ?? null,
       b.currency,
       price,
-      price ? commission / price : null,
-      commission,
+      provider,
+      toNumber(line.agentSharePercent ?? 100) / 100,
+      Math.round((provider - toTransfer) * 100) / 100,
+      toTransfer,
       COMMISSION_STATUS_LABEL[r.commissionStatus],
       r.commissionPaidAt ?? null,
     ];
@@ -164,16 +176,16 @@ export async function buildStatementWorkbook(s: LoadedStatement) {
     row++;
   }
   const last = row - 1;
-  if (s.items.length) {
-    ws.getRow(row).values = ["Total", "", "", "", "", "", "", "", "", "", { formula: `SUM(K8:K${last})` }, "", { formula: `SUM(M8:M${last})` }];
+  if (row > 9) {
+    ws.getRow(row).values = ["Total", "", "", "", "", "", "", "", "", "", { formula: `SUM(K9:K${last})` }, { formula: `SUM(L9:L${last})` }, "", { formula: `SUM(N9:N${last})` }, { formula: `SUM(O9:O${last})` }];
     ws.getRow(row).font = { bold: true };
   }
 
-  const widths = [10, 24, 20, 40, 20, 16, 13, 13, 13, 8, 13, 11, 13, 12, 13];
+  const widths = [10, 24, 20, 40, 20, 16, 13, 13, 13, 8, 13, 14, 9, 14, 14, 12, 13];
   widths.forEach((w, i) => (ws.getColumn(i + 1).width = w));
-  for (const col of [7, 8, 9, 15]) ws.getColumn(col).numFmt = "dd/mm/yyyy";
-  for (const col of [11, 13]) ws.getColumn(col).numFmt = "#,##0.00";
-  ws.getColumn(12).numFmt = "0.0%";
+  for (const col of [7, 8, 9, 17]) ws.getColumn(col).numFmt = "dd/mm/yyyy";
+  for (const col of [11, 12, 14, 15]) ws.getColumn(col).numFmt = "#,##0.00";
+  ws.getColumn(13).numFmt = "0%";
 
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
@@ -192,6 +204,7 @@ export type CommissionStage = "ready" | "upcoming" | "draft" | "waiting" | "paid
  * en una planilla sin enviar, esperando el pago (planilla enviada) o cobradas.
  */
 export async function commissionOverview(organizationId: string) {
+  const agencyPercent = (await db.organization.findUnique({ where: { id: organizationId }, select: { agency: { select: { agentSharePercent: true } } } }))?.agency?.agentSharePercent;
   const today = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate()));
   const items = await db.bookingItem.findMany({
     where: { status: "CONFIRMED", booking: { organizationId, status: { not: "CANCELLED" } } },
@@ -202,25 +215,30 @@ export async function commissionOverview(organizationId: string) {
     orderBy: [{ booking: { endDate: { sort: "asc", nulls: "last" } } }, { position: "asc" }],
   });
   const rows = items.map((i) => {
-    const statement = i.statementItems.map((x) => x.statement).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0] ?? null;
-    const expected = toNumber(i.commissionAmount);
+    const line = [...i.statementItems].sort((a, b) => b.statement.createdAt.getTime() - a.statement.createdAt.getTime())[0];
+    const statement = line?.statement ?? null;
+    // Lo que le toca al agente: el monto congelado en su planilla o, si no está en ninguna, el reparto de hoy.
+    const provider = toNumber(i.commissionAmount);
+    const expected = line ? toNumber(line.expectedAmount) : agentShareOf(i, agencyPercent);
     const received = receivedOf(i, expected);
     const ended = !!i.booking.endDate && i.booking.endDate < today;
     const stage: CommissionStage =
       i.commissionStatus === "PAID" ? "paid" : statement ? (statement.sentAt ? "waiting" : "draft") : ended ? "ready" : "upcoming";
-    return { item: i, statement, expected, received, owed: Math.max(0, expected - received), ended, stage, currency: i.booking.currency };
+    return { item: i, statement, provider, expected, received, owed: Math.max(0, expected - received), ended, stage, currency: i.booking.currency };
   });
-  const totals = new Map<string, { earned: number; received: number; owed: number; ready: number; waiting: number }>();
+  const totals = new Map<string, { earned: number; received: number; owed: number; ready: number; waiting: number; provider: number }>();
   for (const r of rows) {
-    const t = totals.get(r.currency) ?? { earned: 0, received: 0, owed: 0, ready: 0, waiting: 0 };
+    const t = totals.get(r.currency) ?? { earned: 0, received: 0, owed: 0, ready: 0, waiting: 0, provider: 0 };
     t.earned += r.expected;
+    t.provider += r.provider;
     t.received += r.received;
     t.owed += r.owed;
     if (r.stage === "ready") t.ready += r.owed;
     if (r.stage === "waiting" || r.stage === "draft") t.waiting += r.owed;
     totals.set(r.currency, t);
   }
-  return { rows, totals };
+  const sharePercent = agencyPercent === null || agencyPercent === undefined ? 100 : toNumber(agencyPercent);
+  return { rows, totals, sharePercent };
 }
 
 /** Planillas que todavía esperan plata, con cuántos días llevan y cuándo se espera el pago. */
@@ -243,11 +261,12 @@ export async function openStatements(organizationId: string) {
     const repeated = rows.filter((r) => r.bookingItem.statementItems.some((x) => x.statementId !== s.id)).length;
     const currency = rows[0]?.bookingItem.booking.currency ?? "USD";
     const expected = rows.reduce((t, r) => t + toNumber(r.expectedAmount), 0);
+    const provider = rows.reduce((t, r) => t + toNumber(r.providerAmount ?? r.expectedAmount), 0);
     const received = rows.reduce((t, r) => t + receivedOf(r.bookingItem, toNumber(r.expectedAmount)), 0);
     const term = s.agency?.paymentTermDays ?? DEFAULT_PAYMENT_TERM_DAYS;
     const days = s.sentAt ? Math.floor((Date.now() - s.sentAt.getTime()) / 86400_000) : null;
     const dueAt = s.sentAt ? new Date(s.sentAt.getTime() + term * 86400_000) : null;
-    return { statement: s, count: rows.length, repeated, currency, expected, received, owed: Math.max(0, expected - received), days, term, dueAt, late: days !== null && days > term };
+    return { statement: s, count: rows.length, repeated, currency, expected, provider, received, owed: Math.max(0, expected - received), days, term, dueAt, late: days !== null && days > term };
   });
 }
 

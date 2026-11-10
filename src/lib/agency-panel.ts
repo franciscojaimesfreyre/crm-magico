@@ -1,3 +1,4 @@
+import { agentShareOf } from "@/lib/trips";
 import "server-only";
 import { db } from "@/lib/db";
 import { toNumber } from "@/lib/format";
@@ -18,6 +19,7 @@ const SALE_SELECT = {
   price: true,
   saleDate: true,
   commissionAmount: true,
+  agentSharePercent: true,
   commissionStatus: true,
   commissionPaidAt: true,
   commissionPaidAmount: true,
@@ -44,6 +46,7 @@ function toSale(r: SaleRow) {
     saleDate: r.saleDate,
     totalPrice: r.price,
     commissionAmount: r.commissionAmount,
+    agentSharePercent: r.agentSharePercent,
     commissionStatus: r.commissionStatus,
     commissionPaidAt: r.commissionPaidAt,
     commissionPaidAmount: r.commissionPaidAmount,
@@ -106,16 +109,21 @@ export async function agencyCurrencies(agencyId: string) {
   return rows.map((r) => r.currency);
 }
 
-export function summarize(sales: AgencySale[]) {
+/**
+ * Totales de la agencia: comisión de los proveedores, lo que retiene la agencia, lo que le toca a los agentes,
+ * lo ya transferido y lo que falta transferir (según el % de reparto de la agencia o de cada reserva).
+ */
+export function summarize(sales: AgencySale[], agentSharePercent?: unknown) {
   let revenue = 0;
   let commission = 0;
+  let toAgents = 0;
   let paid = 0;
-  let pending = 0;
   for (const s of sales) {
     revenue += toNumber(s.totalPrice);
     commission += toNumber(s.commissionAmount);
-    if (s.commissionStatus === "PAID") paid += toNumber(s.commissionPaidAmount ?? s.commissionAmount);
-    else pending += toNumber(s.commissionAmount);
+    const share = agentShareOf(s, agentSharePercent as never);
+    toAgents += share;
+    paid += s.commissionPaidAmount !== null ? toNumber(s.commissionPaidAmount) : s.commissionStatus === "PAID" ? share : 0;
   }
-  return { count: sales.length, revenue, commission, paid, pending };
+  return { count: sales.length, revenue, commission, toAgents, retained: commission - toAgents, paid, pending: Math.max(0, toAgents - paid) };
 }

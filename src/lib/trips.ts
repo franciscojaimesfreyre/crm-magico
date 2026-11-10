@@ -124,3 +124,22 @@ export function travelerCountCheck(adults: number, children: number, ages: (numb
   const note = unknown > 0 && parts.length ? ` (${plural(unknown, "no tiene", "no tienen")} fecha de nacimiento, así que no se sabe si es adulto o menor)` : "";
   return `${want} y ${marked}: ${parts.join(" y ")}${note}.`;
 }
+
+// ─── Reparto de la comisión con la agencia host ──────────────────────────────
+
+type Dec = number | string | { toString(): string } | null | undefined;
+const dec = (v: Dec) => (v === null || v === undefined ? null : Number(v.toString()));
+
+/** Parte del agente (%) para una reserva: la de la reserva, si tiene; si no, la de la agencia; si no, 100. */
+export function sharePercentOf(item: { agentSharePercent?: Dec }, agencyPercent?: Dec) {
+  return dec(item.agentSharePercent) ?? dec(agencyPercent) ?? 100;
+}
+
+/**
+ * Lo que le toca al agente de la comisión del proveedor (redondeado a centavos, por reserva, para que las
+ * filas sumen exacto). La retención de la agencia es la diferencia.
+ */
+export function agentShareOf(item: { commissionAmount: Dec; agentSharePercent?: Dec }, agencyPercent?: Dec) {
+  const provider = dec(item.commissionAmount) ?? 0;
+  return Math.round(provider * sharePercentOf(item, agencyPercent)) / 100;
+}

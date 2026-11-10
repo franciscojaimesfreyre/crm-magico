@@ -12,6 +12,7 @@ import { BOOKING_STATUS_COLOR, BOOKING_STATUS_LABEL, DESTINATION_LABEL, DESTINAT
 import { addDays, daysBetween, formatDate, formatRange, money, todayUTC, toNumber } from "@/lib/format";
 import { agenda, defaultScope } from "@/lib/agenda";
 import { receivedOf } from "@/lib/commissions";
+import { agentShareOf } from "@/lib/trips";
 import { AgendaRows } from "./calendario/agenda-ui";
 import { runDateWorkflowsIfDue } from "@/lib/automations";
 import { syncThemeParksIfDue } from "@/lib/themeparks-sync";
@@ -59,19 +60,18 @@ export default async function Dashboard() {
       orderBy: { startDate: "asc" },
     }),
     // Ventas = reservas confirmadas con un proveedor (un viaje puede tener varias).
-    db.bookingItem.aggregate({
+    db.bookingItem.findMany({
       where: { status: "CONFIRMED", saleDate: { gte: last30 }, booking: { organizationId: orgId, status: { not: "CANCELLED" }, currency } },
-      _sum: { price: true, commissionAmount: true },
-      _count: true,
+      select: { price: true, commissionAmount: true, agentSharePercent: true },
     }),
-    db.bookingItem.aggregate({
+    db.bookingItem.findMany({
       where: { status: "CONFIRMED", saleDate: { gte: yearStart }, booking: { organizationId: orgId, status: { not: "CANCELLED" }, currency } },
-      _sum: { price: true, commissionAmount: true },
+      select: { price: true, commissionAmount: true, agentSharePercent: true },
     }),
     // Por cobrar: lo mismo que en Comisiones, de los viajes que ya terminaron (sin depender del estado manual).
     db.bookingItem.findMany({
       where: { status: "CONFIRMED", commissionStatus: { not: "PAID" }, booking: { organizationId: orgId, status: { not: "CANCELLED" }, endDate: { lt: today }, currency } },
-      select: { commissionAmount: true, commissionPaidAmount: true, commissionStatus: true },
+      select: { commissionAmount: true, commissionPaidAmount: true, commissionStatus: true, agentSharePercent: true, statementItems: { where: { cancelledAt: null }, select: { expectedAmount: true } } },
     }),
     db.booking.findMany({
       where: { organizationId: orgId, status: "INQUIRY" },
@@ -111,7 +111,15 @@ export default async function Dashboard() {
   // Lo que vence o pasa en los próximos 7 días y las tareas atrasadas (la fila "Necesita tu atención").
   const thisWeek = allKeyDates.filter((k) => !k.overdue && !k.open && k.date <= in7).length;
   const overdueTasks = tasks.filter((t) => t.dueDate && t.dueDate < today).length;
-  const toCollect = commissionToCollect.reduce((t, i) => t + Math.max(0, toNumber(i.commissionAmount) - receivedOf(i)), 0);
+  // Tu parte de la comisión (la agencia host puede retener un %): la congelada en la planilla o el reparto de hoy.
+  const pct = user.organization.agency?.agentSharePercent;
+  const toCollect = commissionToCollect.reduce((t, i) => {
+    const mine = i.statementItems[0] ? toNumber(i.statementItems[0].expectedAmount) : agentShareOf(i, pct);
+    return t + Math.max(0, mine - receivedOf(i, mine));
+  }, 0);
+  const sum = (list: { price: unknown; commissionAmount: unknown; agentSharePercent: unknown }[], pick: "price" | "provider" | "mine") =>
+    list.reduce((t, i) => t + (pick === "price" ? toNumber(i.price as never) : pick === "provider" ? toNumber(i.commissionAmount as never) : agentShareOf(i as never, pct)), 0);
+  const year = { sold: sum(salesYear, "price"), provider: sum(salesYear, "provider"), mine: sum(salesYear, "mine") };
 
   const featured = nextTrips[0];
   const featuredNext = featured ? keyDates.find((k) => !k.overdue && !k.open && k.booking?.id === featured.id) : undefined;
@@ -188,8 +196,12 @@ export default async function Dashboard() {
 
       <h2 className="mb-3 text-[13px] font-semibold tracking-[0.06em] text-[var(--ink-soft)] uppercase">Tu negocio</h2>
       <StatStrip className="mb-8">
-        <StatCard label="Ventas · últimos 30 días" value={money(sales30._sum.price, currency)} hint={`${sales30._count} ${sales30._count === 1 ? "reserva confirmada" : "reservas confirmadas"} · comisión ${money(sales30._sum.commissionAmount, currency)}`} />
-        <StatCard label={`Comisión ${today.getUTCFullYear()}`} value={money(salesYear._sum.commissionAmount, currency)} hint={`Sobre ${money(salesYear._sum.price, currency)} vendidos`} />
+        <StatCard label="Ventas · últimos 30 días" value={money(sum(sales30, "price"), currency)} hint={`${sales30.length} ${sales30.length === 1 ? "reserva confirmada" : "reservas confirmadas"} · tu comisión ${money(sum(sales30, "mine"), currency)}`} />
+        <StatCard
+          label={`Tu comisión ${today.getUTCFullYear()}`}
+          value={money(year.mine, currency)}
+          hint={year.provider > year.mine + 0.005 ? `De ${money(year.provider, currency)} de los proveedores · sobre ${money(year.sold, currency)} vendidos` : `Sobre ${money(year.sold, currency)} vendidos`}
+        />
         <StatCard
           label="Comisión por cobrar"
           value={money(toCollect, currency)}

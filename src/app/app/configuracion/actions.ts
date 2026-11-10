@@ -1,5 +1,7 @@
 "use server";
 
+import { commissionOverview } from "@/lib/commissions";
+import { money } from "@/lib/format";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { hashPassword, requireUser, verifyPassword } from "@/lib/auth";
@@ -57,12 +59,24 @@ export async function saveMyAgency(_: ActionState, formData: FormData): Promise<
     contactEmail: str(formData, "contactEmail"),
     defaultCommissionRate: rate(formData, "defaultCommissionRate"),
     paymentTermDays: termDays(formData),
+    agentSharePercent: rate(formData, "agentSharePercent"),
     notes: str(formData, "notes"),
   };
+  // Si cambia el reparto, se avisa cómo queda lo por cobrar (las planillas ya generadas no cambian).
+  const before = await commissionOverview(user.organizationId);
   if (current) await db.agency.update({ where: { id: current.id }, data });
   else await db.organization.update({ where: { id: user.organizationId }, data: { agency: { create: data } } });
+  const after = await commissionOverview(user.organizationId);
   revalidatePath("/app", "layout");
-  return { ok: "Agencia guardada" };
+  const cur = user.organization.defaultCurrency;
+  const owedBefore = before.totals.get(cur)?.owed ?? 0;
+  const owedAfter = after.totals.get(cur)?.owed ?? 0;
+  return {
+    ok:
+      Math.abs(owedBefore - owedAfter) > 0.005
+        ? `Agencia guardada. Tu "Por cobrar" pasó de ${money(owedBefore, cur)} a ${money(owedAfter, cur)} (las planillas ya generadas no cambian).`
+        : "Agencia guardada",
+  };
 }
 
 /** El agente se suma a una agencia de la plataforma con el código que ella le pasó. */

@@ -6,7 +6,7 @@ import { Badge, Card, CardHeader, StatCard, StatStrip, Textarea } from "@/compon
 import { DESTINATION_LABEL, urgencyTone } from "@/lib/labels";
 import { ageOn, daysBetween, formatDate, formatRange, money, todayUTC } from "@/lib/format";
 import { computeKeyDates } from "@/lib/key-dates";
-import { expectsBalanceDue, travelerCountCheck } from "@/lib/trips";
+import { agentShareOf, expectsBalanceDue, travelerCountCheck } from "@/lib/trips";
 import { saveTripNotes, setBookingTravelers } from "../actions";
 import type { LoadedBooking } from "./data";
 import { TripFlights } from "./flights";
@@ -35,8 +35,13 @@ export function Summary({ booking: b, alerts, gallery = [] }: { booking: LoadedB
   const reservedTotal = sum(reserved, (i) => Number(i.price));
   const pendingTotal = sum(pending, (i) => Number(i.price));
   const owed = sum(reserved, (i) => (i.balancePaidAt ? 0 : Math.max(0, Number(i.price) - Number(i.paidAmount))));
-  const reservedCommission = sum(reserved, (i) => Number(i.commissionAmount));
-  const pendingCommission = sum(pending, (i) => Number(i.commissionAmount));
+  // Tu parte de la comisión (la agencia host puede retener un %); la del proveedor se muestra chica.
+  const pct = b.organization.agency?.agentSharePercent;
+  const live = b.items.filter((i) => i.status !== "CANCELLED");
+  const myCommission = sum(live, (i) => agentShareOf(i, pct));
+  const providerCommission = sum(live, (i) => Number(i.commissionAmount));
+  const reservedCommission = sum(reserved, (i) => agentShareOf(i, pct));
+  const pendingCommission = sum(pending, (i) => agentShareOf(i, pct));
   const unsettled = [...reserved, ...pending].filter((i) => !i.balancePaidAt && Number(i.price) > Number(i.paidAmount));
   const nextBalance = unsettled.filter((i) => i.balanceDue).sort((x, y) => x.balanceDue!.getTime() - y.balanceDue!.getTime())[0];
   const missingDue = unsettled.filter((i) => !i.balanceDue && expectsBalanceDue(i)).length;
@@ -72,9 +77,17 @@ export function Summary({ booking: b, alerts, gallery = [] }: { booking: LoadedB
           />
           <StatCard
             label="Tu comisión"
-            value={money(b.commissionAmount, b.currency)}
+            value={money(myCommission, b.currency)}
             tone="good"
-            hint={[pendingCommission > 0 && `${money(reservedCommission, b.currency)} de lo reservado`, b.organization.agency && `La paga ${b.organization.agency.name}`].filter(Boolean).join(" · ") || undefined}
+            hint={
+              [
+                pendingCommission > 0 && `${money(reservedCommission, b.currency)} de lo reservado`,
+                providerCommission > myCommission + 0.005 && `Proveedor ${money(providerCommission, b.currency)} · ${b.organization.agency?.name ?? "la agencia"} retiene ${money(providerCommission - myCommission, b.currency)}`,
+                providerCommission <= myCommission + 0.005 && b.organization.agency && `La paga ${b.organization.agency.name}`,
+              ]
+                .filter(Boolean)
+                .join(" · ") || undefined
+            }
           />
         </StatStrip>
       )}

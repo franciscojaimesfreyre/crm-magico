@@ -24,7 +24,7 @@ export default async function AgencyAgentPage({
   const currencies = await agencyCurrencies(user.agencyId);
   const currency = sp.moneda || currencies[0] || "USD";
   const sales = await agencySales(user.agencyId, { year, currency, organizationId: agent.id });
-  const t = summarize(sales);
+  const t = summarize(sales, user.agency.agentSharePercent);
 
   return (
     <>

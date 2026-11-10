@@ -17,10 +17,12 @@ type Row = Awaited<ReturnType<typeof commissionOverview>>["rows"][number];
  */
 export async function CommissionsOverview({ organizationId, agency }: { organizationId: string; agency: { name: string; paymentTermDays: number | null } | null }) {
   const today = todayUTC();
-  const [{ rows, totals }, statements] = await Promise.all([commissionOverview(organizationId), openStatements(organizationId)]);
+  const [{ rows, totals, sharePercent }, statements] = await Promise.all([commissionOverview(organizationId), openStatements(organizationId)]);
   const term = agency?.paymentTermDays ?? DEFAULT_PAYMENT_TERM_DAYS;
   const ready = rows.filter((r) => r.stage === "ready");
-  const [mainCurrency, main] = [...totals.entries()].sort((a, b) => b[1].earned - a[1].earned)[0] ?? ["USD", { earned: 0, received: 0, owed: 0, ready: 0, waiting: 0 }];
+  const [mainCurrency, main] = [...totals.entries()].sort((a, b) => b[1].earned - a[1].earned)[0] ?? ["USD", { earned: 0, received: 0, owed: 0, ready: 0, waiting: 0, provider: 0 }];
+  // El reparto con la agencia solo se muestra si existe (si la agencia no retiene nada, no suma ruido).
+  const split = main.provider > main.earned + 0.005;
 
   // Cuándo se espera cobrar: planillas enviadas (envío + plazo), lo listo para pedir (hoy + plazo) y lo que
   // todavía no terminó (fin del viaje + plazo). Por mes, en la moneda principal.
@@ -42,7 +44,15 @@ export async function CommissionsOverview({ organizationId, agency }: { organiza
   return (
     <div className="space-y-6">
       <StatStrip>
-        <StatCard label="Ganado (todas tus ventas)" value={money(main.earned, mainCurrency)} hint={`${rows.length} ${rows.length === 1 ? "reserva confirmada" : "reservas confirmadas"}`} />
+        <StatCard
+          label={split ? "Tu comisión (todas tus ventas)" : "Ganado (todas tus ventas)"}
+          value={money(main.earned, mainCurrency)}
+          hint={
+            split
+              ? `De ${money(main.provider, mainCurrency)} que pagan los proveedores · la agencia retiene ${money(main.provider - main.earned, mainCurrency)}${sharePercent < 100 ? ` (${100 - sharePercent} %)` : ""}`
+              : `${rows.length} ${rows.length === 1 ? "reserva confirmada" : "reservas confirmadas"}`
+          }
+        />
         <StatCard label="Ya cobrado" value={money(main.received, mainCurrency)} tone="good" />
         <StatCard
           label="Por cobrar"
@@ -83,7 +93,8 @@ export async function CommissionsOverview({ organizationId, agency }: { organiza
                       {o.statement.agency?.name ?? "Sin agencia"} · {formatDate(o.statement.periodFrom, { year: undefined })} al {formatDate(o.statement.periodTo)}
                     </p>
                     <p className="text-xs text-slate-500">
-                      {o.count} {o.count === 1 ? "reserva" : "reservas"} · reclamado {money(o.expected, o.currency)}
+                      {o.count} {o.count === 1 ? "reserva" : "reservas"} · a transferir {money(o.expected, o.currency)}
+                      {o.provider > o.expected + 0.005 && ` (de ${money(o.provider, o.currency)} del proveedor)`}
                       {o.received > 0 && ` · cobrado ${money(o.received, o.currency)}`}
                     </p>
                     {o.repeated > 0 && (
@@ -101,7 +112,7 @@ export async function CommissionsOverview({ organizationId, agency }: { organiza
                     </Badge>
                   ) : (
                     <Badge className="bg-slate-100 text-slate-700">
-                      Enviada hace {o.days} {o.days === 1 ? "día" : "días"}
+                      {o.days === 0 ? "Enviada hoy" : `Enviada hace ${o.days} ${o.days === 1 ? "día" : "días"}`}
                       {o.dueAt && ` · se espera el ${formatDate(o.dueAt, { year: undefined })}`}
                     </Badge>
                   )}
@@ -180,7 +191,10 @@ function SelectableRows({ rows, today, checked = false, submitLabel }: { rows: R
                     {ago >= 0 ? `volvió hace ${ago} ${ago === 1 ? "día" : "días"}` : `vuelve el ${formatDate(b.endDate, { year: undefined })}`}
                   </span>
                 )}
-                <span className="w-28 text-right font-semibold text-brand-700 tabular-nums">{money(r.owed, r.currency)}</span>
+                <span className="w-32 text-right tabular-nums">
+                  <span className="block font-semibold text-brand-700">{money(r.owed, r.currency)}</span>
+                  {r.provider > r.expected + 0.005 && <span className="block text-[11px] text-slate-500">de {money(r.provider, r.currency)} del proveedor</span>}
+                </span>
               </label>
             </li>
           );

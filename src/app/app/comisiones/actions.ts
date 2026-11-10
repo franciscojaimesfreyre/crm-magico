@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { parseDateInput, todayUTC, toNumber } from "@/lib/format";
+import { agentShareOf, sharePercentOf } from "@/lib/trips";
 import { buildStatementWorkbook, loadStatement, refreshStatementStatus, registerStatementPayment, statementFilename, statementTotals } from "@/lib/commissions";
 import { sendEmail } from "@/lib/email";
 import { logActivity } from "@/lib/events";
@@ -16,7 +17,7 @@ async function selectedItems(formData: FormData) {
   const ids = formData.getAll("itemIds").map(String);
   const items = await db.bookingItem.findMany({
     where: { id: { in: ids }, booking: { organizationId: user.organizationId } },
-    include: { booking: { select: { clientId: true } } },
+    include: { booking: { select: { clientId: true, endDate: true } } },
   });
   return { user, items };
 }
@@ -69,8 +70,13 @@ export async function createStatement(formData: FormData) {
   const sep = back(formData).includes("?") ? "&" : "?";
   if (selected.length === 0) redirect(`${back(formData)}${sep}error=sin-seleccion`);
   if (items.length === 0) redirect(`${back(formData)}${sep}error=ya-en-planilla`);
-  const from = parseDateInput(formData.get("desde")) ?? items.map((i) => i.saleDate ?? i.createdAt).sort((a, b) => a.getTime() - b.getTime())[0];
-  const to = parseDateInput(formData.get("hasta")) ?? todayUTC();
+  // Sin período elegido, el de las ventas incluidas, según la base: fechas de venta o de fin de viaje.
+  const byTrip = formData.get("base") === "viaje";
+  const dates = items
+    .map((i) => (byTrip ? (i.booking.endDate ?? i.endDate) : i.saleDate) ?? i.createdAt)
+    .sort((a, b) => a.getTime() - b.getTime());
+  const from = parseDateInput(formData.get("desde")) ?? dates[0];
+  const to = parseDateInput(formData.get("hasta")) ?? dates[dates.length - 1] ?? todayUTC();
   const statement = await db.commissionStatement.create({
     data: {
       organizationId: user.organizationId,
@@ -79,7 +85,15 @@ export async function createStatement(formData: FormData) {
       periodFrom: from,
       periodTo: to,
       dateBasis: formData.get("base") === "viaje" ? "TRAVEL_END" : "SALE",
-      items: { create: items.map((i) => ({ bookingItemId: i.id, expectedAmount: i.commissionAmount })) },
+      // Se congela el reparto: comisión del proveedor, % del agente y lo que se reclama (la parte del agente).
+      items: {
+        create: items.map((i) => ({
+          bookingItemId: i.id,
+          providerAmount: i.commissionAmount,
+          agentSharePercent: sharePercentOf(i, user.organization.agency?.agentSharePercent),
+          expectedAmount: agentShareOf(i, user.organization.agency?.agentSharePercent),
+        })),
+      },
     },
   });
   // Quedan "Sin cobrar" hasta que la planilla se envía: recién ahí están solicitadas.
@@ -210,4 +224,21 @@ export async function markStatementSent(statementId: string) {
   if (!s) return;
   await markSent(statementId);
   revalidatePath("/app/comisiones", "layout");
+}
+
+/** Borrador: recalcula lo reclamado con el reparto de hoy (las filas ya cobradas no se tocan). */
+export async function recalcStatement(statementId: string) {
+  const user = await requireUser();
+  const s = await db.commissionStatement.findFirst({ where: { id: statementId, organizationId: user.organizationId, sentAt: null }, include: { items: { include: { bookingItem: true } } } });
+  if (!s) return;
+  const pct = user.organization.agency?.agentSharePercent;
+  for (const row of s.items) {
+    if (row.bookingItem.commissionStatus === "PAID") continue;
+    await db.commissionStatementItem.update({
+      where: { id: row.id },
+      data: { providerAmount: row.bookingItem.commissionAmount, agentSharePercent: sharePercentOf(row.bookingItem, pct), expectedAmount: agentShareOf(row.bookingItem, pct) },
+    });
+  }
+  await refreshStatementStatus(statementId);
+  revalidatePath(`/app/comisiones/planillas/${statementId}`);
 }

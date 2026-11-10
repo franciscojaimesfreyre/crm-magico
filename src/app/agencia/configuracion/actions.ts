@@ -23,6 +23,7 @@ export async function updateAgency(_: ActionState, formData: FormData): Promise<
       contactEmail: str(formData, "contactEmail"),
       defaultCommissionRate: rate,
       paymentTermDays: termDays(formData),
+      agentSharePercent: sharePct(formData),
       notes: str(formData, "notes"),
     },
   });
@@ -67,4 +68,11 @@ export async function updateAgencyAccount(_: ActionState, formData: FormData): P
 function termDays(formData: FormData) {
   const n = Number(String(formData.get("paymentTermDays") ?? "").trim());
   return Number.isInteger(n) && n > 0 && n <= 365 ? n : null;
+}
+
+/** Parte del agente (%) de la comisión del proveedor. Vacío = 100. */
+function sharePct(formData: FormData) {
+  const raw = String(formData.get("agentSharePercent") ?? "").trim().replace(",", ".");
+  const n = Number(raw);
+  return raw && Number.isFinite(n) && n >= 0 && n <= 100 ? n : null;
 }

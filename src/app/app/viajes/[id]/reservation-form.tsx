@@ -27,6 +27,7 @@ export function ReservationForm({
   selectedTravelers,
   directUpload,
   documents = [],
+  agencyShare,
   submitLabel,
 }: {
   action: (state: ActionState, formData: FormData) => Promise<ActionState>;
@@ -38,6 +39,8 @@ export function ReservationForm({
   selectedTravelers: string[];
   /** Subida directa a R2 (ver FileUpload). */
   directUpload: boolean;
+  /** Reparto con la agencia host: su % y si el agente puede cambiarlo por reserva (solo si la agencia es propia). */
+  agencyShare?: { percent: number | null; editable: boolean };
   /** Adjuntos que ya tiene la reserva (al editar). */
   documents?: { id: string; name: string; storageKey: string | null; url: string | null; mimeType: string | null }[];
   defaultRate: number;
@@ -93,6 +96,11 @@ export function ReservationForm({
       <fieldset className="grid grid-cols-1 gap-3 sm:grid-cols-5">
         <legend className="mb-2 text-xs font-semibold text-slate-500">Comisión</legend>
         <CommissionInput rate={item?.commissionRate?.toString()} fixed={item?.commissionFixed?.toString()} defaultRate={defaultRate} currency={currency} />
+        {agencyShare?.editable && (
+          <Field label="Tu parte (%)" hint={`De la comisión del proveedor. Vacío = el de tu agencia (${agencyShare.percent ?? 100} %)`}>
+            <Input name="agentSharePercent" type="number" step="0.01" min={0} max={100} defaultValue={item?.agentSharePercent?.toString() ?? ""} placeholder={String(agencyShare.percent ?? 100)} />
+          </Field>
+        )}
         <Field label="Fecha de venta" hint="Se completa al confirmar">
           <DateInput name="saleDate" defaultValue={toDateInput(item?.saleDate)} />
         </Field>

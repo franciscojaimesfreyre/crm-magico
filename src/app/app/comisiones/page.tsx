@@ -8,6 +8,7 @@ import { Alert, Badge, Card, EmptyState, LinkButton, PageHeader, Select, StatCar
 import { COMMISSION_STATUS_COLOR, COMMISSION_STATUS_LABEL, DESTINATION_LABEL, DESTINATION_TONE, ITEM_TYPE_LABEL } from "@/lib/labels";
 import { formatDate, formatRange, money, toNumber } from "@/lib/format";
 import { commissionWhere, receivedOf, type CommissionFilters } from "@/lib/commissions";
+import { agentShareOf } from "@/lib/trips";
 import { CommissionsOverview } from "./overview";
 import { createStatement, markCommissionsPaid, markCommissionsPending } from "./actions";
 import { SelectAll } from "./widgets";
@@ -95,7 +96,7 @@ export default async function CommissionsPage({ searchParams }: { searchParams: 
   // Cada fila es una reserva confirmada (una venta): un viaje puede aportar varias.
   const include = {
     booking: { include: { client: { select: { firstName: true, lastName: true } } } },
-    statementItems: { where: { cancelledAt: null }, select: { statementId: true } },
+    statementItems: { where: { cancelledAt: null }, select: { statementId: true, expectedAmount: true } },
   } as const;
   const [items, allForTotals] = await Promise.all([
     db.bookingItem.findMany({
@@ -108,15 +109,19 @@ export default async function CommissionsPage({ searchParams }: { searchParams: 
   ]);
 
   // Totales por moneda.
-  const totals = new Map<string, { commission: number; paid: number; pending: number; sales: number }>();
+  const pct = agency?.agentSharePercent;
+  const totals = new Map<string, { commission: number; paid: number; pending: number; sales: number; provider: number }>();
   for (const i of allForTotals) {
     const cur = i.booking.currency;
-    const t = totals.get(cur) ?? { commission: 0, paid: 0, pending: 0, sales: 0 };
+    const t = totals.get(cur) ?? { commission: 0, paid: 0, pending: 0, sales: 0, provider: 0 };
     t.sales += toNumber(i.price);
-    t.commission += toNumber(i.commissionAmount);
-    const received = receivedOf(i);
+    // Tu parte: la congelada en su planilla o el reparto de hoy.
+    const mine = i.statementItems[0] ? toNumber(i.statementItems[0].expectedAmount) : agentShareOf(i, pct);
+    t.commission += mine;
+    t.provider += toNumber(i.commissionAmount);
+    const received = receivedOf(i, mine);
     t.paid += received;
-    t.pending += Math.max(0, toNumber(i.commissionAmount) - received);
+    t.pending += Math.max(0, mine - received);
     totals.set(cur, t);
   }
   const main = [...totals.entries()][0];
@@ -154,7 +159,11 @@ export default async function CommissionsPage({ searchParams }: { searchParams: 
 
       {main && (
         <StatStrip className="mb-6">
-          <StatCard label="Ganado en el período" value={money(main[1].commission, main[0])} hint={`${allForTotals.length} reservas · vendido ${money(main[1].sales, main[0])}`} />
+          <StatCard
+            label="Tu comisión en el período"
+            value={money(main[1].commission, main[0])}
+            hint={`${allForTotals.length} reservas · vendido ${money(main[1].sales, main[0])}${main[1].provider > main[1].commission + 0.005 ? ` · proveedores ${money(main[1].provider, main[0])}` : ""}`}
+          />
           <StatCard label="Ya cobrado" value={money(main[1].paid, main[0])} tone="good" />
           <StatCard label="Por cobrar" value={money(main[1].pending, main[0])} tone={main[1].pending > 0 ? "warn" : "default"} />
         </StatStrip>
@@ -201,7 +210,7 @@ export default async function CommissionsPage({ searchParams }: { searchParams: 
                   <Th>Reserva</Th>
                   <Th>Vendida</Th>
                   <Th className="text-right">Importe</Th>
-                  <Th className="text-right">Comisión</Th>
+                  <Th className="text-right">Tu comisión</Th>
                   <Th>Estado</Th>
                 </tr>
               </thead>
@@ -228,7 +237,17 @@ export default async function CommissionsPage({ searchParams }: { searchParams: 
                     </Td>
                     <Td className="text-xs whitespace-nowrap">{formatDate(i.saleDate)}</Td>
                     <Td className="text-right whitespace-nowrap tabular-nums">{money(i.price, i.booking.currency)}</Td>
-                    <Td className="text-right font-semibold whitespace-nowrap text-brand-700 tabular-nums">{money(i.commissionAmount, i.booking.currency)}</Td>
+                    <Td className="text-right whitespace-nowrap tabular-nums">
+                      {(() => {
+                        const mine = i.statementItems[0] ? toNumber(i.statementItems[0].expectedAmount) : agentShareOf(i, pct);
+                        return (
+                          <>
+                            <span className="font-semibold text-brand-700">{money(mine, i.booking.currency)}</span>
+                            {toNumber(i.commissionAmount) > mine + 0.005 && <span className="block text-[11px] text-slate-500">de {money(i.commissionAmount, i.booking.currency)} del proveedor</span>}
+                          </>
+                        );
+                      })()}
+                    </Td>
                     <Td className="whitespace-nowrap">
                       <Badge className={COMMISSION_STATUS_COLOR[i.commissionStatus]}>{COMMISSION_STATUS_LABEL[i.commissionStatus]}</Badge>
                       {i.commissionPaidAt && <p className="text-[11px] text-slate-500">{formatDate(i.commissionPaidAt)}</p>}

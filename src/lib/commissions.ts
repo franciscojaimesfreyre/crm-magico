@@ -179,7 +179,7 @@ export async function buildStatementWorkbook(s: LoadedStatement) {
 }
 
 
-// ─── Qué hacer con las comisiones ────────────────────────────────────────────
+// ─── Seguimiento de las comisiones ───────────────────────────────────────────
 
 /** Días que la agencia tarda en pagar por defecto, si no se cargó otro. */
 export const DEFAULT_PAYMENT_TERM_DAYS = 30;

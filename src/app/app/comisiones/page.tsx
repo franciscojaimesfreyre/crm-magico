@@ -35,8 +35,8 @@ export default async function CommissionsPage({ searchParams }: { searchParams: 
           <div className="flex flex-wrap gap-2">
             <div className="flex rounded-full bg-white p-1 ring-1 ring-[var(--border)]">
               {[
-                { key: undefined, label: "Qué hacer" },
-                { key: "todas", label: "Todas las ventas" },
+                { key: undefined, label: "Seguimiento" },
+                { key: "todas", label: "Listado" },
               ].map((v) => (
                 <Link
                   key={v.label}

@@ -12,7 +12,7 @@ import { SelectAll } from "./widgets";
 type Row = Awaited<ReturnType<typeof commissionOverview>>["rows"][number];
 
 /**
- * "Qué hacer" con las comisiones: lo que ya se puede pedir, lo que espera pago (y desde cuándo), cuándo se
+ * Seguimiento de las comisiones: lo que ya se puede pedir, lo que espera pago (y desde cuándo), cuándo se
  * va a cobrar y lo cobrado. Los totales no dependen de ningún filtro: ganado = cobrado + por cobrar.
  */
 export async function CommissionsOverview({ organizationId, agency }: { organizationId: string; agency: { name: string; paymentTermDays: number | null } | null }) {
@@ -171,7 +171,7 @@ export async function CommissionsOverview({ organizationId, agency }: { organiza
 
       <p className="text-sm">
         <Link href="/app/comisiones?vista=todas" className="font-medium text-brand-700 hover:underline">
-          Ver todas las ventas con filtros (período, estado, fecha de venta o fin de viaje)
+          Ver el listado de todas las ventas, con filtros por período, estado y fecha
         </Link>
       </p>
     </div>

@@ -1,11 +1,12 @@
 import Link from "next/link";
 import clsx from "clsx";
+import { AlertTriangle } from "lucide-react";
 import { ActionForm, SubmitButton } from "@/components/form-controls";
 import { Badge, Card, CardHeader, StatCard, StatStrip, Textarea } from "@/components/ui";
 import { DESTINATION_LABEL, urgencyTone } from "@/lib/labels";
 import { ageOn, daysBetween, formatDate, formatRange, money, todayUTC } from "@/lib/format";
 import { computeKeyDates } from "@/lib/key-dates";
-import { expectsBalanceDue } from "@/lib/trips";
+import { expectsBalanceDue, travelerCountCheck } from "@/lib/trips";
 import { saveTripNotes, setBookingTravelers } from "../actions";
 import type { LoadedBooking } from "./data";
 import { TripFlights } from "./flights";
@@ -20,6 +21,12 @@ export function Summary({ booking: b, alerts, gallery = [] }: { booking: LoadedB
   const upcomingDates = keyDates.filter((k) => k.date >= today);
   const pastDates = keyDates.filter((k) => k.date < today);
   const selected = new Set(b.travelers.map((t) => t.travelerId));
+  // Los marcados contra la cantidad cargada en el viaje (adultos y menores, por la edad al viajar).
+  const countWarning = travelerCountCheck(
+    b.adults,
+    b.children,
+    b.client.travelers.filter((t) => selected.has(t.id)).map((t) => ageOn(t.birthDate, b.startDate ?? undefined)),
+  );
   // El total y la comisión del viaje (los mismos del listado) incluyen lo que falta reservar, que se detalla aparte;
   // el saldo del cliente cuenta solo lo reservado con el proveedor.
   const sum = (list: typeof b.items, pick: (i: (typeof b.items)[number]) => number) => list.reduce((t, i) => t + pick(i), 0);
@@ -135,6 +142,17 @@ export function Summary({ booking: b, alerts, gallery = [] }: { booking: LoadedB
           </Card>
           <Card>
             <CardHeader title="Viajeros" description="Marcá quiénes viajan." />
+            {countWarning && (
+              <div className="mx-5 mt-4 flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-900 ring-1 ring-amber-200">
+                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600" />
+                <p>
+                  {countWarning}{" "}
+                  <Link href={`/app/viajes/${b.id}/editar`} className="font-medium text-brand-700 hover:underline">
+                    Cambiar la cantidad
+                  </Link>
+                </p>
+              </div>
+            )}
             {b.client.travelers.length === 0 ? (
               <p className="p-5 text-sm text-slate-500">
                 El cliente no tiene viajeros cargados.{" "}

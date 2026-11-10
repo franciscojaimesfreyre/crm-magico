@@ -14,7 +14,7 @@ export async function loadBooking(id: string, organizationId: string) {
         include: {
           payments: { orderBy: [{ paidAt: "asc" }, { createdAt: "asc" }] },
           travelers: { include: { traveler: { select: { firstName: true, lastName: true } } } },
-          documents: { orderBy: { createdAt: "asc" }, select: { id: true, name: true, storageKey: true, url: true } },
+          documents: { orderBy: { createdAt: "asc" }, select: { id: true, name: true, storageKey: true, url: true, mimeType: true } },
           // De qué cotización salió (vacío = cargada a mano).
           quoteItem: { select: { option: { select: { name: true, quote: { select: { id: true, title: true, _count: { select: { options: true } } } } } } } },
         },

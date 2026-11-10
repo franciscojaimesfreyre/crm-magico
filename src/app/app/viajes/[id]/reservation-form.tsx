@@ -4,6 +4,7 @@ import { COMMISSION_STATUS_LABEL, RESERVATION_STATUSES } from "@/lib/labels";
 import { toDateInput } from "@/lib/format";
 import { CommissionInput } from "@/components/commission-input";
 import { MultiFileUpload } from "@/components/file-upload";
+import { AttachmentChips } from "@/components/attachment-chips";
 import type { BookingItem } from "@/generated/prisma/client";
 import { PriceWithTax, ReservationTravelers, TripDatesGuard, type TravelerOption } from "./reservation-extras";
 import { ItemTypeSelect } from "@/components/item-type-select";
@@ -24,6 +25,7 @@ export function ReservationForm({
   travelers,
   selectedTravelers,
   directUpload,
+  documents = [],
   submitLabel,
 }: {
   action: (state: ActionState, formData: FormData) => Promise<ActionState>;
@@ -35,6 +37,8 @@ export function ReservationForm({
   selectedTravelers: string[];
   /** Subida directa a R2 (ver FileUpload). */
   directUpload: boolean;
+  /** Adjuntos que ya tiene la reserva (al editar). */
+  documents?: { id: string; name: string; storageKey: string | null; url: string | null; mimeType: string | null }[];
   defaultRate: number;
   currency: string;
   submitLabel: string;
@@ -114,6 +118,12 @@ export function ReservationForm({
       <fieldset className="space-y-2">
         <legend className="mb-2 text-xs font-semibold text-slate-500">{item ? "Agregar documentos" : "Documentos"}</legend>
         <p className="text-xs text-slate-500">Voucher, recibos, confirmaciones… Quedan también en la pestaña Documentos del viaje, asociados a esta reserva.</p>
+        {documents.length > 0 && (
+          <div className="text-xs text-slate-600">
+            <span className="font-medium">Ya tiene ({documents.length}):</span>
+            <AttachmentChips docs={documents} removable insideForm />
+          </div>
+        )}
         <MultiFileUpload direct={directUpload} />
         <Checkbox name="docsVisibleToClient" label="Visibles para el cliente en su portal" defaultChecked />
       </fieldset>

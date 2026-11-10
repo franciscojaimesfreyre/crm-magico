@@ -89,3 +89,38 @@ export function describeFlightLegs(legs: LegLike[] | undefined, formatDate: (d: 
       flight: [l.airline, l.flightNumber].filter(Boolean).join(" "),
     }));
 }
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/**
+ * Compara los viajeros marcados con la cantidad cargada en el viaje (adultos y menores, por la edad al
+ * viajar). Devuelve qué falta o sobra, o null si coincide. Si alguno no tiene fecha de nacimiento, compara
+ * solo el total.
+ */
+export function travelerCountCheck(adults: number, children: number, ages: (number | null)[]) {
+  const expected = adults + children;
+  const known = ages.filter((a): a is number => a !== null);
+  const markedAdults = known.filter((a) => a >= 18).length;
+  const markedChildren = known.filter((a) => a < 18).length;
+  const unknown = ages.length - known.length;
+  const want = `El viaje es para ${plural(adults, "adulto", "adultos")}${children ? ` y ${plural(children, "menor", "menores")}` : ""}`;
+  const missing: string[] = [];
+  const extra: string[] = [];
+  const add = (d: number, one: string, many: string) => {
+    if (d > 0) missing.push(plural(d, one, many));
+    if (d < 0) extra.push(plural(-d, one, many));
+  };
+  if (unknown === 0) {
+    add(adults - markedAdults, "adulto", "adultos");
+    add(children - markedChildren, "menor", "menores");
+  } else {
+    add(expected - ages.length, "viajero", "viajeros");
+  }
+  // "faltan 1 adulto y 1 menor", "sobra 1 adulto".
+  const verb = (list: string[], sing: string, plur: string) => `${list.length === 1 && list[0].startsWith("1 ") ? sing : plur} ${list.join(" y ")}`;
+  const parts = [missing.length && verb(missing, "falta", "faltan"), extra.length && verb(extra, "sobra", "sobran")].filter((x): x is string => !!x);
+  if (parts.length === 0) return null;
+  const marked = ages.length === 0 ? "no marcaste a nadie" : `marcaste ${plural(ages.length, "viajero", "viajeros")}`;
+  const note = unknown > 0 && parts.length ? ` (${plural(unknown, "no tiene", "no tienen")} fecha de nacimiento, así que no se sabe si es adulto o menor)` : "";
+  return `${want} y ${marked}: ${parts.join(" y ")}${note}.`;
+}

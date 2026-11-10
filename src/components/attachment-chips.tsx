@@ -3,8 +3,11 @@ import { deleteDocument } from "@/app/app/documentos/actions";
 
 type Doc = { id: string; name: string; storageKey: string | null; url: string | null; mimeType: string | null };
 
-/** Adjuntos como chips que abren el archivo. Con `removable`, cada uno lleva una cruz para quitarlo (solo agentes). */
-export function AttachmentChips({ docs, removable = false }: { docs: Doc[]; removable?: boolean }) {
+/**
+ * Adjuntos como chips que abren el archivo. Con `removable`, cada uno lleva una cruz para quitarlo (solo agentes).
+ * `insideForm`: la cruz usa formAction, porque los formularios no se pueden anidar (ej. dentro de la edición).
+ */
+export function AttachmentChips({ docs, removable = false, insideForm = false }: { docs: Doc[]; removable?: boolean; insideForm?: boolean }) {
   if (docs.length === 0) return null;
   return (
     <ul className="mt-1.5 flex flex-wrap gap-1.5">
@@ -20,13 +23,18 @@ export function AttachmentChips({ docs, removable = false }: { docs: Doc[]; remo
             >
               <Icon className="size-3 shrink-0" /> <span className="truncate">{d.name}</span>
             </a>
-            {removable && (
-              <form action={deleteDocument.bind(null, d.id)}>
-                <button className="rounded p-0.5 pr-1.5 text-slate-400 hover:text-rose-600" title="Quitar adjunto" aria-label={`Quitar ${d.name}`}>
+            {removable &&
+              (insideForm ? (
+                <button formAction={deleteDocument.bind(null, d.id)} formNoValidate className="rounded p-0.5 pr-1.5 text-slate-400 hover:text-rose-600" title="Quitar adjunto" aria-label={`Quitar ${d.name}`}>
                   <X className="size-3" />
                 </button>
-              </form>
-            )}
+              ) : (
+                <form action={deleteDocument.bind(null, d.id)}>
+                  <button className="rounded p-0.5 pr-1.5 text-slate-400 hover:text-rose-600" title="Quitar adjunto" aria-label={`Quitar ${d.name}`}>
+                    <X className="size-3" />
+                  </button>
+                </form>
+              ))}
           </li>
         );
       })}

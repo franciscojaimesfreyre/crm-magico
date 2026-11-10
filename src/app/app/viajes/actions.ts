@@ -319,7 +319,8 @@ export async function updateBookingItem(itemId: string, _: ActionState, formData
     });
   }
   await afterItemChange(item.bookingId, user.id);
-  return { ok: "Reserva actualizada" };
+  // Que se note que los archivos quedaron guardados (el campo se vacía al guardar).
+  return { ok: files.length ? `Reserva actualizada · ${files.length === 1 ? "1 adjunto agregado" : `${files.length} adjuntos agregados`}: ${files.map((f) => f.name).join(", ")}` : "Reserva actualizada" };
 }
 
 /** Accesos rápidos desde la lista de reservas del viaje. */

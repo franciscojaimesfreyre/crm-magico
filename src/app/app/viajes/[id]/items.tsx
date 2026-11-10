@@ -1,7 +1,7 @@
 import Link from "next/link";
 import clsx from "clsx";
 import type { ReactNode } from "react";
-import { AlertTriangle, BedDouble, CalendarDays, Car, CheckCircle2, FileText, Hash, Building2, Plane, Plus, Package, PartyPopper, Ship, Shield, Ticket, Trash2, Users, Utensils, Bus, Sparkles, Ban, Wallet } from "lucide-react";
+import { Paperclip, AlertTriangle, BedDouble, CalendarDays, Car, CheckCircle2, FileText, Hash, Building2, Plane, Plus, Package, PartyPopper, Ship, Shield, Ticket, Trash2, Users, Utensils, Bus, Sparkles, Ban, Wallet } from "lucide-react";
 import { ConfirmButton } from "@/components/form-controls";
 import { Badge, Card, CardHeader, buttonClass } from "@/components/ui";
 import { COMMISSION_STATUS_LABEL, ITEM_TYPE_BASE, ITEM_TYPE_LABEL, reservationStage } from "@/lib/labels";
@@ -10,6 +10,7 @@ import { storageMode } from "@/lib/storage";
 import type { ItemType } from "@/generated/prisma/enums";
 import { addBookingItem, deleteBookingItem, payReservationDeposit, quickItemAction, updateBookingItem } from "../actions";
 import { ReservationForm } from "./reservation-form";
+import { AttachmentChips } from "@/components/attachment-chips";
 import { ReservationPayments } from "./payments";
 import { TripDatesGuard, type TravelerOption } from "./reservation-extras";
 import type { LoadedBooking } from "./data";
@@ -230,6 +231,7 @@ function ItemCard({
               travelers={travelerOptions}
               selectedTravelers={item.travelers.map((t) => t.travelerId)}
               directUpload={directUpload}
+              documents={item.documents}
               submitLabel="Guardar reserva"
             />
             <form action={deleteBookingItem.bind(null, item.id)} className="mt-3">
@@ -289,19 +291,13 @@ function ReservationBasics({ item, trip }: { item: LoadedItem; trip: { startDate
         </p>
       )}
       {item.documents.length > 0 && (
-        <ul className="flex flex-wrap gap-1.5">
-          {item.documents.map((d) => (
-            <li key={d.id}>
-              <a
-                href={d.storageKey ? `/api/archivos/${d.id}` : (d.url ?? "#")}
-                target="_blank"
-                className="inline-flex max-w-56 items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-700 hover:bg-brand-50 hover:text-brand-700"
-              >
-                <FileText className="size-3 shrink-0" /> <span className="truncate">{d.name}</span>
-              </a>
-            </li>
-          ))}
-        </ul>
+        <div className="flex items-start gap-1.5 text-xs text-slate-600">
+          <Paperclip className="mt-1.5 size-3.5 shrink-0 text-slate-500" />
+          <span className="mt-1 shrink-0 font-medium">Adjuntos ({item.documents.length})</span>
+          <div className="-mt-1.5 min-w-0">
+            <AttachmentChips docs={item.documents} removable />
+          </div>
+        </div>
       )}
       {flag && (
         <p className="flex items-center gap-1.5 text-xs text-amber-700">

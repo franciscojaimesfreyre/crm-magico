@@ -15,6 +15,8 @@ type ItemLike = {
   price: { toString(): string };
   commissionRate: { toString(): string } | null;
   commissionFixed: { toString(): string } | null;
+  depositAmount?: { toString(): string } | null;
+  notes?: string | null;
 };
 
 /** Campos de un servicio (reserva o cotización). */
@@ -23,11 +25,14 @@ export function ItemFields({
   defaultRate,
   currency,
   withConfirmation = true,
+  withDetails = false,
 }: {
   item?: ItemLike;
   defaultRate: number;
   currency: string;
   withConfirmation?: boolean;
+  /** Depósito y detalles: en la cotización, para que pasen a la reserva al aceptarse y no se carguen dos veces. */
+  withDetails?: boolean;
 }) {
   return (
     <>
@@ -50,6 +55,16 @@ export function ItemFields({
         <Input type="number" step="0.01" min={0} name="price" defaultValue={item?.price.toString() ?? ""} required />
       </Field>
       <CommissionInput rate={item?.commissionRate?.toString()} fixed={item?.commissionFixed?.toString()} defaultRate={defaultRate} currency={currency} />
+      {withDetails && (
+        <>
+          <Field label="Depósito para reservar" hint="Ej: 200 en un paquete Disney">
+            <Input type="number" step="0.01" min={0} name="depositAmount" defaultValue={item?.depositAmount?.toString() ?? ""} />
+          </Field>
+          <Field label="Detalles" hint="Habitación, retiro del auto, equipaje…" className="sm:col-span-2">
+            <Input name="notes" defaultValue={item?.notes ?? ""} />
+          </Field>
+        </>
+      )}
       {withConfirmation && (
         <Field label="N° de confirmación">
           <Input name="confirmationNumber" defaultValue={item?.confirmationNumber ?? ""} />

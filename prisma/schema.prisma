@@ -401,7 +401,14 @@ model BookingItem {
   travelers      BookingItemTraveler[]
   documents      Document[]
 
+  /// Servicio de la cotización aceptada del que salió esta reserva (vacío = cargada a mano).
+  quoteItemId String?
+  quoteItem   QuoteItem?  @relation("ReservationFromQuote", fields: [quoteItemId], references: [id], onDelete: SetNull)
+  /// Servicios de cotizaciones que se armaron partiendo de esta reserva (al aceptarse, no la duplican).
+  quotedAs    QuoteItem[] @relation("QuoteItemFromReservation")
+
   @@index([bookingId])
+  @@index([quoteItemId])
 }
 
 /// Viajeros incluidos en una reserva (subconjunto de los del viaje).
@@ -476,6 +483,8 @@ model Quote {
   sentAt           DateTime?
   respondedAt      DateTime?
   acceptedOptionId String?
+  /// Cómo se aceptó: "portal" si la aceptó el cliente; si la marcó el agente, el canal (WhatsApp, teléfono…).
+  acceptedVia      String?
   clientComment    String?
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
@@ -506,7 +515,15 @@ model QuoteItem {
   price           Decimal     @default(0) @db.Decimal(12, 2)
   commissionRate  Decimal?    @db.Decimal(5, 2)
   commissionFixed Decimal?    @db.Decimal(12, 2)
+  depositAmount   Decimal?    @db.Decimal(12, 2) // depósito para reservar; pasa a la reserva al aceptar
+  notes           String? // detalles (habitación, retiro del auto…); pasan a la reserva al aceptar
   position        Int         @default(0)
+
+  /// Reserva de la que se copió este servicio al armar la cotización: al aceptarse, se actualiza esa en vez de duplicarla.
+  sourceItemId String?
+  sourceItem   BookingItem?  @relation("QuoteItemFromReservation", fields: [sourceItemId], references: [id], onDelete: SetNull)
+  /// Reservas que salieron de este servicio al aceptarse la cotización.
+  reservations BookingItem[] @relation("ReservationFromQuote")
 }
 
 // ─── Itinerarios ─────────────────────────────────────────────────────────────

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   DndContext,
   PointerSensor,
@@ -12,10 +13,22 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import clsx from "clsx";
+import { Lock } from "lucide-react";
 import { Avatar } from "@/components/ui";
 import { BOOKING_STATUS_COLOR, BOOKING_STATUS_LABEL, DESTINATION_LABEL, DESTINATION_TONE, PIPELINE } from "@/lib/labels";
 import type { BookingStatus, Destination } from "@/generated/prisma/enums";
 import { setBookingStatus } from "./actions";
+
+/** Etapas que se ponen a mano (como en la ficha del viaje). */
+const MANUAL: BookingStatus[] = ["TRAVELED", "COMPLETED", "CANCELLED"];
+
+/** Qué mueve cada etapa automática, para explicarlo si alguien intenta arrastrar un viaje ahí. */
+const AUTO_HINT: Partial<Record<BookingStatus, string>> = {
+  INQUIRY: "es donde arranca todo viaje.",
+  QUOTED: "pasa cuando enviás una cotización.",
+  BOOKED: "pasa cuando confirmás una reserva con el proveedor.",
+  PAID_IN_FULL: "pasa cuando todas las reservas están confirmadas y saldadas.",
+};
 
 export type KanbanCard = {
   id: string;
@@ -34,21 +47,41 @@ export type KanbanCard = {
 export function Kanban({ cards: initial, currency }: { cards: KanbanCard[]; currency: string }) {
   const [cards, setCards] = useState(initial);
   const [, start] = useTransition();
+  const router = useRouter();
+  const [notice, setNotice] = useState<string | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
+  // Consulta, Cotizado, Reservado y Pagado los mueve el sistema (cotización enviada, reserva confirmada, todo
+  // saldado); a mano solo se pasa a Viajó o Completado. Soltar un viaje manual en una etapa automática lo
+  // devuelve al estado que le corresponde.
   function onDragEnd(e: DragEndEvent) {
     const status = e.over?.id as BookingStatus | undefined;
     const id = String(e.active.id);
     const card = cards.find((c) => c.id === id);
     if (!status || !card || card.status === status) return;
-    setCards((prev) => prev.map((c) => (c.id === id ? { ...c, status } : c)));
-    start(() => setBookingStatus(id, status));
+    if (MANUAL.includes(status)) {
+      setCards((prev) => prev.map((c) => (c.id === id ? { ...c, status } : c)));
+      start(() => setBookingStatus(id, status));
+    } else if (MANUAL.includes(card.status)) {
+      start(async () => {
+        await setBookingStatus(id, "AUTO");
+        router.refresh();
+      });
+    } else {
+      setNotice(`"${BOOKING_STATUS_LABEL[status]}" se mueve solo: ${AUTO_HINT[status]}`);
+      setTimeout(() => setNotice(null), 6000);
+    }
   }
 
   const fmt = new Intl.NumberFormat("es-AR", { style: "currency", currency, maximumFractionDigits: 0 });
 
   return (
     <DndContext id="kanban" sensors={sensors} onDragEnd={onDragEnd}>
+      {notice && (
+        <p role="status" className="mb-3 rounded-[10px] bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          {notice}
+        </p>
+      )}
       <div className="flex gap-3 overflow-x-auto pb-4">
         {PIPELINE.map((status) => {
           const column = cards.filter((c) => c.status === status);
@@ -70,7 +103,10 @@ function Column({ status, count, sum, cards }: { status: BookingStatus; count: n
     >
       <div className="mb-3 px-1.5 pt-1">
         <p className="flex items-baseline justify-between gap-2">
-          <span className={clsx("rounded-full px-2.5 py-0.5 text-[13px] font-bold", BOOKING_STATUS_COLOR[status])}>{BOOKING_STATUS_LABEL[status]}</span>
+          <span className="flex items-center gap-1.5">
+            <span className={clsx("rounded-full px-2.5 py-0.5 text-[13px] font-bold", BOOKING_STATUS_COLOR[status])}>{BOOKING_STATUS_LABEL[status]}</span>
+            {!MANUAL.includes(status) && <Lock className="size-3 text-[var(--ink-soft)]" aria-label="Se mueve solo" />}
+          </span>
           <span className="text-sm text-[var(--ink-soft)] tabular-nums">{count}</span>
         </p>
         <p className="text-xs text-[var(--ink-soft)] tabular-nums">{sum}</p>

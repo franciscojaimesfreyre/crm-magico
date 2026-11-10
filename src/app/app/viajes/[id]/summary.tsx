@@ -2,17 +2,10 @@ import Link from "next/link";
 import clsx from "clsx";
 import { ActionForm, SubmitButton } from "@/components/form-controls";
 import { Badge, Card, CardHeader, StatCard, StatStrip, Textarea } from "@/components/ui";
-import {
-  COMMISSION_STATUS_COLOR,
-  COMMISSION_STATUS_LABEL,
-  DESTINATION_LABEL,
-  ITEM_TYPE_LABEL,
-  RESERVATION_STATUS_COLOR,
-  RESERVATION_STATUS_LABEL,
-  urgencyTone,
-} from "@/lib/labels";
+import { DESTINATION_LABEL, urgencyTone } from "@/lib/labels";
 import { ageOn, daysBetween, formatDate, formatRange, money, todayUTC } from "@/lib/format";
 import { computeKeyDates } from "@/lib/key-dates";
+import { expectsBalanceDue } from "@/lib/trips";
 import { saveTripNotes, setBookingTravelers } from "../actions";
 import type { LoadedBooking } from "./data";
 import { TripFlights } from "./flights";
@@ -27,98 +20,73 @@ export function Summary({ booking: b, alerts, gallery = [] }: { booking: LoadedB
   const upcomingDates = keyDates.filter((k) => k.date >= today);
   const pastDates = keyDates.filter((k) => k.date < today);
   const selected = new Set(b.travelers.map((t) => t.travelerId));
-  // Lo que el cliente todavía les debe a los proveedores, y el próximo saldo que vence.
-  const active = b.items.filter((i) => i.status !== "CANCELLED");
-  const owed = active.filter((i) => !i.balancePaidAt).reduce((sum, i) => sum + Math.max(0, Number(i.price) - Number(i.paidAmount)), 0);
-  const nextBalance = active
-    .filter((i) => !i.balancePaidAt && i.balanceDue)
-    .sort((x, y) => x.balanceDue!.getTime() - y.balanceDue!.getTime())[0];
+  // El total y la comisión del viaje (los mismos del listado) incluyen lo que falta reservar, que se detalla aparte;
+  // el saldo del cliente cuenta solo lo reservado con el proveedor.
+  const sum = (list: typeof b.items, pick: (i: (typeof b.items)[number]) => number) => list.reduce((t, i) => t + pick(i), 0);
+  const reserved = b.items.filter((i) => i.status === "CONFIRMED");
+  const pending = b.items.filter((i) => i.status === "PENDING");
+  const reservedTotal = sum(reserved, (i) => Number(i.price));
+  const pendingTotal = sum(pending, (i) => Number(i.price));
+  const owed = sum(reserved, (i) => (i.balancePaidAt ? 0 : Math.max(0, Number(i.price) - Number(i.paidAmount))));
+  const reservedCommission = sum(reserved, (i) => Number(i.commissionAmount));
+  const pendingCommission = sum(pending, (i) => Number(i.commissionAmount));
+  const unsettled = [...reserved, ...pending].filter((i) => !i.balancePaidAt && Number(i.price) > Number(i.paidAmount));
+  const nextBalance = unsettled.filter((i) => i.balanceDue).sort((x, y) => x.balanceDue!.getTime() - y.balanceDue!.getTime())[0];
+  const missingDue = unsettled.filter((i) => !i.balanceDue && expectsBalanceDue(i)).length;
   const nextBalanceDays = nextBalance ? daysBetween(today, nextBalance.balanceDue!) : null;
 
   return (
     <div className="space-y-6">
-      {/* Primero, la plata del viaje en cifras: lo que se lee de un vistazo. */}
+      {/* Primero, la plata del viaje en cifras: lo que se lee de un vistazo. Es el único lugar donde están. */}
       {b.items.length > 0 && (
         <StatStrip>
-          <StatCard label="Total del viaje" value={money(b.totalPrice, b.currency)} hint={`${active.length} ${active.length === 1 ? "reserva" : "reservas"}`} />
+          <StatCard
+            label="Total del viaje"
+            value={money(b.totalPrice, b.currency)}
+            hint={pendingTotal > 0 ? `${money(reservedTotal, b.currency)} reservado · ${money(pendingTotal, b.currency)} por reservar` : `${reserved.length} ${reserved.length === 1 ? "reserva" : "reservas"}`}
+          />
           <StatCard
             label="Saldo del cliente"
             value={money(owed, b.currency)}
-            tone={owed > 0 ? "warn" : "good"}
-            hint={owed > 0 ? "Le falta pagar a los proveedores" : "Todo pagado"}
+            tone={owed > 0 ? "warn" : reserved.length > 0 ? "good" : "default"}
+            hint={owed > 0 ? "Le falta pagar de lo reservado" : reserved.length > 0 ? "Lo reservado está pagado" : "Cuando reserves, se cuenta acá"}
           />
           <StatCard
             label="Próximo vencimiento"
             value={nextBalance ? new Intl.DateTimeFormat("es-AR", { day: "numeric", month: "short", timeZone: "UTC" }).format(nextBalance.balanceDue!).replace(".", "") : "—"}
-            tone={nextBalanceDays === null ? "default" : nextBalanceDays < 0 ? "bad" : nextBalanceDays <= 14 ? "warn" : "info"}
-            hint={nextBalance ? `${nextBalanceDays! < 0 ? `Venció hace ${-nextBalanceDays!} días` : urgencyTone(nextBalanceDays!).label} · ${nextBalance.description}` : "Sin saldos pendientes"}
+            tone={nextBalanceDays === null ? (missingDue > 0 ? "warn" : "default") : nextBalanceDays < 0 ? "bad" : nextBalanceDays <= 14 ? "warn" : "info"}
+            hint={
+              nextBalance
+                ? `${nextBalanceDays! < 0 ? `Venció hace ${-nextBalanceDays!} días` : urgencyTone(nextBalanceDays!).label} · ${nextBalance.description}`
+                : missingDue > 0
+                  ? `Falta la fecha de saldo en ${missingDue} ${missingDue === 1 ? "reserva" : "reservas"}${b.startDate ? "" : ": cargá las fechas del viaje"}`
+                  : "Sin saldos pendientes"
+            }
           />
-          <StatCard label="Tu comisión" value={money(b.commissionAmount, b.currency)} tone="good" hint={b.organization.agency ? `La paga ${b.organization.agency.name}` : undefined} />
+          <StatCard
+            label="Tu comisión"
+            value={money(b.commissionAmount, b.currency)}
+            tone="good"
+            hint={[pendingCommission > 0 && `${money(reservedCommission, b.currency)} de lo reservado`, b.organization.agency && `La paga ${b.organization.agency.name}`].filter(Boolean).join(" · ") || undefined}
+          />
         </StatStrip>
       )}
 
       {alerts && <TripAlerts alerts={alerts} />}
 
-      <Card>
-        <CardHeader
-          title="Reservas, pagos y comisiones"
-          description="El cliente le paga directo a cada proveedor; acá llevás el seguimiento."
-          actions={
-            <Link href={`/app/viajes/${b.id}?tab=reservas`} className="text-sm font-semibold text-brand-700 hover:underline">
-              Gestionar reservas →
-            </Link>
-          }
-        />
-        {b.items.length === 0 ? (
-          <p className="p-5 text-sm text-slate-500">
-            Todavía no hay reservas. Cargá el paquete, los tickets, el hotel o el auto en la pestaña{" "}
-            <Link href={`/app/viajes/${b.id}?tab=reservas`} className="text-brand-700 hover:underline">
-              Reservas
-            </Link>
-            .
-          </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <tbody className="divide-y divide-[var(--rule)]">
-                {b.items.map((i) => {
-                  const due = i.balanceDue && !i.balancePaidAt ? daysBetween(today, i.balanceDue) : null;
-                  return (
-                    <tr key={i.id} className={clsx(i.status === "CANCELLED" && "opacity-50")}>
-                      <td className="px-5 py-3">
-                        <p className="font-semibold text-slate-900">{i.description}</p>
-                        <p className="text-xs text-slate-500">{[ITEM_TYPE_LABEL[i.type], i.supplier, i.confirmationNumber && `Conf. ${i.confirmationNumber}`].filter(Boolean).join(" · ")}</p>
-                      </td>
-                      <td className="px-3 py-3">
-                        <Badge className={RESERVATION_STATUS_COLOR[i.status]}>{RESERVATION_STATUS_LABEL[i.status]}</Badge>
-                      </td>
-                      <td className="px-3 py-3 text-xs whitespace-nowrap">
-                        {i.balancePaidAt ? (
-                          <Badge className="bg-emerald-50 text-emerald-800">Saldada</Badge>
-                        ) : (
-                          <>
-                            <span className="text-slate-600">Pagado {money(i.paidAmount, b.currency)}</span>
-                            {i.balanceDue && due !== null && (
-                              <span className={clsx("mt-0.5 block w-fit rounded-full px-2 py-0.5 font-semibold", due < 0 ? "bg-rose-50 text-rose-700" : urgencyTone(due).soft, due >= 0 && urgencyTone(due).ink)}>
-                                Saldar antes del {formatDate(i.balanceDue, { year: undefined })}
-                              </span>
-                            )}
-                          </>
-                        )}
-                      </td>
-                      <td className="px-3 py-3 text-right font-semibold whitespace-nowrap text-slate-900 tabular-nums">{money(i.price, b.currency)}</td>
-                      <td className="px-5 py-3 text-right whitespace-nowrap">
-                        <span className="font-semibold text-brand-700 tabular-nums">{money(i.commissionAmount, b.currency)}</span>{" "}
-                        <Badge className={COMMISSION_STATUS_COLOR[i.commissionStatus]}>{COMMISSION_STATUS_LABEL[i.commissionStatus]}</Badge>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+      <Link href={`/app/viajes/${b.id}?tab=${b.items.length > 0 ? "reservas" : "cotizaciones"}`} className="block">
+        <Card className="flex items-center justify-between gap-4 px-5 py-4 transition hover:ring-brand-300">
+          <div>
+            <p className="font-semibold text-slate-900">Reservas</p>
+            <p className="text-sm text-slate-600">
+              {b.items.length === 0
+                ? "Todavía no hay reservas. Llegan solas al aceptarse una cotización, o se cargan a mano."
+                : [pending.length > 0 && `${pending.length} por reservar`, reserved.length > 0 && `${reserved.length} ${reserved.length === 1 ? "reservada" : "reservadas"}`].filter(Boolean).join(" · ")}
+            </p>
           </div>
-        )}
-      </Card>
+          <span className="text-sm font-semibold whitespace-nowrap text-brand-700">{b.items.length > 0 ? "Gestionar reservas →" : "Armar cotización →"}</span>
+        </Card>
+      </Link>
 
       {/* Dos columnas que fluyen cada una por su lado: lo que pasa y quiénes viajan; el detalle y los vuelos. */}
       <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">

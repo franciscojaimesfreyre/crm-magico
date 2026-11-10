@@ -5,7 +5,7 @@ import { Wand2 } from "lucide-react";
 import { buttonClass } from "@/components/ui";
 import { generateQuoteMessage } from "../quote-actions";
 
-export function QuoteMessageEditor({ quoteId, initial }: { quoteId: string; initial: string }) {
+export function QuoteMessageEditor({ quoteId, initial, single = true }: { quoteId: string; initial: string; single?: boolean }) {
   const [text, setText] = useState(initial);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -29,9 +29,9 @@ export function QuoteMessageEditor({ quoteId, initial }: { quoteId: string; init
           <Wand2 className="size-3.5" /> {pending ? "Redactando…" : "Redactar con IA"}
         </button>
       </div>
-      <textarea name="message" rows={5} className="field" value={text} onChange={(e) => setText(e.target.value)} placeholder="Contale al cliente qué incluye cada opción…" />
+      <textarea name="message" rows={5} className="field" value={text} onChange={(e) => setText(e.target.value)} placeholder={single ? "Contale al cliente qué incluye la cotización…" : "Contale al cliente qué incluye cada opción y en qué se diferencian…"} />
       {error && <p className="mt-1 text-xs text-rose-700">{error}</p>}
-      <p className="mt-1 text-xs text-slate-500">La IA usa las opciones guardadas, el perfil de la familia y las novedades vigentes. Guardá las opciones antes de redactar.</p>
+      <p className="mt-1 text-xs text-slate-500">La IA usa los servicios cargados, el perfil de la familia y las novedades vigentes.</p>
     </div>
   );
 }

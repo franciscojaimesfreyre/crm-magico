@@ -2,7 +2,7 @@ import Link from "next/link";
 import { UserPlus } from "lucide-react";
 import { ActionForm, SubmitButton, type ActionState } from "@/components/form-controls";
 import { Card, CardHeader, Field, Input, Select, Textarea } from "@/components/ui";
-import { BOOKING_STATUSES, DESTINATIONS } from "@/lib/labels";
+import { DESTINATIONS } from "@/lib/labels";
 import { toDateInput } from "@/lib/format";
 import { DateRangeFields } from "@/components/date-range-fields";
 import type { Booking } from "@/generated/prisma/client";
@@ -46,9 +46,6 @@ export function BookingForm({
           </Field>
           <Field label="Destino *">
             <Select name="destination" options={DESTINATIONS} defaultValue={booking?.destination ?? "DISNEY_WORLD"} />
-          </Field>
-          <Field label="Estado">
-            <Select name="status" options={BOOKING_STATUSES} defaultValue={booking?.status ?? "INQUIRY"} />
           </Field>
           <Field label="Grupo">
             <Select name="groupId" options={groups} defaultValue={booking?.groupId ?? ""} placeholder="Sin grupo" />

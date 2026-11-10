@@ -12,6 +12,7 @@ import type { ActionState } from "@/components/form-controls";
 import type { ItemType } from "@/generated/prisma/enums";
 import { appUrl } from "@/lib/app-url";
 import { commissionFromForm } from "@/lib/trips";
+import { acceptQuoteOption } from "@/lib/quotes";
 
 async function ownQuote(quoteId: string) {
   const user = await requireUser();
@@ -31,7 +32,7 @@ export async function createQuote(bookingId: string) {
   const user = await requireUser();
   const booking = await db.booking.findFirst({
     where: { id: bookingId, organizationId: user.organizationId },
-    include: { items: { orderBy: { position: "asc" } } },
+    include: { items: { where: { status: { not: "CANCELLED" } }, orderBy: { position: "asc" } } },
   });
   if (!booking) throw new Error("Viaje no encontrado");
   const count = await db.quote.count({ where: { bookingId } });
@@ -43,7 +44,8 @@ export async function createQuote(bookingId: string) {
         create: {
           name: "Opción 1",
           position: 0,
-          // Si la reserva ya tiene servicios, se usan como punto de partida.
+          // Si el viaje ya tiene reservas, se usan como punto de partida; cada servicio recuerda de qué reserva
+          // salió, así al aceptarse la cotización se actualiza esa reserva en vez de duplicarla.
           items: {
             create: booking.items.map((i, idx) => ({
               type: i.type,
@@ -54,6 +56,9 @@ export async function createQuote(bookingId: string) {
               price: i.price,
               commissionRate: i.commissionRate,
               commissionFixed: i.commissionFixed,
+              depositAmount: i.depositAmount,
+              notes: i.notes,
+              sourceItemId: i.id,
               position: idx,
             })),
           },
@@ -64,6 +69,10 @@ export async function createQuote(bookingId: string) {
   revalidatePath(path(bookingId));
 }
 
+/**
+ * Guarda el título, la validez y el mensaje. Con intent=send, además la envía: así lo que el agente acaba de
+ * escribir sale en el email aunque no haya apretado Guardar antes.
+ */
 export async function updateQuote(quoteId: string, _: ActionState, formData: FormData): Promise<ActionState> {
   const { quote } = await ownQuote(quoteId);
   await db.quote.update({
@@ -74,13 +83,53 @@ export async function updateQuote(quoteId: string, _: ActionState, formData: For
       validUntil: parseDateInput(formData.get("validUntil")),
     },
   });
+  if (formData.get("intent") === "send") return sendQuote(quoteId);
   revalidatePath(path(quote.bookingId));
   return { ok: "Cotización guardada" };
 }
 
 export async function deleteQuote(quoteId: string) {
-  const { quote } = await ownQuote(quoteId);
+  const { user, quote } = await ownQuote(quoteId);
   await db.quote.delete({ where: { id: quoteId } });
+  // Si era la única cotización activa, el viaje vuelve a Consulta.
+  await syncBookingStatus(quote.bookingId, user.id);
+  revalidatePath(path(quote.bookingId));
+}
+
+/** Copia una cotización (opciones y servicios) como borrador nuevo, para armar una variante sin empezar de cero. */
+export async function duplicateQuote(quoteId: string) {
+  const { quote } = await ownQuote(quoteId);
+  const options = await db.quoteOption.findMany({ where: { quoteId }, orderBy: { position: "asc" }, include: { items: { orderBy: { position: "asc" } } } });
+  await db.quote.create({
+    data: {
+      bookingId: quote.bookingId,
+      title: `${quote.title} (copia)`,
+      message: quote.message,
+      options: {
+        create: options.map((o) => ({
+          name: o.name,
+          description: o.description,
+          position: o.position,
+          items: {
+            create: o.items.map((i) => ({
+              type: i.type,
+              description: i.description,
+              supplier: i.supplier,
+              startDate: i.startDate,
+              endDate: i.endDate,
+              price: i.price,
+              commissionRate: i.commissionRate,
+              commissionFixed: i.commissionFixed,
+              depositAmount: i.depositAmount,
+              notes: i.notes,
+              sourceItemId: i.sourceItemId,
+              position: i.position,
+            })),
+          },
+        })),
+      },
+    },
+  });
   revalidatePath(path(quote.bookingId));
 }
 
@@ -107,6 +156,33 @@ export async function deleteQuoteOption(optionId: string) {
   revalidatePath(path(option.quote.bookingId));
 }
 
+/** Datos de un servicio de la cotización, tal como llegan del formulario. */
+function quoteItemFields(formData: FormData) {
+  const number = (key: string) => {
+    const raw = String(formData.get(key) ?? "").trim();
+    if (!raw) return null;
+    const n = Number(raw.replace(",", "."));
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  };
+  return {
+    type: String(formData.get("type") ?? "OTHER") as ItemType,
+    description: String(formData.get("description") ?? "").trim(),
+    supplier: String(formData.get("supplier") ?? "").trim() || null,
+    startDate: parseDateInput(formData.get("startDate")),
+    endDate: parseDateInput(formData.get("endDate")),
+    price: number("price") ?? 0,
+    depositAmount: number("depositAmount"),
+    notes: String(formData.get("notes") ?? "").trim() || null,
+    ...commissionFromForm(formData),
+  };
+}
+
+function checkQuoteItem(data: ReturnType<typeof quoteItemFields>) {
+  if (!data.description) return "Describí el servicio";
+  if (data.startDate && data.endDate && data.endDate < data.startDate) return "La fecha de fin no puede ser anterior a la de inicio";
+  return null;
+}
+
 export async function addQuoteItem(optionId: string, _: ActionState, formData: FormData): Promise<ActionState> {
   const user = await requireUser();
   const option = await db.quoteOption.findFirst({
@@ -114,25 +190,30 @@ export async function addQuoteItem(optionId: string, _: ActionState, formData: F
     include: { quote: true },
   });
   if (!option) return { error: "Opción no encontrada" };
-  const description = String(formData.get("description") ?? "").trim();
-  if (!description) return { error: "Describí el servicio" };
-  const price = Number(String(formData.get("price") ?? "0").replace(",", "."));
+  const data = quoteItemFields(formData);
+  const invalid = checkQuoteItem(data);
+  if (invalid) return { error: invalid };
   const position = await db.quoteItem.count({ where: { optionId } });
-  await db.quoteItem.create({
-    data: {
-      optionId,
-      type: String(formData.get("type") ?? "OTHER") as ItemType,
-      description,
-      supplier: String(formData.get("supplier") ?? "").trim() || null,
-      startDate: parseDateInput(formData.get("startDate")),
-      endDate: parseDateInput(formData.get("endDate")),
-      price: Number.isFinite(price) ? price : 0,
-      ...commissionFromForm(formData),
-      position,
-    },
-  });
+  await db.quoteItem.create({ data: { optionId, ...data, position } });
   revalidatePath(path(option.quote.bookingId));
   return { ok: "Servicio agregado" };
+}
+
+/** Editar un servicio de la cotización (mientras no esté aceptada). */
+export async function updateQuoteItem(itemId: string, _: ActionState, formData: FormData): Promise<ActionState> {
+  const user = await requireUser();
+  const item = await db.quoteItem.findFirst({
+    where: { id: itemId, option: { quote: { booking: { organizationId: user.organizationId } } } },
+    include: { option: { include: { quote: true } } },
+  });
+  if (!item) return { error: "Servicio no encontrado" };
+  if (!["DRAFT", "SENT"].includes(item.option.quote.status)) return { error: "La cotización ya fue respondida: los cambios van en las reservas." };
+  const data = quoteItemFields(formData);
+  const invalid = checkQuoteItem(data);
+  if (invalid) return { error: invalid };
+  await db.quoteItem.update({ where: { id: itemId }, data });
+  revalidatePath(path(item.option.quote.bookingId));
+  return { ok: "Servicio actualizado" };
 }
 
 export async function deleteQuoteItem(itemId: string) {
@@ -203,6 +284,44 @@ ${user.name}`,
   });
   revalidatePath(path(quote.bookingId));
   return { ok: `Cotización publicada en el portal del cliente${emailNote}.` };
+}
+
+/**
+ * El cliente aceptó por otro canal (WhatsApp, teléfono…): el agente lo registra y la opción elegida pasa a las
+ * reservas igual que si la hubiera aceptado desde el portal.
+ */
+export async function markQuoteAccepted(quoteId: string, _: ActionState, formData: FormData): Promise<ActionState> {
+  const { user, quote } = await ownQuote(quoteId);
+  if (!["DRAFT", "SENT"].includes(quote.status)) return { error: "Esta cotización ya fue respondida." };
+  const optionId = String(formData.get("optionId") ?? "");
+  const option = await db.quoteOption.findFirst({ where: { id: optionId, quoteId }, include: { _count: { select: { items: true } } } });
+  if (!option) return { error: "Elegí la opción que aceptó el cliente" };
+  if (option._count.items === 0) return { error: "Esa opción no tiene servicios" };
+  const via = String(formData.get("via") ?? "").trim() || "Otro";
+  const comment = String(formData.get("comment") ?? "").trim() || null;
+  const replace = formData.get("replace") === "on";
+  await acceptQuoteOption({ quoteId, optionId, via, comment, userId: user.id, replace });
+  revalidatePath(path(quote.bookingId));
+  return { ok: `Listo: "${option.name}" pasó a Reservas, por reservar.` };
+}
+
+/** El cliente dijo que no por otro canal: queda registrado, y las reservas no cambian. */
+export async function markQuoteRejected(quoteId: string, _: ActionState, formData: FormData): Promise<ActionState> {
+  const { user, quote } = await ownQuote(quoteId);
+  if (!["DRAFT", "SENT"].includes(quote.status)) return { error: "Esta cotización ya fue respondida." };
+  const comment = String(formData.get("comment") ?? "").trim() || null;
+  await db.quote.update({ where: { id: quoteId }, data: { status: "REJECTED", respondedAt: new Date(), clientComment: comment } });
+  await logActivity({
+    organizationId: user.organizationId,
+    clientId: quote.booking.clientId,
+    bookingId: quote.bookingId,
+    userId: user.id,
+    type: "quote",
+    description: `Cotización rechazada por el cliente${comment ? `: ${comment}` : ""}`,
+  });
+  await syncBookingStatus(quote.bookingId, user.id);
+  revalidatePath(path(quote.bookingId));
+  return { ok: "Quedó registrada como rechazada" };
 }
 
 /** Borrador del mensaje de la cotización escrito por la IA. */

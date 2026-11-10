@@ -24,6 +24,14 @@ export function suggestedBalanceDue(type: ItemType, arrival: Date | null) {
   return new Date(arrival.getTime() - PACKAGE_FINAL_PAYMENT_DAYS * 86_400_000);
 }
 
+/**
+ * Si a esta reserva le corresponde una fecha para saldar: los paquetes (salvo Universal, donde depende de cómo se
+ * compró) y lo que pide depósito. Un hotel o unos tickets pagados de una vez no la necesitan.
+ */
+export function expectsBalanceDue(item: { type: ItemType; depositAmount?: unknown }) {
+  return (ITEM_TYPE_BASE[item.type] === "PACKAGE" && itemBrand(item.type) !== "UNIVERSAL") || (item.depositAmount !== null && item.depositAmount !== undefined);
+}
+
 type Num = number | string | { toString(): string } | null | undefined;
 const toN = (v: Num) => (v === null || v === undefined ? 0 : Number(v.toString()));
 

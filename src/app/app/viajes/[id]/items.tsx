@@ -1,24 +1,17 @@
+import Link from "next/link";
 import clsx from "clsx";
 import type { ReactNode } from "react";
-import { AlertTriangle, BedDouble, CalendarDays, Car, CheckCircle2, FileText, Hash, Building2, Plane, Plus, Package, PartyPopper, Ship, Shield, Ticket, Trash2, Users, Utensils, Bus, Sparkles, Ban } from "lucide-react";
+import { AlertTriangle, BedDouble, CalendarDays, Car, CheckCircle2, FileText, Hash, Building2, Plane, Plus, Package, PartyPopper, Ship, Shield, Ticket, Trash2, Users, Utensils, Bus, Sparkles, Ban, Wallet } from "lucide-react";
 import { ConfirmButton } from "@/components/form-controls";
-import { Badge, Card, CardHeader, StatCard, StatStrip, buttonClass } from "@/components/ui";
-import {
-  COMMISSION_STATUS_COLOR,
-  COMMISSION_STATUS_LABEL,
-  ITEM_TYPE_BASE,
-  ITEM_TYPE_LABEL,
-  RESERVATION_STATUS_COLOR,
-  RESERVATION_STATUS_LABEL,
-} from "@/lib/labels";
+import { Badge, Card, CardHeader, buttonClass } from "@/components/ui";
+import { COMMISSION_STATUS_LABEL, ITEM_TYPE_BASE, ITEM_TYPE_LABEL, reservationStage } from "@/lib/labels";
 import { ageOn, daysBetween, formatDate, formatRange, money, percent, toDateInput, toNumber } from "@/lib/format";
 import { storageMode } from "@/lib/storage";
 import type { ItemType } from "@/generated/prisma/enums";
-import { paymentProgress } from "@/lib/trips";
-import { addBookingItem, deleteBookingItem, quickItemAction, updateBookingItem } from "../actions";
+import { addBookingItem, deleteBookingItem, payReservationDeposit, quickItemAction, updateBookingItem } from "../actions";
 import { ReservationForm } from "./reservation-form";
 import { ReservationPayments } from "./payments";
-import { TripDatesGuard } from "./reservation-extras";
+import { TripDatesGuard, type TravelerOption } from "./reservation-extras";
 import type { LoadedBooking } from "./data";
 import { DateInput } from "@/components/date-input";
 
@@ -39,7 +32,11 @@ const ICON: Partial<Record<ItemType, typeof Package>> = {
   OTHER: Package,
 };
 
-/** Las reservas que componen el viaje: cada una con su proveedor, pagos y comisión. */
+/**
+ * Las reservas que componen el viaje, en dos grupos: las que faltan reservar con el proveedor (con la
+ * confirmación como acción principal) y las reservadas. Cada una muestra de qué cotización salió, sus pagos y,
+ * plegada, su comisión. La plata del viaje en cifras vive en Resumen.
+ */
 export function Items({
   booking: b,
   defaultRate,
@@ -56,105 +53,65 @@ export function Items({
     const age = ageOn(t.birthDate, b.startDate ?? undefined);
     return { id: t.id, firstName: t.firstName, lastName: t.lastName, detail: age !== null ? `${age} años` : undefined };
   });
-  const active = b.items.filter((i) => i.status !== "CANCELLED");
-  const progress = active.map((i) => ({ item: i, ...paymentProgress(i) }));
-  const paid = progress.reduce((t, p) => t + p.paid, 0);
-  const remaining = progress.reduce((t, p) => t + p.remaining, 0);
-  const nextDue = progress
-    .filter((p) => p.remaining > 0 && p.item.balanceDue)
-    .sort((x, y) => x.item.balanceDue!.getTime() - y.item.balanceDue!.getTime())[0];
-  const commissionPaid = active
-    .filter((i) => i.commissionStatus === "PAID")
-    .reduce((s, i) => s + toNumber(i.commissionPaidAmount ?? i.commissionAmount), 0);
+  const groups = [
+    { key: "PENDING", title: "Por reservar", hint: "Confirmalas con el proveedor y cargá el n° de confirmación.", items: b.items.filter((i) => i.status === "PENDING") },
+    { key: "CONFIRMED", title: "Reservadas", hint: "Confirmadas con el proveedor. Registrá los pagos del cliente hasta saldarlas.", items: b.items.filter((i) => i.status === "CONFIRMED") },
+  ];
+  const cancelled = b.items.filter((i) => i.status === "CANCELLED");
+  const card = (item: LoadedItem) => (
+    <ItemCard
+      key={item.id}
+      item={item}
+      booking={b}
+      defaultRate={defaultRate}
+      warning={eventWarnings[item.id]}
+      travelerOptions={travelerOptions}
+      directUpload={directUpload}
+    />
+  );
 
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-slate-500">
-        Un viaje se compone de varias reservas: por ejemplo, el paquete de Disney, los tickets de Universal, el auto y unas noches de hotel en Orlando.
-        Cada una tiene su proveedor, su confirmación, sus pagos y su comisión. Los totales del viaje se calculan solos.
-      </p>
-
-      {b.items.length > 0 && (
-        <StatStrip>
-          <Total label="Total del viaje" value={money(b.totalPrice, b.currency)} hint={`${active.length} reservas activas`} />
-          <Total label="Pagado por el cliente" value={money(paid, b.currency)} hint={`Resta ${money(remaining, b.currency)}`} />
-          <Total label="Próximo vencimiento" value={nextDue ? formatDate(nextDue.item.balanceDue) : "—"} hint={nextDue ? `${money(nextDue.remaining, b.currency)} · ${nextDue.item.description}` : "Sin saldos pendientes"} />
-          <Total label="Comisión del viaje" value={money(b.commissionAmount, b.currency)} />
-          <Total label="Comisión cobrada" value={money(commissionPaid, b.currency)} />
-        </StatStrip>
+    <div className="space-y-6">
+      {b.items.length === 0 && (
+        <p className="text-sm text-slate-500">
+          Un viaje se compone de varias reservas: el paquete, los tickets, el auto, unas noches de hotel… Llegan solas cuando el cliente acepta una{" "}
+          <Link href={`/app/viajes/${b.id}?tab=cotizaciones`} className="text-brand-700 hover:underline">
+            cotización
+          </Link>
+          , o las cargás acá.
+        </p>
       )}
 
-      {b.items.map((item) => {
-        const Icon = ICON[ITEM_TYPE_BASE[item.type]] ?? Package;
-        return (
-          <Card key={item.id} className={clsx(item.status === "CANCELLED" && "opacity-60")}>
-            <div className="flex flex-wrap items-start gap-4 p-4">
-              <span className="flex size-6 shrink-0 items-center justify-center text-slate-500">
-                <Icon className="size-5" />
-              </span>
-              <div className="min-w-0 flex-1 basis-56">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs text-slate-500">{ITEM_TYPE_LABEL[item.type]}</span>
-                  <Badge className={RESERVATION_STATUS_COLOR[item.status]}>{RESERVATION_STATUS_LABEL[item.status]}</Badge>
-                </div>
-                <p className="font-medium text-slate-900">{item.description}</p>
-                <ReservationBasics item={item} />
-                {eventWarnings[item.id] && (
-                  <p className="mt-1.5 flex items-start gap-1.5 rounded-lg bg-amber-50 px-2 py-1.5 text-xs text-amber-800">
-                    <AlertTriangle className="mt-px size-3.5 shrink-0" /> {eventWarnings[item.id]} Revisá la fecha de la reserva.
-                  </p>
-                )}
-                <ReservationPayments item={item} currency={b.currency} />
+      {groups
+        .filter((g) => g.items.length > 0)
+        .map((g) => (
+          <section key={g.key} className="space-y-3">
+            <header className="flex flex-wrap items-baseline justify-between gap-2">
+              <div>
+                <h3 className="font-semibold text-slate-900">
+                  {g.title} <span className="font-normal text-slate-500">({g.items.length})</span>
+                </h3>
+                <p className="text-xs text-slate-500">{g.hint}</p>
               </div>
-              <div className="ml-14 sm:ml-0 sm:text-right">
-                <p className="font-semibold text-slate-900">{money(item.price, b.currency)}</p>
-                {item.taxAmount !== null && toNumber(item.taxAmount) > 0 && <p className="text-[11px] text-slate-500">Incluye tax {money(item.taxAmount, b.currency)}</p>}
-                <p className="text-xs text-emerald-700">
-                  Comisión {money(item.commissionAmount, b.currency)} <span className="text-slate-500">({item.commissionFixed !== null ? "monto fijo" : percent(item.commissionRate ?? defaultRate)})</span>
-                </p>
-                <Badge className={clsx("mt-1", COMMISSION_STATUS_COLOR[item.commissionStatus])}>{COMMISSION_STATUS_LABEL[item.commissionStatus]}</Badge>
-                {item.saleDate && <p className="text-[11px] text-slate-500">Vendida el {formatDate(item.saleDate)}</p>}
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 px-4 py-2">
-              {item.status === "PENDING" && <ConfirmReservation item={item} trip={b} />}
-              {item.status !== "CANCELLED" && (
-                <form action={quickItemAction.bind(null, item.id, "cancel")}>
-                  <ConfirmButton variant="ghost" message={`¿Cancelar "${item.description}"? Deja de sumar al total y a las comisiones.`}>
-                    <Ban className="size-3.5" /> Cancelar
-                  </ConfirmButton>
-                </form>
-              )}
-              <details className="group w-full">
-                <summary className="cursor-pointer list-none text-xs font-medium text-brand-700">Editar todos los datos</summary>
-                <div className="pt-4 pb-2">
-                  <ReservationForm
-                    action={updateBookingItem.bind(null, item.id)}
-                    item={item}
-                    defaultRate={defaultRate}
-                    currency={b.currency}
-                    trip={b}
-                    travelers={travelerOptions}
-                    selectedTravelers={item.travelers.map((t) => t.travelerId)}
-                    directUpload={directUpload}
-                    submitLabel="Guardar reserva"
-                  />
-                  <form action={deleteBookingItem.bind(null, item.id)} className="mt-3">
-                    <ConfirmButton message="¿Eliminar esta reserva? Si ya figura en una planilla de comisiones, también se quita de ahí.">
-                      <Trash2 className="size-3.5" /> Eliminar reserva
-                    </ConfirmButton>
-                  </form>
-                </div>
-              </details>
-            </div>
-          </Card>
-        );
-      })}
+              <p className="text-sm font-semibold text-slate-900 tabular-nums">{money(g.items.reduce((t, i) => t + toNumber(i.price), 0), b.currency)}</p>
+            </header>
+            {g.items.map(card)}
+          </section>
+        ))}
+
+      {cancelled.length > 0 && (
+        <details className="group">
+          <summary className="cursor-pointer list-none text-sm font-medium text-slate-600 hover:underline">
+            {cancelled.length} {cancelled.length === 1 ? "reserva cancelada" : "reservas canceladas"}
+          </summary>
+          <div className="mt-3 space-y-3">{cancelled.map(card)}</div>
+        </details>
+      )}
 
       <Card>
         <details open={b.items.length === 0}>
           <summary className="cursor-pointer list-none">
-            <CardHeader title={<span className="flex items-center gap-2"><Plus className="size-4" /> Agregar reserva</span>} description="Paquete, tickets, hotel, auto, vuelo, seguro…" />
+            <CardHeader title={<span className="flex items-center gap-2"><Plus className="size-4" /> Agregar reserva a mano</span>} description="Paquete, tickets, hotel, auto, vuelo, seguro…" />
           </summary>
           <div className="p-5">
             <ReservationForm
@@ -174,6 +131,113 @@ export function Items({
   );
 }
 
+function ItemCard({
+  item,
+  booking: b,
+  defaultRate,
+  warning,
+  travelerOptions,
+  directUpload,
+}: {
+  item: LoadedItem;
+  booking: LoadedBooking;
+  defaultRate: number;
+  warning?: string;
+  travelerOptions: TravelerOption[];
+  directUpload: boolean;
+}) {
+  const Icon = ICON[ITEM_TYPE_BASE[item.type]] ?? Package;
+  const stage = reservationStage(item);
+  const source = item.quoteItem?.option;
+  return (
+    <Card className={clsx(item.status === "CANCELLED" && "opacity-60")}>
+      <div className="flex flex-wrap items-start gap-4 p-4">
+        <span className="flex size-6 shrink-0 items-center justify-center text-slate-500">
+          <Icon className="size-5" />
+        </span>
+        <div className="min-w-0 flex-1 basis-56">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-slate-500">{ITEM_TYPE_LABEL[item.type]}</span>
+            <Badge className={stage.color}>{stage.label}</Badge>
+            {source && (
+              <Link href={`/app/viajes/${b.id}?tab=cotizaciones`} className="text-xs text-slate-500 hover:text-brand-700 hover:underline">
+                De: {source.quote.title}
+                {source.quote._count.options > 1 && ` · ${source.name}`}
+              </Link>
+            )}
+          </div>
+          <p className="font-medium text-slate-900">{item.description}</p>
+          <ReservationBasics item={item} trip={b} />
+          {warning && (
+            <p className="mt-1.5 flex items-start gap-1.5 rounded-lg bg-amber-50 px-2 py-1.5 text-xs text-amber-800">
+              <AlertTriangle className="mt-px size-3.5 shrink-0" /> {warning} Revisá la fecha de la reserva.
+            </p>
+          )}
+          <ReservationPayments item={item} currency={b.currency} />
+        </div>
+        <div className="ml-14 sm:ml-0 sm:text-right">
+          <p className="font-semibold text-slate-900">{money(item.price, b.currency)}</p>
+          {item.taxAmount !== null && toNumber(item.taxAmount) > 0 && <p className="text-[11px] text-slate-500">Incluye tax {money(item.taxAmount, b.currency)}</p>}
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 px-4 py-2">
+        {item.status === "PENDING" && <ConfirmReservation item={item} trip={b} />}
+        {/* El depósito es lo próximo que paga el cliente: a mano, en un clic. */}
+        {item.status !== "CANCELLED" && item.depositAmount !== null && toNumber(item.paidAmount) < toNumber(item.depositAmount) && (
+          <form action={payReservationDeposit.bind(null, item.id)}>
+            <button className={buttonClass("secondary", "sm")}>
+              <Wallet className="size-3.5" /> Registrar depósito {money(toNumber(item.depositAmount) - toNumber(item.paidAmount), b.currency)}
+            </button>
+          </form>
+        )}
+        {item.status !== "CANCELLED" && (
+          <form action={quickItemAction.bind(null, item.id, "cancel")}>
+            <ConfirmButton variant="ghost" message={`¿Cancelar "${item.description}"? Deja de sumar al total y a las comisiones.`}>
+              <Ban className="size-3.5" /> Cancelar
+            </ConfirmButton>
+          </form>
+        )}
+        {/* La comisión, plegada: se sigue en Comisiones. */}
+        <details className="group ml-auto text-right open:basis-full open:text-left">
+          <summary className="cursor-pointer list-none text-xs text-slate-500 hover:text-slate-800">
+            Comisión <span className="font-semibold text-emerald-700">{money(item.commissionAmount, b.currency)}</span> · {COMMISSION_STATUS_LABEL[item.commissionStatus]}
+          </summary>
+          <p className="mt-2 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
+            {item.commissionFixed !== null ? "Monto fijo" : `${percent(item.commissionRate ?? defaultRate)} sobre el importe${item.taxAmount !== null ? " sin tax" : ""}`}
+            {item.saleDate && ` · Vendida el ${formatDate(item.saleDate)}`}
+            {item.commissionPaidAt && ` · Cobrada el ${formatDate(item.commissionPaidAt)}`}. Se cobra desde{" "}
+            <Link href="/app/comisiones" className="text-brand-700 hover:underline">
+              Comisiones
+            </Link>
+            ; el porcentaje y el estado de cobro se cambian en «Editar todos los datos».
+          </p>
+        </details>
+        <details className="group w-full">
+          <summary className="cursor-pointer list-none text-xs font-medium text-brand-700">Editar todos los datos</summary>
+          <div className="pt-4 pb-2">
+            <ReservationForm
+              action={updateBookingItem.bind(null, item.id)}
+              item={item}
+              defaultRate={defaultRate}
+              currency={b.currency}
+              trip={b}
+              travelers={travelerOptions}
+              selectedTravelers={item.travelers.map((t) => t.travelerId)}
+              directUpload={directUpload}
+              submitLabel="Guardar reserva"
+            />
+            <form action={deleteBookingItem.bind(null, item.id)} className="mt-3">
+              <ConfirmButton message="¿Eliminar esta reserva? Si ya figura en una planilla de comisiones, también se quita de ahí.">
+                <Trash2 className="size-3.5" /> Eliminar reserva
+              </ConfirmButton>
+            </form>
+          </div>
+        </details>
+      </div>
+    </Card>
+  );
+}
+
 /** Tipos que se miden en noches (alojamiento); el resto, en días. */
 const STAY_TYPES: ItemType[] = ["PACKAGE", "HOTEL", "CRUISE"];
 
@@ -185,7 +249,7 @@ function duration(item: LoadedItem) {
 }
 
 /** Datos básicos de la reserva, siempre visibles. Si está confirmada y falta algo, lo marca. */
-function ReservationBasics({ item }: { item: LoadedItem }) {
+function ReservationBasics({ item, trip }: { item: LoadedItem; trip: { startDate: Date | null; endDate: Date | null } }) {
   const missing = [!item.startDate && "las fechas", !item.confirmationNumber && "el n° de confirmación"].filter(Boolean) as string[];
   const flag = item.status === "CONFIRMED" && missing.length > 0;
   const empty = (text: string) => <span className={flag ? "text-amber-700" : "text-slate-500"}>{text}</span>;
@@ -198,6 +262,8 @@ function ReservationBasics({ item }: { item: LoadedItem }) {
               {item.endDate ? `${formatDate(item.startDate)} → ${formatDate(item.endDate)}` : `Desde ${formatDate(item.startDate)}`}
               {duration(item) && <span className="text-slate-500"> · {duration(item)}</span>}
             </>
+          ) : trip.startDate ? (
+            empty(`Las del viaje (${formatRange(trip.startDate, trip.endDate)})`)
           ) : (
             empty("Sin fechas")
           )}
@@ -251,14 +317,14 @@ function Datum({ icon: Icon, label, children }: { icon: typeof Package; label: s
   );
 }
 
-/** Confirmar con el proveedor: aprovecha para cargar el n° de confirmación y las fechas. */
+/** Confirmar con el proveedor: en un paso, el n° de confirmación, las fechas, el depósito y cuándo hay que saldarla. */
 function ConfirmReservation({ item, trip }: { item: LoadedItem; trip: { startDate: Date | null; endDate: Date | null } }) {
   return (
     <details className="group open:basis-full">
-      <summary className={clsx(buttonClass("secondary", "sm"), "list-none")}>
-        <CheckCircle2 className="size-3.5" /> Confirmar
+      <summary className={clsx(buttonClass("primary", "sm"), "list-none")}>
+        <CheckCircle2 className="size-3.5" /> Confirmar con el proveedor
       </summary>
-      <form action={quickItemAction.bind(null, item.id, "confirm")} className="mt-2 grid grid-cols-1 gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:grid-cols-4">
+      <form action={quickItemAction.bind(null, item.id, "confirm")} className="mt-2 grid grid-cols-1 gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:grid-cols-3">
         <TripDatesGuard tripStart={toDateInput(trip.startDate) || null} tripEnd={toDateInput(trip.endDate) || null} />
         <label className="block">
           <span className="label">N° de confirmación</span>
@@ -272,17 +338,22 @@ function ConfirmReservation({ item, trip }: { item: LoadedItem; trip: { startDat
           <span className="label">Hasta</span>
           <DateInput name="endDate" defaultValue={toDateInput(item.endDate)} />
         </label>
+        <label className="block">
+          <span className="label">Depósito para reservar</span>
+          <input type="number" step="0.01" min={0} name="depositAmount" defaultValue={item.depositAmount?.toString() ?? ""} className="field" />
+        </label>
+        <label className="block">
+          <span className="label">Saldar antes del</span>
+          <DateInput name="balanceDue" defaultValue={toDateInput(item.balanceDue)} />
+        </label>
         <div className="flex items-end">
           <button className={buttonClass("primary", "sm", "w-full")}>
             <CheckCircle2 className="size-3.5" /> Confirmar reserva
           </button>
         </div>
-        {(trip.startDate || trip.endDate) && <p className="text-xs text-slate-500 sm:col-span-4">Viaje: {formatRange(trip.startDate, trip.endDate)}. Lo que dejes vacío se puede completar después.</p>}
+        {(trip.startDate || trip.endDate) && <p className="text-xs text-slate-500 sm:col-span-3">Viaje: {formatRange(trip.startDate, trip.endDate)}. Lo que dejes vacío se puede completar después.</p>}
       </form>
     </details>
   );
 }
 
-function Total({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return <StatCard label={label} value={value} hint={hint} />;
-}

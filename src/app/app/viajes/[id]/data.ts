@@ -15,12 +15,14 @@ export async function loadBooking(id: string, organizationId: string) {
           payments: { orderBy: [{ paidAt: "asc" }, { createdAt: "asc" }] },
           travelers: { include: { traveler: { select: { firstName: true, lastName: true } } } },
           documents: { orderBy: { createdAt: "asc" }, select: { id: true, name: true, storageKey: true, url: true } },
+          // De qué cotización salió (vacío = cargada a mano).
+          quoteItem: { select: { option: { select: { name: true, quote: { select: { id: true, title: true, _count: { select: { options: true } } } } } } } },
         },
       },
       flightLegs: true,
       quotes: {
         orderBy: { createdAt: "desc" },
-        include: { options: { orderBy: { position: "asc" }, include: { items: { orderBy: { position: "asc" } } } } },
+        include: { options: { orderBy: { position: "asc" }, include: { items: { orderBy: { position: "asc" }, include: { reservations: { select: { id: true, status: true, balancePaidAt: true, price: true } } } } } } },
       },
       _count: { select: { days: true, documents: true, messages: true, tasks: { where: { completedAt: null } } } },
     },

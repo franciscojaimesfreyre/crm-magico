@@ -3,7 +3,7 @@ import { CheckCircle2, Wallet, X } from "lucide-react";
 import { ActionForm, SubmitButton } from "@/components/form-controls";
 import { Input, buttonClass } from "@/components/ui";
 import { daysBetween, formatDate, money, toDateInput, todayUTC } from "@/lib/format";
-import { paymentProgress } from "@/lib/trips";
+import { expectsBalanceDue, paymentProgress } from "@/lib/trips";
 import { addReservationPayment, deleteReservationPayment, payReservationBalance } from "../actions";
 import type { LoadedBooking } from "./data";
 import { DateInput } from "@/components/date-input";
@@ -41,6 +41,8 @@ export function ReservationPayments({ item, currency }: { item: Item; currency: 
             Saldar antes del {formatDate(item.balanceDue)}
             {dueIn !== null && (dueIn < 0 ? " (vencido)" : dueIn === 0 ? " (hoy)" : ` (en ${dueIn} días)`)}
           </span>
+        ) : !cancelled && p.price > 0 && expectsBalanceDue(item) ? (
+          <span className="font-medium text-amber-700">Falta la fecha para saldar</span>
         ) : null}
       </div>
       <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-200">

@@ -9,6 +9,7 @@ import { Alert } from "@/components/ui";
 import { DESTINATION_LABEL, ITEM_TYPE_LABEL } from "@/lib/labels";
 import { formatDate, formatRange, money, toNumber } from "@/lib/format";
 import { acceptQuote, rejectQuote } from "../../../actions";
+import { expiredMessage, quoteExpired } from "@/lib/quotes";
 
 export const metadata = { title: "Cotización" };
 
@@ -24,8 +25,9 @@ export default async function PortalQuote({ params }: { params: Promise<{ id: st
   });
   if (!quote) notFound();
   const b = quote.booking;
-  const open = quote.status === "SENT";
-  const expired = quote.validUntil && quote.validUntil < new Date() && open;
+  // Vencida: ya no se puede aceptar; el cliente le pide una nueva a su agente.
+  const expired = quote.status === "SENT" && quoteExpired(quote);
+  const open = quote.status === "SENT" && !expired;
 
   return (
     <div className="space-y-5">
@@ -51,7 +53,7 @@ export default async function PortalQuote({ params }: { params: Promise<{ id: st
       {quote.status === "ACCEPTED" && <Alert tone="success">¡Aceptaste esta cotización! Tu agente está confirmando las reservas con cada proveedor.</Alert>}
       {quote.status === "REJECTED" && <Alert tone="info">Respondiste que esta cotización no te convence. Tu agente ya fue avisado.</Alert>}
       {quote.status === "EXPIRED" && <Alert tone="info">Esta cotización ya no está vigente.</Alert>}
-      {expired && <Alert tone="warn">La fecha de validez ya pasó: los precios pueden haber cambiado. Consultá con tu agente antes de aceptar.</Alert>}
+      {expired && <Alert tone="warn">{expiredMessage(quote)} Los precios pueden haber cambiado: pedile a tu agente una cotización nueva.</Alert>}
 
       <ActionForm action={acceptQuote.bind(null, quote.id)} className="space-y-4">
         {quote.options.map((o) => {

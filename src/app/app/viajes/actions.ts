@@ -4,13 +4,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { ageOn, money, parseDateInput, todayUTC } from "@/lib/format";
+import { ageOn, money, parseDateInput, toNumber, todayUTC } from "@/lib/format";
 import { commissionFromForm, paymentProgress, suggestedBalanceDue } from "@/lib/trips";
-import { changeBookingStatus, confirmationData, nextBookingCode, recalcBookingTotals } from "@/lib/bookings";
+import { MANUAL_STATUSES, changeBookingStatus, confirmationData, nextBookingCode, recalcBookingTotals, resumeAutoStatus } from "@/lib/bookings";
 import { logActivity, notifyClient } from "@/lib/events";
 import { incomingFiles, type StoredFile } from "@/lib/incoming-files";
 import { runEventWorkflows } from "@/lib/automations";
-import { DESTINATION_LABEL, RESERVATION_STATUS_LABEL, BOOKING_STATUS_LABEL } from "@/lib/labels";
+import { DESTINATION_LABEL, RESERVATION_STATUS_LABEL } from "@/lib/labels";
 import type { ActionState } from "@/components/form-controls";
 import type { BookingStatus, CommissionStatus, Destination, ItemType, ReservationStatus } from "@/generated/prisma/enums";
 import { bannerItem } from "@/lib/media";
@@ -65,7 +65,8 @@ export async function createBooking(_: ActionState, formData: FormData): Promise
   }
   const year = fields.startDate ? ` ${fields.startDate.getUTCFullYear()}` : "";
   const title = str(formData, "title") ?? `${DESTINATION_LABEL[fields.destination]}${year} — ${client.lastName}`;
-  const status = (str(formData, "status") ?? "INQUIRY") as BookingStatus;
+  // El estado arranca en Consulta y lo mueve el sistema (cotización enviada, reserva confirmada…).
+  const status: BookingStatus = "INQUIRY";
 
   const booking = await db.booking.create({
     data: {
@@ -103,16 +104,19 @@ export async function updateBooking(id: string, _: ActionState, formData: FormDa
     where: { id },
     data: { ...fields, currency: fields.currency ?? booking.currency, title: str(formData, "title") ?? booking.title },
   });
-  const status = str(formData, "status") as BookingStatus | null;
-  if (status && status !== booking.status) await changeBookingStatus({ bookingId: id, status, userId: user.id });
   await logActivity({ organizationId: user.organizationId, clientId: booking.clientId, bookingId: id, userId: user.id, type: "updated", description: "Viaje actualizado" });
   redirect(`/app/viajes/${id}`);
 }
 
-export async function setBookingStatus(id: string, status: BookingStatus) {
-  if (!(status in BOOKING_STATUS_LABEL)) return;
+/**
+ * Estado del viaje a mano: solo Viajó, Completado o Cancelado (el resto lo mueve el sistema según cotizaciones y
+ * reservas). "AUTO" lo devuelve a la etapa automática.
+ */
+export async function setBookingStatus(id: string, status: BookingStatus | "AUTO") {
   const { user } = await ownBooking(id);
-  await changeBookingStatus({ bookingId: id, status, userId: user.id });
+  if (status === "AUTO") await resumeAutoStatus(id, user.id);
+  else if (MANUAL_STATUSES.includes(status)) await changeBookingStatus({ bookingId: id, status, userId: user.id });
+  else return;
   revalidatePath("/app/viajes");
   revalidatePath(`/app/viajes/${id}`);
 }
@@ -322,15 +326,27 @@ export async function updateBookingItem(itemId: string, _: ActionState, formData
 /** Confirmar o cancelar en un clic. Al confirmar se pueden cargar el n° de confirmación y las fechas. */
 export async function quickItemAction(itemId: string, action: "confirm" | "cancel", formData?: FormData) {
   const { user, item } = await ownItem(itemId);
-  const data: { status: ReservationStatus; saleDate?: Date; confirmationNumber?: string; startDate?: Date; endDate?: Date } =
-    action === "confirm" ? confirmationData(item) : { status: "CANCELLED" };
+  const data: {
+    status: ReservationStatus;
+    saleDate?: Date;
+    confirmationNumber?: string;
+    startDate?: Date;
+    endDate?: Date;
+    depositAmount?: number;
+    balanceDue?: Date | null;
+  } = action === "confirm" ? confirmationData(item) : { status: "CANCELLED" };
   if (action === "confirm" && formData) {
     const confirmationNumber = str(formData, "confirmationNumber");
     const startDate = parseDateInput(formData.get("startDate"));
     const endDate = parseDateInput(formData.get("endDate"));
+    const depositAmount = num(formData, "depositAmount");
+    const balanceDue = parseDateInput(formData.get("balanceDue"));
     if (confirmationNumber) data.confirmationNumber = confirmationNumber;
     if (startDate) data.startDate = startDate;
     if (endDate && (!startDate || endDate >= startDate)) data.endDate = endDate;
+    if (depositAmount !== null) data.depositAmount = depositAmount;
+    // Sin fecha de saldo cargada, en los paquetes se sugiere la de siempre (30 días antes de la llegada).
+    data.balanceDue = balanceDue ?? item.balanceDue ?? suggestedBalanceDue(item.type, startDate ?? item.startDate ?? item.booking.startDate);
   }
   await db.bookingItem.update({ where: { id: itemId }, data });
   const label = action === "confirm" ? "confirmada" : "cancelada";
@@ -359,6 +375,24 @@ export async function addReservationPayment(itemId: string, _: ActionState, form
 }
 
 /** Registra un pago por todo lo que falta. */
+/** El cliente pagó el depósito para reservar: se registra lo que falta para cubrirlo, en un clic. */
+export async function payReservationDeposit(itemId: string) {
+  const { user, item } = await ownItem(itemId);
+  if (item.depositAmount === null) return;
+  const amount = Math.round((toNumber(item.depositAmount) - toNumber(item.paidAmount)) * 100) / 100;
+  if (amount <= 0) return;
+  await db.reservationPayment.create({ data: { bookingItemId: itemId, amount, paidAt: todayUTC(), note: "Depósito" } });
+  await logActivity({
+    organizationId: user.organizationId,
+    clientId: item.booking.clientId,
+    bookingId: item.bookingId,
+    userId: user.id,
+    type: "payment",
+    description: `Depósito pagado (${money(amount, item.booking.currency)}): ${item.description}`,
+  });
+  await afterItemChange(item.bookingId, user.id);
+}
+
 export async function payReservationBalance(itemId: string) {
   const { user, item } = await ownItem(itemId);
   const { remaining } = paymentProgress(item);

@@ -106,9 +106,10 @@ export const COMMISSION_STATUS_COLOR: Record<CommissionStatus, string> = {
   PAID: "bg-emerald-100 text-emerald-800",
 };
 
+// Un solo vocabulario para la reserva: Por reservar → Reservada → Pagada (ver reservationStage).
 export const RESERVATION_STATUS_LABEL: Record<ReservationStatus, string> = {
-  PENDING: "A reservar",
-  CONFIRMED: "Confirmada",
+  PENDING: "Por reservar",
+  CONFIRMED: "Reservada",
   CANCELLED: "Cancelada",
 };
 export const RESERVATION_STATUSES = options(RESERVATION_STATUS_LABEL);
@@ -117,6 +118,14 @@ export const RESERVATION_STATUS_COLOR: Record<ReservationStatus, string> = {
   CONFIRMED: "bg-brand-600 text-white",
   CANCELLED: "bg-rose-100 text-rose-800 line-through",
 };
+
+/** Etapa visible de una reserva: una reservada que ya está saldada se muestra como "Pagada". */
+export function reservationStage(item: { status: ReservationStatus; balancePaidAt: Date | null; price: { toString(): string } }) {
+  if (item.status === "CONFIRMED" && (item.balancePaidAt || Number(item.price.toString()) === 0)) {
+    return { label: "Pagada", color: "bg-emerald-100 text-emerald-800" };
+  }
+  return { label: RESERVATION_STATUS_LABEL[item.status], color: RESERVATION_STATUS_COLOR[item.status] };
+}
 
 export const ITEM_TYPE_LABEL: Record<ItemType, string> = {
   DISNEY_WORLD_PACKAGE: "Paquete Disney World",

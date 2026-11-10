@@ -10,7 +10,7 @@ import { ItineraryView } from "@/components/itinerary-view";
 import { bookingClosures } from "@/lib/catalog";
 import { TaskList } from "@/components/task-list";
 import { TaskForm } from "@/components/task-form";
-import { BOOKING_STATUSES, CONTRACT_STATUS_COLOR, CONTRACT_STATUS_LABEL, ITEM_TYPE_BASE, ITEM_TYPE_LABEL } from "@/lib/labels";
+import { BOOKING_STATUS_LABEL, CONTRACT_STATUS_COLOR, CONTRACT_STATUS_LABEL, ITEM_TYPE_BASE, ITEM_TYPE_LABEL } from "@/lib/labels";
 import { fileSize, formatDate, formatDateTime, toDateInput, toNumber } from "@/lib/format";
 import { TripHeader } from "./trip-header";
 import { loadThread } from "@/lib/messages";
@@ -29,7 +29,8 @@ import { storageMode } from "@/lib/storage";
 import { tripKnowledgeAlerts } from "@/lib/knowledge-alerts";
 import { eventGuideFor, guideOptions } from "@/lib/park-guides";
 import { eventDateWarning } from "@/lib/park-sheet";
-import type { ItemType } from "@/generated/prisma/enums";
+import type { BookingStatus, ItemType } from "@/generated/prisma/enums";
+import { MANUAL_STATUSES } from "@/lib/bookings";
 import { avatarImages } from "@/lib/avatars-server";
 import { ShareAccessButton } from "@/components/share-access";
 import { regenerateInviteCode, sendPortalInvite } from "@/app/app/clientes/actions";
@@ -69,7 +70,7 @@ export default async function BookingPage({
         booking={b}
         actions={
           <>
-            <StatusSelect action={setBookingStatus.bind(null, b.id) as (status: string) => Promise<void>} value={b.status} options={BOOKING_STATUSES} />
+            <StatusSelect action={setBookingStatus.bind(null, b.id) as (status: string) => Promise<void>} value={b.status} options={statusOptions(b.status)} />
             <ShareAccessButton
               firstName={b.client.firstName}
               email={b.client.email}
@@ -371,4 +372,17 @@ async function ActivityTab({ bookingId }: { bookingId: string }) {
       )}
     </Card>
   );
+}
+
+/**
+ * Opciones del estado del viaje: el actual y lo que se marca a mano (Viajó, Completado, Cancelado). Consulta,
+ * Cotizado, Reservado y Pagado los mueve el sistema; desde un estado manual se puede volver al automático.
+ */
+function statusOptions(current: BookingStatus) {
+  const manual = MANUAL_STATUSES.includes(current);
+  return [
+    { value: current, label: manual ? BOOKING_STATUS_LABEL[current] : `${BOOKING_STATUS_LABEL[current]} (auto)` },
+    ...(manual ? [{ value: "AUTO", label: "Volver al automático" }] : []),
+    ...MANUAL_STATUSES.filter((st) => st !== current).map((st) => ({ value: st, label: BOOKING_STATUS_LABEL[st] })),
+  ];
 }

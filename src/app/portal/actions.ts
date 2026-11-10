@@ -11,9 +11,10 @@ import {
   startPortalSession,
   verifyPassword,
 } from "@/lib/auth";
-import { parseDateInput, todayUTC } from "@/lib/format";
-import { nextBookingCode, recalcBookingTotals } from "@/lib/bookings";
+import { parseDateInput } from "@/lib/format";
+import { nextBookingCode, syncBookingStatus } from "@/lib/bookings";
 import { logActivity, notifyStaff } from "@/lib/events";
+import { acceptQuoteOption, expiredMessage, quoteExpired } from "@/lib/quotes";
 import { runEventWorkflows } from "@/lib/automations";
 import { loadThread } from "@/lib/messages";
 import { splitList } from "@/lib/clients";
@@ -83,62 +84,13 @@ async function ownQuote(quoteId: string) {
 }
 
 export async function acceptQuote(quoteId: string, _: ActionState, formData: FormData): Promise<ActionState> {
-  const { account, quote } = await ownQuote(quoteId);
+  const { quote } = await ownQuote(quoteId);
   if (quote.status !== "SENT") return { error: "Esta cotización ya fue respondida." };
+  if (quoteExpired(quote)) return { error: `${expiredMessage(quote)} Pedile a tu agente una nueva.` };
   const optionId = String(formData.get("optionId") ?? "");
-  const option = quote.options.find((o) => o.id === optionId);
-  if (!option) return { error: "Elegí una opción" };
+  if (!quote.options.some((o) => o.id === optionId)) return { error: "Elegí una opción" };
   const comment = String(formData.get("comment") ?? "").trim() || null;
-
-  await db.$transaction(async (tx) => {
-    await tx.quote.update({
-      where: { id: quoteId },
-      data: { status: "ACCEPTED", acceptedOptionId: option.id, respondedAt: new Date(), clientComment: comment },
-    });
-    // Las otras cotizaciones enviadas del mismo viaje quedan vencidas.
-    await tx.quote.updateMany({ where: { bookingId: quote.bookingId, id: { not: quoteId }, status: "SENT" }, data: { status: "EXPIRED" } });
-    // Las reservas de la opción elegida entran "a reservar" y reemplazan a las que estaban pendientes.
-    // Las ya confirmadas con el proveedor no se tocan.
-    await tx.bookingItem.deleteMany({ where: { bookingId: quote.bookingId, status: "PENDING", statementItems: { none: {} } } });
-    const offset = await tx.bookingItem.count({ where: { bookingId: quote.bookingId } });
-    await tx.bookingItem.createMany({
-      data: option.items.map((i, idx) => ({
-        bookingId: quote.bookingId,
-        type: i.type,
-        description: i.description,
-        supplier: i.supplier,
-        startDate: i.startDate,
-        endDate: i.endDate,
-        price: i.price,
-        commissionRate: i.commissionRate,
-        commissionFixed: i.commissionFixed,
-        status: "PENDING" as const,
-        position: offset + idx,
-      })),
-    });
-  });
-  // El viaje pasa a Reservado cuando el agente confirma la primera reserva con el proveedor.
-  await recalcBookingTotals(quote.bookingId);
-  await notifyStaff({
-    organizationId: quote.booking.organizationId,
-    userId: quote.booking.agentId,
-    title: `${account.client.firstName} aceptó la cotización (${option.name})`,
-    body: comment ?? quote.title,
-    link: `/app/viajes/${quote.bookingId}?tab=cotizaciones`,
-  });
-  await db.task.create({
-    data: {
-      organizationId: quote.booking.organizationId,
-      assigneeId: quote.booking.agentId,
-      bookingId: quote.bookingId,
-      clientId: quote.booking.clientId,
-      title: `Confirmar con los proveedores las reservas de "${option.name}"`,
-      priority: "HIGH",
-      dueDate: todayUTC(),
-      automated: true,
-    },
-  });
-  await logActivity({ organizationId: quote.booking.organizationId, clientId: quote.booking.clientId, bookingId: quote.bookingId, type: "quote", description: `El cliente aceptó la cotización: ${option.name}` });
+  await acceptQuoteOption({ quoteId, optionId, via: "portal", comment });
   revalidatePath(`/portal/cotizaciones/${quoteId}`);
   // La página se revalida y muestra el estado "aceptada"; no hace falta un segundo mensaje.
   return {};
@@ -157,6 +109,7 @@ export async function rejectQuote(quoteId: string, _: ActionState, formData: For
     link: `/app/viajes/${quote.bookingId}?tab=cotizaciones`,
   });
   await logActivity({ organizationId: quote.booking.organizationId, clientId: quote.booking.clientId, bookingId: quote.bookingId, type: "quote", description: `El cliente rechazó la cotización${comment ? `: ${comment}` : ""}` });
+  await syncBookingStatus(quote.bookingId);
   revalidatePath(`/portal/cotizaciones/${quoteId}`);
   return {};
 }

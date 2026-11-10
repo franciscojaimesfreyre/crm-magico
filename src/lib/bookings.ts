@@ -65,6 +65,7 @@ export async function recalcBookingTotals(bookingId: string, userId?: string | n
 }
 
 /** Etapas que el sistema mueve solo; Viajó, Completado y Cancelado son siempre manuales. */
+export const MANUAL_STATUSES: BookingStatus[] = ["TRAVELED", "COMPLETED", "CANCELLED"];
 const AUTO_STATUSES: BookingStatus[] = ["INQUIRY", "QUOTED", "BOOKED", "PAID_IN_FULL"];
 const RANK: Record<string, number> = { INQUIRY: 0, QUOTED: 1, BOOKED: 2, PAID_IN_FULL: 3 };
 
@@ -74,10 +75,19 @@ const RANK: Record<string, number> = { INQUIRY: 0, QUOTED: 1, BOOKED: 2, PAID_IN
  * - Reservado: hay al menos una reserva confirmada.
  * - Cotizado: se envió (o aceptó) una cotización.
  * - Consulta: nada de lo anterior.
- * Avanza siempre. Retrocede solo desde Reservado o Pagado, cuando ya no se cumple (se canceló la
- * reserva confirmada o se borró un pago); Cotizado puesto a mano no vuelve a Consulta.
+ * Avanza siempre. Retrocede cuando ya no se cumple: se canceló la reserva confirmada, se borró un pago, o no
+ * queda ninguna cotización enviada ni aceptada (se rechazó o se borró).
  */
 export async function syncBookingStatus(bookingId: string, userId?: string | null) {
+  const { status, target } = await autoStatus(bookingId);
+  if (!AUTO_STATUSES.includes(status) || target === status) return;
+  const forward = RANK[target] > RANK[status];
+  const allowedBack = !forward && (status === "BOOKED" || status === "PAID_IN_FULL" || status === "QUOTED");
+  if (forward || allowedBack) await changeBookingStatus({ bookingId, status: target, userId });
+}
+
+/** La etapa que corresponde según lo que pasó en el viaje (ver syncBookingStatus). */
+async function autoStatus(bookingId: string) {
   const booking = await db.booking.findUniqueOrThrow({
     where: { id: bookingId },
     select: {
@@ -86,7 +96,6 @@ export async function syncBookingStatus(bookingId: string, userId?: string | nul
       _count: { select: { quotes: { where: { status: { in: ["SENT", "ACCEPTED"] } } } } },
     },
   });
-  if (!AUTO_STATUSES.includes(booking.status)) return;
   const active = booking.items.filter((i) => i.status !== "CANCELLED");
   const confirmed = active.filter((i) => i.status === "CONFIRMED");
   const target: BookingStatus =
@@ -97,10 +106,13 @@ export async function syncBookingStatus(bookingId: string, userId?: string | nul
         : booking._count.quotes > 0
           ? "QUOTED"
           : "INQUIRY";
-  if (target === booking.status) return;
-  const forward = RANK[target] > RANK[booking.status];
-  const allowedBack = !forward && (booking.status === "BOOKED" || booking.status === "PAID_IN_FULL");
-  if (forward || allowedBack) await changeBookingStatus({ bookingId, status: target, userId });
+  return { status: booking.status, target };
+}
+
+/** Vuelve a la etapa automática un viaje que estaba en una manual (Viajó, Completado o Cancelado). */
+export async function resumeAutoStatus(bookingId: string, userId?: string | null) {
+  const { target } = await autoStatus(bookingId);
+  await changeBookingStatus({ bookingId, status: target, userId });
 }
 
 /** Confirma una reserva con el proveedor: queda registrada la fecha de venta (para la planilla). */

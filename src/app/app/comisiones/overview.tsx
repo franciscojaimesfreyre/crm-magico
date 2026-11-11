@@ -5,7 +5,7 @@ import { SubmitButton } from "@/components/form-controls";
 import { Badge, Card, CardHeader, LinkButton, StatCard, StatStrip } from "@/components/ui";
 import { DESTINATION_LABEL } from "@/lib/labels";
 import { daysBetween, formatDate, money, todayUTC } from "@/lib/format";
-import { DEFAULT_PAYMENT_TERM_DAYS, commissionOverview, openStatements } from "@/lib/commissions";
+import { DEFAULT_PAYMENT_TERM_DAYS, commissionOverview, openStatements, pendingRefunds } from "@/lib/commissions";
 import { createStatement } from "./actions";
 import { SelectAll } from "./widgets";
 
@@ -17,7 +17,7 @@ type Row = Awaited<ReturnType<typeof commissionOverview>>["rows"][number];
  */
 export async function CommissionsOverview({ organizationId, agency }: { organizationId: string; agency: { name: string; paymentTermDays: number | null } | null }) {
   const today = todayUTC();
-  const [{ rows, totals, sharePercent }, statements] = await Promise.all([commissionOverview(organizationId), openStatements(organizationId)]);
+  const [{ rows, totals, sharePercent }, statements, refunds] = await Promise.all([commissionOverview(organizationId), openStatements(organizationId), pendingRefunds(organizationId)]);
   const term = agency?.paymentTermDays ?? DEFAULT_PAYMENT_TERM_DAYS;
   const ready = rows.filter((r) => r.stage === "ready");
   const [mainCurrency, main] = [...totals.entries()].sort((a, b) => b[1].earned - a[1].earned)[0] ?? ["USD", { earned: 0, received: 0, owed: 0, ready: 0, waiting: 0, provider: 0 }];
@@ -61,6 +61,11 @@ export async function CommissionsOverview({ organizationId, agency }: { organiza
           hint={`${money(main.ready, mainCurrency)} para presentar · ${money(main.waiting, mainCurrency)} en planillas`}
         />
       </StatStrip>
+      {refunds.length > 0 && (
+        <div className="rounded-2xl bg-rose-50 px-5 py-3 text-sm text-rose-900 ring-1 ring-rose-200">
+          <span className="font-semibold">A devolver: {refunds.map((r) => money(r.amount, r.currency)).join(" + ")}</span> · comisiones cobradas de reservas que después se cancelaron. Se descuentan solas en la próxima planilla.
+        </div>
+      )}
       {totals.size > 1 && (
         <p className="-mt-3 text-xs text-slate-500">
           Otras monedas:{" "}

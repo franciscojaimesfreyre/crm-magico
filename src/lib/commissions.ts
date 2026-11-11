@@ -5,7 +5,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import type { CommissionStatus } from "@/generated/prisma/enums";
 import { COMMISSION_STATUS_LABEL, DESTINATION_LABEL, ITEM_TYPE_LABEL } from "@/lib/labels";
 import { formatDate, parseDateInput, toNumber } from "@/lib/format";
-import { agentShareOf } from "@/lib/trips";
+import { agentShareOf, myCommissionOf, orgSharePercent } from "@/lib/trips";
 
 export type CommissionFilters = {
   desde?: string;
@@ -50,6 +50,7 @@ export async function loadStatement(id: string, organizationId: string) {
       agent: true,
       organization: true,
       payments: { orderBy: { paidAt: "asc" } },
+      adjustments: { orderBy: { createdAt: "asc" } },
       items: {
         include: { bookingItem: { include: { booking: { include: { client: true } }, statementItems: { where: { cancelledAt: null }, select: { statementId: true } } } } },
         orderBy: [{ bookingItem: { saleDate: "asc" } }, { bookingItem: { booking: { code: "asc" } } }],
@@ -74,12 +75,18 @@ export function receivedOf(item: { commissionStatus: string; commissionPaidAmoun
 export async function refreshStatementStatus(statementId: string) {
   const s = await db.commissionStatement.findUnique({
     where: { id: statementId },
-    include: { items: { include: { bookingItem: { select: { commissionStatus: true, commissionPaidAmount: true, commissionAmount: true } } } } },
+    include: {
+      items: { include: { bookingItem: { select: { commissionStatus: true, commissionPaidAmount: true, commissionAmount: true } } } },
+      adjustments: { select: { amount: true } },
+      _count: { select: { payments: true } },
+    },
   });
   if (!s) return;
   const rows = s.items.filter((i) => !i.cancelledAt);
-  const expected = rows.reduce((t, r) => t + toNumber(r.expectedAmount), 0);
-  const received = rows.reduce((t, r) => t + receivedOf(r.bookingItem, toNumber(r.expectedAmount)), 0);
+  const adj = s.adjustments.reduce((t, a) => t + toNumber(a.amount), 0);
+  const expected = rows.reduce((t, r) => t + toNumber(r.expectedAmount), 0) + adj;
+  // Los ajustes (devoluciones, cargos) se compensan con el primer pago registrado.
+  const received = rows.reduce((t, r) => t + receivedOf(r.bookingItem, toNumber(r.expectedAmount)), 0) + (s._count.payments > 0 ? adj : 0);
   const status = received <= 0 ? (s.sentAt ? "SENT" : "DRAFT") : received + 0.005 >= expected ? "PAID" : "PARTIALLY_PAID";
   if (status !== s.status) await db.commissionStatement.update({ where: { id: statementId }, data: { status } });
 }
@@ -98,7 +105,15 @@ export function statementTotals(s: LoadedStatement) {
     t.pending += Math.max(0, expected - received);
     byCurrency.set(cur, t);
   }
-  return [...byCurrency.entries()].map(([currency, t]) => ({ currency, ...t }));
+  // Ajustes (devoluciones de reservas canceladas, cargos de la agencia): en la moneda de la planilla.
+  const adj = s.adjustments.reduce((t, a) => t + toNumber(a.amount), 0);
+  const main = [...byCurrency.values()][0];
+  if (main && adj) {
+    main.expected += adj;
+    if (s.payments.length > 0) main.received += adj;
+    main.pending = Math.max(0, main.expected - main.received);
+  }
+  return [...byCurrency.entries()].map(([currency, t]) => ({ currency, ...t, adjustments: t === main ? adj : 0 }));
 }
 
 export function statementFilename(s: LoadedStatement, ext: string) {
@@ -131,7 +146,7 @@ export async function buildStatementWorkbook(s: LoadedStatement) {
   const shares = [...new Set(s.items.map((l) => toNumber(l.agentSharePercent ?? 100)))];
   ws.getCell("A6").value = "Reparto";
   ws.getCell("A6").font = { bold: true };
-  ws.getCell("B6").value = shares.length === 1 ? `${shares[0]} % agente / ${100 - shares[0]} % agencia` : "Varía por reserva (ver columnas)";
+  ws.getCell("B6").value = shares.length === 1 ? `${shares[0]} % agente / ${Math.round((100 - shares[0]) * 100) / 100} % agencia` : "Varía por reserva (ver columnas)";
 
   const headers = [
     "Viaje", "Cliente", "Destino", "Reserva", "Proveedor", "Confirmación", "Fecha de venta", "Desde", "Hasta",
@@ -175,6 +190,12 @@ export async function buildStatementWorkbook(s: LoadedStatement) {
     ws.getRow(row).alignment = { vertical: "top", wrapText: true };
     row++;
   }
+  // Ajustes: devoluciones de reservas canceladas y cargos de la agencia, restan de lo que se transfiere.
+  for (const a of s.adjustments) {
+    ws.getRow(row).values = ["Ajuste", "", "", a.description, "", "", null, null, null, s.items[0]?.bookingItem.booking.currency ?? "", null, null, null, null, toNumber(a.amount)];
+    ws.getRow(row).font = { italic: true };
+    row++;
+  }
   const last = row - 1;
   if (row > 9) {
     ws.getRow(row).values = ["Total", "", "", "", "", "", "", "", "", "", { formula: `SUM(K9:K${last})` }, { formula: `SUM(L9:L${last})` }, "", { formula: `SUM(N9:N${last})` }, { formula: `SUM(O9:O${last})` }];
@@ -185,7 +206,7 @@ export async function buildStatementWorkbook(s: LoadedStatement) {
   widths.forEach((w, i) => (ws.getColumn(i + 1).width = w));
   for (const col of [7, 8, 9, 17]) ws.getColumn(col).numFmt = "dd/mm/yyyy";
   for (const col of [11, 12, 14, 15]) ws.getColumn(col).numFmt = "#,##0.00";
-  ws.getColumn(13).numFmt = "0%";
+  ws.getColumn(13).numFmt = "0.##%";
 
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
@@ -204,7 +225,7 @@ export type CommissionStage = "ready" | "upcoming" | "draft" | "waiting" | "paid
  * en una planilla sin enviar, esperando el pago (planilla enviada) o cobradas.
  */
 export async function commissionOverview(organizationId: string) {
-  const agencyPercent = (await db.organization.findUnique({ where: { id: organizationId }, select: { agency: { select: { agentSharePercent: true } } } }))?.agency?.agentSharePercent;
+  const agencyPercent = orgSharePercent(await db.organization.findUnique({ where: { id: organizationId }, select: { agentSharePercent: true, agency: { select: { agentSharePercent: true } } } }));
   const today = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate()));
   const items = await db.bookingItem.findMany({
     where: { status: "CONFIRMED", booking: { organizationId, status: { not: "CANCELLED" } } },
@@ -219,7 +240,7 @@ export async function commissionOverview(organizationId: string) {
     const statement = line?.statement ?? null;
     // Lo que le toca al agente: el monto congelado en su planilla o, si no está en ninguna, el reparto de hoy.
     const provider = toNumber(i.commissionAmount);
-    const expected = line ? toNumber(line.expectedAmount) : agentShareOf(i, agencyPercent);
+    const expected = myCommissionOf({ ...i, statementItems: line ? [line] : [] }, agencyPercent);
     const received = receivedOf(i, expected);
     const ended = !!i.booking.endDate && i.booking.endDate < today;
     const stage: CommissionStage =
@@ -252,6 +273,8 @@ export async function openStatements(organizationId: string) {
           bookingItem: { include: { booking: { select: { currency: true } }, statementItems: { where: { cancelledAt: null }, select: { statementId: true } } } },
         },
       },
+      adjustments: { select: { amount: true } },
+      _count: { select: { payments: true } },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -260,9 +283,10 @@ export async function openStatements(organizationId: string) {
     // Reservas que también están en otra planilla (se reclamarían dos veces).
     const repeated = rows.filter((r) => r.bookingItem.statementItems.some((x) => x.statementId !== s.id)).length;
     const currency = rows[0]?.bookingItem.booking.currency ?? "USD";
-    const expected = rows.reduce((t, r) => t + toNumber(r.expectedAmount), 0);
+    const adj = s.adjustments.reduce((t, a) => t + toNumber(a.amount), 0);
+    const expected = rows.reduce((t, r) => t + toNumber(r.expectedAmount), 0) + adj;
     const provider = rows.reduce((t, r) => t + toNumber(r.providerAmount ?? r.expectedAmount), 0);
-    const received = rows.reduce((t, r) => t + receivedOf(r.bookingItem, toNumber(r.expectedAmount)), 0);
+    const received = rows.reduce((t, r) => t + receivedOf(r.bookingItem, toNumber(r.expectedAmount)), 0) + (s._count.payments > 0 ? adj : 0);
     const term = s.agency?.paymentTermDays ?? DEFAULT_PAYMENT_TERM_DAYS;
     const days = s.sentAt ? Math.floor((Date.now() - s.sentAt.getTime()) / 86400_000) : null;
     const dueAt = s.sentAt ? new Date(s.sentAt.getTime() + term * 86400_000) : null;
@@ -278,12 +302,17 @@ export async function openStatements(organizationId: string) {
 export async function registerStatementPayment(statementId: string, organizationId: string, input: { amount: number; paidAt: Date; reference: string | null }) {
   const s = await db.commissionStatement.findFirst({
     where: { id: statementId, organizationId },
-    include: { items: { where: { cancelledAt: null }, include: { bookingItem: true }, orderBy: { bookingItem: { saleDate: "asc" } } } },
+    include: {
+      items: { where: { cancelledAt: null }, include: { bookingItem: true }, orderBy: { bookingItem: { saleDate: "asc" } } },
+      adjustments: { select: { amount: true } },
+      _count: { select: { payments: true } },
+    },
   });
   if (!s) return { error: "Planilla no encontrada" };
   if (!(input.amount > 0)) return { error: "Indicá cuánto pagó la agencia" };
   await db.statementPayment.create({ data: { statementId, amount: input.amount, paidAt: input.paidAt, reference: input.reference } });
-  let left = input.amount;
+  // Con el primer pago se compensan los ajustes (lo que la agencia descontó por devoluciones o cargos).
+  let left = input.amount + (s._count.payments === 0 ? -s.adjustments.reduce((t, a) => t + toNumber(a.amount), 0) : 0);
   for (const row of s.items) {
     if (left <= 0.004) break;
     const expected = toNumber(row.expectedAmount);
@@ -364,4 +393,57 @@ export async function remindOverdueStatements(organizationId: string) {
     n++;
   }
   return n;
+}
+
+
+/**
+ * Ajustes que se descuentan en una planilla nueva: la devolución de cada reserva cancelada que ya se había
+ * cobrado (una sola vez) y el cargo fijo de la agencia por viaje (la primera vez que el viaje entra en una planilla).
+ */
+export async function addStatementAdjustments(statementId: string, organizationId: string) {
+  const s = await db.commissionStatement.findUniqueOrThrow({
+    where: { id: statementId },
+    include: { agency: true, items: { include: { bookingItem: { include: { booking: { select: { id: true, code: true } } } } } } },
+  });
+  // Devoluciones pendientes de la cuenta.
+  const cancelled = await db.commissionStatementItem.findMany({
+    where: { cancelledAt: { not: null }, statement: { organizationId } },
+    include: { bookingItem: true },
+  });
+  for (const row of cancelled) {
+    const received = receivedOf(row.bookingItem, toNumber(row.expectedAmount));
+    if (received <= 0) continue;
+    const done = await db.statementAdjustment.findFirst({ where: { kind: "REFUND", bookingItemId: row.bookingItemId } });
+    if (done) continue;
+    await db.statementAdjustment.create({
+      data: { statementId, kind: "REFUND", amount: -received, description: `Devolución: ${row.bookingItem.description} (cancelada)`, bookingItemId: row.bookingItemId, bookingId: row.bookingItem.bookingId },
+    });
+  }
+  // Cargo de la agencia por viaje.
+  const fee = s.agency?.feePerTrip ? toNumber(s.agency.feePerTrip) : 0;
+  if (fee > 0) {
+    const trips = new Map(s.items.filter((i) => !i.cancelledAt).map((i) => [i.bookingItem.booking.id, i.bookingItem.booking.code]));
+    for (const [bookingId, code] of trips) {
+      const charged = await db.statementAdjustment.findFirst({ where: { kind: "AGENCY_FEE", bookingId } });
+      if (charged) continue;
+      await db.statementAdjustment.create({ data: { statementId, kind: "AGENCY_FEE", amount: -fee, description: `Cargo de la agencia por el viaje ${code}`, bookingId } });
+    }
+  }
+  await refreshStatementStatus(statementId);
+}
+
+/** Lo que el agente tiene que devolver: comisiones cobradas de reservas que después se cancelaron y todavía no se descontaron. */
+export async function pendingRefunds(organizationId: string) {
+  const rows = await db.commissionStatementItem.findMany({
+    where: { cancelledAt: { not: null }, statement: { organizationId } },
+    include: { bookingItem: { include: { booking: { select: { currency: true } } } } },
+  });
+  const out: { amount: number; currency: string }[] = [];
+  for (const r of rows) {
+    const received = receivedOf(r.bookingItem, toNumber(r.expectedAmount));
+    if (received <= 0) continue;
+    if (await db.statementAdjustment.findFirst({ where: { kind: "REFUND", bookingItemId: r.bookingItemId } })) continue;
+    out.push({ amount: received, currency: r.bookingItem.booking.currency });
+  }
+  return out;
 }

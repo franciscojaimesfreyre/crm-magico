@@ -2,7 +2,7 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { receivedOf } from "@/lib/commissions";
-import { agentShareOf } from "@/lib/trips";
+import { myCommissionOf, orgSharePercent } from "@/lib/trips";
 import { Card, CardHeader, PageHeader, StatCard, StatStrip, Table, Td, buttonClass } from "@/components/ui";
 import { BarList, ColumnChart } from "@/components/charts";
 import { BOOKING_STATUS_LABEL, DESTINATION_LABEL, ITEM_TYPE_LABEL, PIPELINE } from "@/lib/labels";
@@ -32,7 +32,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         saleDate: { gte: from, lte: to },
         booking: { organizationId: user.organizationId, status: { not: "CANCELLED" }, currency },
       },
-      include: { booking: { include: { client: true } } },
+      include: { booking: { include: { client: true } }, statementItems: { where: { cancelledAt: null }, select: { expectedAmount: true } } },
     }),
     db.booking.findMany({
       where: { organizationId: user.organizationId, createdAt: { gte: from, lt: new Date(Date.UTC(year + 1, 0, 1)) } },
@@ -61,7 +61,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     saleDate: i.saleDate!,
     totalPrice: i.price,
     // Tu parte (la agencia host puede retener un %); la del proveedor, aparte.
-    commissionAmount: agentShareOf(i, user.organization.agency?.agentSharePercent),
+    commissionAmount: myCommissionOf(i, orgSharePercent(user.organization)),
     providerAmount: i.commissionAmount,
     destination: i.booking.destination,
     client: i.booking.client,

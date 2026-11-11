@@ -20,21 +20,24 @@ export default async function AgencyStatement({ params }: { params: Promise<{ id
       organization: { select: { name: true } },
       agent: { select: { name: true } },
       payments: { orderBy: { paidAt: "asc" } },
+      adjustments: { orderBy: { createdAt: "asc" } },
       items: { include: { bookingItem: { include: { booking: { include: { client: { select: { firstName: true, lastName: true } } } } } } } },
     },
   });
   if (!s) notFound();
   const rows = s.items.filter((r) => !r.cancelledAt);
   const currency = rows[0]?.bookingItem.booking.currency ?? "USD";
-  const expected = rows.reduce((t, r) => t + toNumber(r.expectedAmount), 0);
-  const received = rows.reduce((t, r) => t + receivedOf(r.bookingItem, toNumber(r.expectedAmount)), 0);
+  const adj = s.adjustments.reduce((t, a) => t + toNumber(a.amount), 0);
+  const provider = rows.reduce((t, r) => t + toNumber(r.providerAmount ?? r.expectedAmount), 0);
+  const expected = rows.reduce((t, r) => t + toNumber(r.expectedAmount), 0) + adj;
+  const received = rows.reduce((t, r) => t + receivedOf(r.bookingItem, toNumber(r.expectedAmount)), 0) + (s.payments.length ? adj : 0);
   const owed = Math.max(0, expected - received);
   return (
     <>
       <PageHeader
         back={{ href: "/agencia/planillas", label: "Planillas" }}
         title={`${s.agent?.name ?? s.organization.name}: ${formatDate(s.periodFrom)} al ${formatDate(s.periodTo)}`}
-        description={`Recibida el ${formatDate(s.sentAt)} · reclamado ${money(expected, currency)} · pagado ${money(received, currency)} · falta ${money(owed, currency)}`}
+        description={`Recibida el ${formatDate(s.sentAt)} · comisión de proveedores ${money(provider, currency)} · retenés ${money(provider - expected + adj, currency)} · a transferir ${money(expected, currency)} · pagado ${money(received, currency)} · falta ${money(owed, currency)}`}
       />
       <Card className="mb-6">
         <Table>
@@ -44,7 +47,9 @@ export default async function AgencyStatement({ params }: { params: Promise<{ id
               <Th>Reserva</Th>
               <Th>Viaje</Th>
               <Th className="text-right">Importe</Th>
-              <Th className="text-right">Comisión</Th>
+              <Th className="text-right">Comisión del proveedor</Th>
+              <Th className="text-right">Retenés</Th>
+              <Th className="text-right">A transferir</Th>
               <Th className="text-right">Pagado</Th>
             </tr>
           </thead>
@@ -65,6 +70,11 @@ export default async function AgencyStatement({ params }: { params: Promise<{ id
                   </Td>
                   <Td className="text-xs whitespace-nowrap">{formatRange(i.booking.startDate, i.booking.endDate)}</Td>
                   <Td className="text-right whitespace-nowrap">{money(i.price, currency)}</Td>
+                  <Td className="text-right whitespace-nowrap">{money(r.providerAmount ?? r.expectedAmount, currency)}</Td>
+                  <Td className="text-right whitespace-nowrap text-slate-600">
+                    {money(toNumber(r.providerAmount ?? r.expectedAmount) - toNumber(r.expectedAmount), currency)}
+                    <span className="block text-[11px] text-slate-400">agente {toNumber(r.agentSharePercent ?? 100)} %</span>
+                  </Td>
                   <Td className="text-right font-medium whitespace-nowrap">{money(r.expectedAmount, currency)}</Td>
                   <Td className="text-right whitespace-nowrap text-emerald-700">{money(receivedOf(i, toNumber(r.expectedAmount)), currency)}</Td>
                 </tr>
@@ -73,6 +83,19 @@ export default async function AgencyStatement({ params }: { params: Promise<{ id
           </tbody>
         </Table>
       </Card>
+      {s.adjustments.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader title="Ajustes" description="Se descuentan de lo que le transferís al agente." />
+          <ul className="divide-y divide-slate-100 px-5 pb-3 text-sm">
+            {s.adjustments.map((a) => (
+              <li key={a.id} className="flex justify-between gap-3 py-2">
+                <span className="text-slate-700">{a.description}</span>
+                <span className="font-medium text-rose-700 tabular-nums">{money(a.amount, currency)}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {owed > 0 && (
           <Card>

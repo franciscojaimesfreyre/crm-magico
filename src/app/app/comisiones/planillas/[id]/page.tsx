@@ -8,7 +8,7 @@ import { Alert, Badge, Card, CardHeader, Field, Input, PageHeader, Table, Td, Te
 import { DESTINATION_LABEL, ITEM_TYPE_LABEL, STATEMENT_STATUS_LABEL } from "@/lib/labels";
 import { formatDate, formatRange, money, toNumber } from "@/lib/format";
 import { loadStatement, statementTotals } from "@/lib/commissions";
-import { sharePercentOf } from "@/lib/trips";
+import { sharePercentOf, orgSharePercent } from "@/lib/trips";
 import {
   deleteStatement,
   emailStatement,
@@ -36,7 +36,9 @@ export default async function StatementPage({ params, searchParams }: { params: 
   const basis = s.dateBasis === "TRAVEL_END" ? "fin de viaje" : "fecha de venta";
   const defaultBody = `Hola${s.agency?.contactName ? ` ${s.agency.contactName}` : ""}:
 
-Te envío la planilla de comisiones del período ${formatDate(s.periodFrom)} al ${formatDate(s.periodTo)} (${s.items.length} reservas, total ${totals.map((t) => money(t.expected, t.currency)).join(" + ")}).
+Te envío la planilla de comisiones del período ${formatDate(s.periodFrom)} al ${formatDate(s.periodTo)}: ${s.items.filter((i) => !i.cancelledAt).length} reservas · ${totals
+    .map((t) => `comisión de proveedores ${money(t.provider, t.currency)} · a transferir ${money(t.expected, t.currency)}${t.provider > t.expected + 0.005 ? ` (mi parte${t.adjustments ? ", con ajustes" : ""})` : ""}`)
+    .join(" + ")}.
 
 Quedo atento/a a la liquidación. ¡Gracias!
 
@@ -94,7 +96,7 @@ ${user.organization.name}`;
           </Alert>
         )}
         {!s.sentAt && <Alert tone="warn">Todavía no la enviaste: las comisiones quedan sin solicitar hasta que la mandes a la agencia.</Alert>}
-        {!s.sentAt && s.items.some((i) => !i.cancelledAt && toNumber(i.agentSharePercent ?? 100) !== sharePercentOf(i.bookingItem, user.organization.agency?.agentSharePercent)) && (
+        {!s.sentAt && s.items.some((i) => !i.cancelledAt && toNumber(i.agentSharePercent ?? 100) !== sharePercentOf(i.bookingItem, orgSharePercent(user.organization))) && (
           <Alert tone="info">
             El reparto con la agencia cambió desde que generaste esta planilla.{" "}
             <form action={recalcStatement.bind(null, s.id)} className="inline">
@@ -111,9 +113,11 @@ ${user.organization.name}`;
               <div>
                 <p className="text-xs text-slate-500">A transferir: tu comisión ({t.currency})</p>
                 <p className="text-2xl font-semibold">{money(t.expected, t.currency)}</p>
-                {t.provider > t.expected + 0.005 && (
+                {(t.provider > t.expected - t.adjustments + 0.005 || t.adjustments !== 0) && (
                   <p className="text-xs text-slate-500">
-                    De {money(t.provider, t.currency)} que pagan los proveedores · la agencia retiene {money(t.provider - t.expected, t.currency)}
+                    De {money(t.provider, t.currency)} que pagan los proveedores
+                    {t.provider > t.expected - t.adjustments + 0.005 && ` · la agencia retiene ${money(t.provider - (t.expected - t.adjustments), t.currency)}`}
+                    {t.adjustments !== 0 && ` · ajustes ${money(t.adjustments, t.currency)}`}
                   </p>
                 )}
               </div>
@@ -228,6 +232,20 @@ ${user.organization.name}`;
           </tbody>
         </Table>
       </Card>
+
+      {s.adjustments.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader title="Ajustes" description="Se descuentan de lo que la agencia te transfiere en esta planilla." />
+          <ul className="divide-y divide-slate-100 px-5 pb-3 text-sm">
+            {s.adjustments.map((a) => (
+              <li key={a.id} className="flex justify-between gap-3 py-2">
+                <span className="text-slate-700">{a.description}</span>
+                <span className="font-medium text-rose-700 tabular-nums">{money(a.amount, totals[0]?.currency ?? "USD")}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 print:hidden">
         <Card>

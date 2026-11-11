@@ -8,7 +8,7 @@ import { Alert, Badge, Card, EmptyState, LinkButton, PageHeader, Select, StatCar
 import { COMMISSION_STATUS_COLOR, COMMISSION_STATUS_LABEL, DESTINATION_LABEL, DESTINATION_TONE, ITEM_TYPE_LABEL } from "@/lib/labels";
 import { formatDate, formatRange, money, toNumber } from "@/lib/format";
 import { commissionWhere, receivedOf, type CommissionFilters } from "@/lib/commissions";
-import { agentShareOf } from "@/lib/trips";
+import { myCommissionOf, orgSharePercent } from "@/lib/trips";
 import { CommissionsOverview } from "./overview";
 import { createStatement, markCommissionsPaid, markCommissionsPending } from "./actions";
 import { SelectAll } from "./widgets";
@@ -109,14 +109,14 @@ export default async function CommissionsPage({ searchParams }: { searchParams: 
   ]);
 
   // Totales por moneda.
-  const pct = agency?.agentSharePercent;
+  const pct = orgSharePercent(user.organization);
   const totals = new Map<string, { commission: number; paid: number; pending: number; sales: number; provider: number }>();
   for (const i of allForTotals) {
     const cur = i.booking.currency;
     const t = totals.get(cur) ?? { commission: 0, paid: 0, pending: 0, sales: 0, provider: 0 };
     t.sales += toNumber(i.price);
     // Tu parte: la congelada en su planilla o el reparto de hoy.
-    const mine = i.statementItems[0] ? toNumber(i.statementItems[0].expectedAmount) : agentShareOf(i, pct);
+    const mine = myCommissionOf(i, pct);
     t.commission += mine;
     t.provider += toNumber(i.commissionAmount);
     const received = receivedOf(i, mine);
@@ -239,7 +239,7 @@ export default async function CommissionsPage({ searchParams }: { searchParams: 
                     <Td className="text-right whitespace-nowrap tabular-nums">{money(i.price, i.booking.currency)}</Td>
                     <Td className="text-right whitespace-nowrap tabular-nums">
                       {(() => {
-                        const mine = i.statementItems[0] ? toNumber(i.statementItems[0].expectedAmount) : agentShareOf(i, pct);
+                        const mine = myCommissionOf(i, pct);
                         return (
                           <>
                             <span className="font-semibold text-brand-700">{money(mine, i.booking.currency)}</span>

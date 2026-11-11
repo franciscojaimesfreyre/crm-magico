@@ -1,3 +1,4 @@
+import { myCommissionOf, orgSharePercent } from "@/lib/trips";
 import Link from "next/link";
 import clsx from "clsx";
 import { Download, LayoutGrid, List } from "lucide-react";
@@ -30,7 +31,12 @@ export default async function BookingsPage({
 
   const bookings = await db.booking.findMany({
     where,
-    include: { client: { select: { firstName: true, lastName: true } }, items: { select: { status: true } } },
+    include: {
+      client: { select: { firstName: true, lastName: true } },
+      items: {
+        select: { status: true, commissionAmount: true, agentSharePercent: true, commissionStatus: true, commissionPaidAmount: true, statementItems: { where: { cancelledAt: null }, select: { expectedAmount: true } } },
+      },
+    },
     orderBy: [{ startDate: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }],
     take: 1000,
   });
@@ -38,7 +44,11 @@ export default async function BookingsPage({
   const active = bookings.filter((b) => b.status !== "CANCELLED");
   const sold = active.filter((b) => !["INQUIRY", "QUOTED"].includes(b.status));
   const revenue = sold.reduce((s, b) => s + toNumber(b.totalPrice), 0);
-  const commission = sold.reduce((s, b) => s + toNumber(b.commissionAmount), 0);
+  // Tu comisión (la agencia host puede retener un %): por reserva, igual que en Comisiones.
+  const pct = orgSharePercent(user.organization);
+  const mineOf = (b: (typeof bookings)[number]) => b.items.filter((i) => i.status !== "CANCELLED").reduce((t, i) => t + myCommissionOf(i, pct), 0);
+  const commission = sold.reduce((s, b) => s + mineOf(b), 0);
+  const providerCommission = sold.reduce((s, b) => s + toNumber(b.commissionAmount), 0);
   const currency = user.organization.defaultCurrency;
   const qs = new URLSearchParams(Object.entries(filters).filter(([, v]) => v) as [string, string][]);
   const viewHref = (v: string) => {
@@ -66,7 +76,7 @@ export default async function BookingsPage({
         <StatCard label="Viajes" value={active.length} hint={`${bookings.length - active.length} canceladas`} />
         <StatCard label="Consultas y cotizadas" value={active.length - sold.length} />
         <StatCard label="Vendido" value={money(revenue, currency)} hint={`${sold.length} viajes`} />
-        <StatCard label="Comisiones" value={money(commission, currency)} tone="good" />
+        <StatCard label="Tu comisión" value={money(commission, currency)} tone="good" hint={providerCommission > commission + 0.005 ? `de ${money(providerCommission, currency)} de los proveedores` : undefined} />
       </StatStrip>
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -141,7 +151,7 @@ export default async function BookingsPage({
                 <Th className="text-right">Pasajeros</Th>
                 <Th>Reservas</Th>
                 <Th className="text-right">Total</Th>
-                <Th className="text-right">Comisión</Th>
+                <Th className="text-right">Tu comisión</Th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -177,7 +187,8 @@ export default async function BookingsPage({
                   </Td>
                   <Td className="text-right whitespace-nowrap">{money(b.totalPrice, b.currency)}</Td>
                   <Td className="text-right whitespace-nowrap">
-                    <span className="text-slate-700">{money(b.commissionAmount, b.currency)}</span>
+                    <span className="text-slate-700">{money(mineOf(b), b.currency)}</span>
+                    {toNumber(b.commissionAmount) > mineOf(b) + 0.005 && <span className="block text-[11px] text-slate-400">de {money(b.commissionAmount, b.currency)}</span>}
                   </Td>
                 </tr>
               ))}

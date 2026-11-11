@@ -1,5 +1,6 @@
 "use server";
 
+import { isPlatformAgency } from "@/lib/agencies";
 import { onReservationCancelled } from "@/lib/commissions";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -272,6 +273,8 @@ async function afterItemChange(bookingId: string, userId: string) {
 
 export async function addBookingItem(bookingId: string, _: ActionState, formData: FormData): Promise<ActionState> {
   const { user, booking } = await ownBooking(bookingId);
+  // En las agencias de la plataforma el reparto lo define la agencia: el agente no lo cambia por reserva.
+  if (isPlatformAgency(user.organization.agency)) formData.delete("agentSharePercent");
   // Una reserva nueva arranca con la comisión pendiente: el cobro se registra después, al editarla.
   const data = { ...itemFields(formData), commissionStatus: "PENDING" as const, commissionPaidAt: null, commissionPaidAmount: null };
   const invalid = checkItem(data);
@@ -292,6 +295,7 @@ export async function addBookingItem(bookingId: string, _: ActionState, formData
 
 export async function updateBookingItem(itemId: string, _: ActionState, formData: FormData): Promise<ActionState> {
   const { user, item } = await ownItem(itemId);
+  if (isPlatformAgency(user.organization.agency)) formData.delete("agentSharePercent");
   const data = itemFields(formData);
   const invalid = checkItem(data);
   if (invalid) return { error: invalid };

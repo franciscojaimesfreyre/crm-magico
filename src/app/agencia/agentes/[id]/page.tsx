@@ -5,6 +5,9 @@ import { BOOKING_STATUS_COLOR, BOOKING_STATUS_LABEL, COMMISSION_STATUS_COLOR, CO
 import { formatDate, formatRange, money } from "@/lib/format";
 import { agencyAgent, agencyCurrencies, agencySales, summarize } from "@/lib/agency-panel";
 import { SelectField } from "@/components/select-field";
+import { ActionForm, SubmitButton } from "@/components/form-controls";
+import { Input } from "@/components/ui";
+import { setAgentShare } from "./actions";
 
 export const metadata = { title: "Ventas del agente" };
 
@@ -24,7 +27,7 @@ export default async function AgencyAgentPage({
   const currencies = await agencyCurrencies(user.agencyId);
   const currency = sp.moneda || currencies[0] || "USD";
   const sales = await agencySales(user.agencyId, { year, currency, organizationId: agent.id });
-  const t = summarize(sales, user.agency.agentSharePercent);
+  const t = summarize(sales, agent.agentSharePercent ?? user.agency.agentSharePercent);
 
   return (
     <>
@@ -43,10 +46,23 @@ export default async function AgencyAgentPage({
 
       <StatStrip className="mb-6">
         <StatCard label="Vendido" value={money(t.revenue, currency)} hint={`${t.count} ventas en ${year}`} />
-        <StatCard label="Comisiones" value={money(t.commission, currency)} />
-        <StatCard label="Ya pagadas" value={money(t.paid, currency)} tone="good" />
-        <StatCard label="Por pagar" value={money(t.pending, currency)} tone={t.pending > 0 ? "warn" : "default"} />
+        <StatCard label="Comisiones de proveedores" value={money(t.commission, currency)} hint={t.retained > 0.005 ? `Retenés ${money(t.retained, currency)} · al agente ${money(t.toAgents, currency)}` : undefined} />
+        <StatCard label="Ya transferido" value={money(t.paid, currency)} tone="good" />
+        <StatCard label="Falta transferir" value={money(t.pending, currency)} tone={t.pending > 0 ? "warn" : "default"} />
       </StatStrip>
+
+      <Card className="mb-6">
+        <ActionForm action={setAgentShare.bind(null, agent.id)} className="flex flex-wrap items-end gap-3 p-5">
+          <label className="w-56">
+            <span className="label">Parte de este agente (%)</span>
+            <Input name="agentSharePercent" type="number" step="0.01" min={0} max={100} defaultValue={agent.agentSharePercent?.toString() ?? ""} placeholder={user.agency.agentSharePercent?.toString() ?? "100"} />
+          </label>
+          <p className="flex-1 basis-64 pb-2 text-xs text-slate-500">
+            Lo que le transferís de la comisión que pagan los proveedores. Vacío = la general de la agencia ({user.agency.agentSharePercent?.toString() ?? "100"} %).
+          </p>
+          <SubmitButton size="sm">Guardar</SubmitButton>
+        </ActionForm>
+      </Card>
 
       {sales.length === 0 ? (
         <EmptyState title={`Sin ventas en ${year} en ${currency}`} description="Cada reserva que el agente confirma con un proveedor cuenta como una venta." />

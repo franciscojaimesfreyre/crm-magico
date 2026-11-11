@@ -143,3 +143,26 @@ export function agentShareOf(item: { commissionAmount: Dec; agentSharePercent?: 
   const provider = dec(item.commissionAmount) ?? 0;
   return Math.round(provider * sharePercentOf(item, agencyPercent)) / 100;
 }
+
+/** El % de la cuenta: el que le definió su agencia a este agente, o el general de la agencia. */
+export function orgSharePercent(org: { agentSharePercent?: Dec; agency?: { agentSharePercent?: Dec } | null } | null | undefined) {
+  return dec(org?.agentSharePercent) ?? dec(org?.agency?.agentSharePercent);
+}
+
+type MineInput = {
+  commissionAmount: Dec;
+  agentSharePercent?: Dec;
+  commissionStatus?: string;
+  commissionPaidAmount?: Dec;
+  statementItems?: { expectedAmount: Dec }[];
+};
+
+/**
+ * "Tu comisión" de una reserva, igual en todas las pantallas: si ya se cobró, lo cobrado; si está en una
+ * planilla, lo que quedó congelado ahí; si no, el reparto de hoy.
+ */
+export function myCommissionOf(item: MineInput, agencyPercent?: Dec) {
+  const frozen = item.statementItems?.[0] ? dec(item.statementItems[0].expectedAmount) : null;
+  if (item.commissionStatus === "PAID") return dec(item.commissionPaidAmount) ?? frozen ?? agentShareOf(item, agencyPercent);
+  return frozen ?? agentShareOf(item, agencyPercent);
+}

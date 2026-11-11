@@ -14,7 +14,13 @@ export default async function AgencyStatements() {
   const user = await requireAgencyUser();
   const list = await db.commissionStatement.findMany({
     where: { agencyId: user.agencyId, sentAt: { not: null } },
-    include: { organization: { select: { name: true } }, agent: { select: { name: true } }, items: { where: { cancelledAt: null }, include: { bookingItem: { include: { booking: { select: { currency: true } } } } } } },
+    include: {
+      organization: { select: { name: true } },
+      agent: { select: { name: true } },
+      adjustments: { select: { amount: true } },
+      _count: { select: { payments: true } },
+      items: { where: { cancelledAt: null }, include: { bookingItem: { include: { booking: { select: { currency: true } } } } } },
+    },
     orderBy: { sentAt: "desc" },
   });
   return (
@@ -27,8 +33,9 @@ export default async function AgencyStatements() {
           <ul className="divide-y divide-slate-100">
             {list.map((s) => {
               const currency = s.items[0]?.bookingItem.booking.currency ?? "USD";
-              const expected = s.items.reduce((t, r) => t + toNumber(r.expectedAmount), 0);
-              const received = s.items.reduce((t, r) => t + receivedOf(r.bookingItem, toNumber(r.expectedAmount)), 0);
+              const adj = s.adjustments.reduce((t, a) => t + toNumber(a.amount), 0);
+              const expected = s.items.reduce((t, r) => t + toNumber(r.expectedAmount), 0) + adj;
+              const received = s.items.reduce((t, r) => t + receivedOf(r.bookingItem, toNumber(r.expectedAmount)), 0) + (s._count.payments ? adj : 0);
               return (
                 <li key={s.id}>
                   <Link href={`/agencia/planillas/${s.id}`} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3 hover:bg-slate-50">
@@ -40,7 +47,7 @@ export default async function AgencyStatements() {
                     </div>
                     <Badge className={s.status === "PAID" ? "bg-emerald-50 text-emerald-800" : "bg-amber-100 text-amber-900"}>{STATEMENT_STATUS_LABEL[s.status]}</Badge>
                     <span className="text-sm tabular-nums">
-                      {money(received, currency)} de {money(expected, currency)}
+                      transferido {money(received, currency)} de {money(expected, currency)}
                     </span>
                     <ChevronRight className="size-4 text-slate-400" />
                   </Link>

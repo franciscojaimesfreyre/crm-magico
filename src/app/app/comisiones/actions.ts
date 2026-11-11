@@ -5,8 +5,8 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { parseDateInput, todayUTC, toNumber } from "@/lib/format";
-import { agentShareOf, sharePercentOf } from "@/lib/trips";
-import { buildStatementWorkbook, loadStatement, refreshStatementStatus, registerStatementPayment, statementFilename, statementTotals } from "@/lib/commissions";
+import { agentShareOf, sharePercentOf, orgSharePercent } from "@/lib/trips";
+import { addStatementAdjustments, buildStatementWorkbook, loadStatement, refreshStatementStatus, registerStatementPayment, statementFilename, statementTotals } from "@/lib/commissions";
 import { sendEmail } from "@/lib/email";
 import { logActivity } from "@/lib/events";
 import type { ActionState } from "@/components/form-controls";
@@ -90,12 +90,14 @@ export async function createStatement(formData: FormData) {
         create: items.map((i) => ({
           bookingItemId: i.id,
           providerAmount: i.commissionAmount,
-          agentSharePercent: sharePercentOf(i, user.organization.agency?.agentSharePercent),
-          expectedAmount: agentShareOf(i, user.organization.agency?.agentSharePercent),
+          agentSharePercent: sharePercentOf(i, orgSharePercent(user.organization)),
+          expectedAmount: agentShareOf(i, orgSharePercent(user.organization)),
         })),
       },
     },
   });
+  // Devoluciones de reservas canceladas ya cobradas y cargo de la agencia por viaje.
+  await addStatementAdjustments(statement.id, user.organizationId);
   // Quedan "Sin cobrar" hasta que la planilla se envía: recién ahí están solicitadas.
   redirect(`/app/comisiones/planillas/${statement.id}${inOther.size ? "?omitidas=" + inOther.size : ""}`);
 }
@@ -231,7 +233,7 @@ export async function recalcStatement(statementId: string) {
   const user = await requireUser();
   const s = await db.commissionStatement.findFirst({ where: { id: statementId, organizationId: user.organizationId, sentAt: null }, include: { items: { include: { bookingItem: true } } } });
   if (!s) return;
-  const pct = user.organization.agency?.agentSharePercent;
+  const pct = orgSharePercent(user.organization);
   for (const row of s.items) {
     if (row.bookingItem.commissionStatus === "PAID") continue;
     await db.commissionStatementItem.update({

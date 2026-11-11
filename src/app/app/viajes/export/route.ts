@@ -1,3 +1,4 @@
+import { myCommissionOf, orgSharePercent, sharePercentOf } from "@/lib/trips";
 import type { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
@@ -11,9 +12,10 @@ export async function GET(request: NextRequest) {
   const filters = Object.fromEntries(request.nextUrl.searchParams);
   const bookings = await db.booking.findMany({
     where: bookingWhere(user.organizationId, filters),
-    include: { client: true, items: { orderBy: { position: "asc" } } },
+    include: { client: true, items: { orderBy: { position: "asc" }, include: { statementItems: { where: { cancelledAt: null }, select: { expectedAmount: true } } } } },
     orderBy: { startDate: "asc" },
   });
+  const pct = orgSharePercent(user.organization);
   const amount = (v: unknown) => (v === null || v === undefined ? "" : toNumber(v as number).toFixed(2).replace(".", ","));
   // Una fila por reserva (paquete, tickets, auto…); los viajes sin reservas salen en una sola fila.
   const rows = bookings.flatMap((b) => {
@@ -46,6 +48,8 @@ export async function GET(request: NextRequest) {
       i.balancePaidAt,
       i.saleDate,
       amount(i.commissionAmount),
+      String(sharePercentOf(i, pct)).replace(".", ","),
+      amount(myCommissionOf(i, pct)),
       COMMISSION_STATUS_LABEL[i.commissionStatus],
     ]);
   });
@@ -53,7 +57,7 @@ export async function GET(request: NextRequest) {
     [
       "Viaje", "Cliente", "Email", "Título", "Destino", "Estado del viaje", "Desde", "Hasta", "Adultos", "Menores", "Moneda",
       "Tipo de reserva", "Reserva", "Proveedor", "Confirmación", "Estado de la reserva", "Reserva desde", "Reserva hasta",
-      "Importe", "Pagado", "Saldar antes del", "Saldada el", "Fecha de venta", "Comisión", "Estado comisión",
+      "Importe", "Pagado", "Saldar antes del", "Saldada el", "Fecha de venta", "Comisión del proveedor", "% agente", "Tu comisión", "Estado comisión",
     ],
     rows,
   );

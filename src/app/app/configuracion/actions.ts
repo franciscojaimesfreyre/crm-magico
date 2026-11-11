@@ -60,6 +60,7 @@ export async function saveMyAgency(_: ActionState, formData: FormData): Promise<
     defaultCommissionRate: rate(formData, "defaultCommissionRate"),
     paymentTermDays: termDays(formData),
     agentSharePercent: rate(formData, "agentSharePercent"),
+    feePerTrip: money2(formData.get("feePerTrip")),
     notes: str(formData, "notes"),
   };
   // Si cambia el reparto, se avisa cómo queda lo por cobrar (las planillas ya generadas no cambian).
@@ -126,4 +127,10 @@ export async function regenerateIcalToken() {
 function termDays(formData: FormData) {
   const n = Number(String(formData.get("paymentTermDays") ?? "").trim());
   return Number.isInteger(n) && n > 0 && n <= 365 ? n : null;
+}
+
+/** Monto con dos decimales (vacío = sin cargo). */
+function money2(v: FormDataEntryValue | null) {
+  const n = Number(String(v ?? "").trim().replace(",", "."));
+  return String(v ?? "").trim() && Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null;
 }

@@ -6,7 +6,7 @@ export async function loadBooking(id: string, organizationId: string) {
     where: { id, organizationId },
     include: {
       client: { include: { travelers: { orderBy: { createdAt: "asc" } }, account: true } },
-      organization: { select: { agency: true } },
+      organization: { select: { agency: true, agentSharePercent: true } },
       group: true,
       travelers: { include: { traveler: true } },
       items: {
@@ -15,6 +15,7 @@ export async function loadBooking(id: string, organizationId: string) {
           payments: { orderBy: [{ paidAt: "asc" }, { createdAt: "asc" }] },
           travelers: { include: { traveler: { select: { firstName: true, lastName: true } } } },
           documents: { orderBy: { createdAt: "asc" }, select: { id: true, name: true, storageKey: true, url: true, mimeType: true } },
+          statementItems: { where: { cancelledAt: null }, select: { expectedAmount: true } },
           // De qué cotización salió (vacío = cargada a mano).
           quoteItem: { select: { option: { select: { name: true, quote: { select: { id: true, title: true, _count: { select: { options: true } } } } } } } },
         },

@@ -12,7 +12,7 @@ import { BOOKING_STATUS_COLOR, BOOKING_STATUS_LABEL, DESTINATION_LABEL, DESTINAT
 import { addDays, daysBetween, formatDate, formatRange, money, todayUTC, toNumber } from "@/lib/format";
 import { agenda, defaultScope } from "@/lib/agenda";
 import { receivedOf } from "@/lib/commissions";
-import { agentShareOf } from "@/lib/trips";
+import { myCommissionOf, orgSharePercent } from "@/lib/trips";
 import { AgendaRows } from "./calendario/agenda-ui";
 import { runDateWorkflowsIfDue } from "@/lib/automations";
 import { syncThemeParksIfDue } from "@/lib/themeparks-sync";
@@ -62,11 +62,11 @@ export default async function Dashboard() {
     // Ventas = reservas confirmadas con un proveedor (un viaje puede tener varias).
     db.bookingItem.findMany({
       where: { status: "CONFIRMED", saleDate: { gte: last30 }, booking: { organizationId: orgId, status: { not: "CANCELLED" }, currency } },
-      select: { price: true, commissionAmount: true, agentSharePercent: true },
+      select: { price: true, commissionAmount: true, agentSharePercent: true, commissionStatus: true, commissionPaidAmount: true, statementItems: { where: { cancelledAt: null }, select: { expectedAmount: true } } },
     }),
     db.bookingItem.findMany({
       where: { status: "CONFIRMED", saleDate: { gte: yearStart }, booking: { organizationId: orgId, status: { not: "CANCELLED" }, currency } },
-      select: { price: true, commissionAmount: true, agentSharePercent: true },
+      select: { price: true, commissionAmount: true, agentSharePercent: true, commissionStatus: true, commissionPaidAmount: true, statementItems: { where: { cancelledAt: null }, select: { expectedAmount: true } } },
     }),
     // Por cobrar: lo mismo que en Comisiones, de los viajes que ya terminaron (sin depender del estado manual).
     db.bookingItem.findMany({
@@ -112,13 +112,13 @@ export default async function Dashboard() {
   const thisWeek = allKeyDates.filter((k) => !k.overdue && !k.open && k.date <= in7).length;
   const overdueTasks = tasks.filter((t) => t.dueDate && t.dueDate < today).length;
   // Tu parte de la comisión (la agencia host puede retener un %): la congelada en la planilla o el reparto de hoy.
-  const pct = user.organization.agency?.agentSharePercent;
+  const pct = orgSharePercent(user.organization);
   const toCollect = commissionToCollect.reduce((t, i) => {
-    const mine = i.statementItems[0] ? toNumber(i.statementItems[0].expectedAmount) : agentShareOf(i, pct);
+    const mine = myCommissionOf(i, pct);
     return t + Math.max(0, mine - receivedOf(i, mine));
   }, 0);
-  const sum = (list: { price: unknown; commissionAmount: unknown; agentSharePercent: unknown }[], pick: "price" | "provider" | "mine") =>
-    list.reduce((t, i) => t + (pick === "price" ? toNumber(i.price as never) : pick === "provider" ? toNumber(i.commissionAmount as never) : agentShareOf(i as never, pct)), 0);
+  const sum = (list: (typeof salesYear)[number][], pick: "price" | "provider" | "mine") =>
+    list.reduce((t, i) => t + (pick === "price" ? toNumber(i.price) : pick === "provider" ? toNumber(i.commissionAmount) : myCommissionOf(i, pct)), 0);
   const year = { sold: sum(salesYear, "price"), provider: sum(salesYear, "provider"), mine: sum(salesYear, "mine") };
 
   const featured = nextTrips[0];

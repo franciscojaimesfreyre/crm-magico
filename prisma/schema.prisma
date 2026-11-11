@@ -21,6 +21,8 @@ model Organization {
   tagline               String?
   bio                   String?
   logoUrl               String?
+  /// Parte del agente (%) que le define su agencia de la plataforma (si es distinta de la general de la agencia).
+  agentSharePercent     Decimal?  @db.Decimal(5, 2)
   /// Cuándo se crearon las automatizaciones de formularios por defecto (una sola vez: si se borran, no vuelven).
   formWorkflowsSeededAt DateTime?
   primaryColor          String    @default("#0e7c70")
@@ -104,6 +106,8 @@ model Agency {
   paymentTermDays       Int?
   /// Parte de la comisión del proveedor que la agencia le transfiere al agente (%). Vacío = 100 (no retiene nada).
   agentSharePercent     Decimal? @db.Decimal(5, 2)
+  /// Cargo fijo que la agencia descuenta por cada viaje (una sola vez, en la primera planilla que lo incluye).
+  feePerTrip            Decimal? @db.Decimal(12, 2)
   notes                 String?
   inviteCode            String?  @unique // solo agencias de la plataforma
   createdAt             DateTime @default(now())
@@ -1063,8 +1067,28 @@ model CommissionStatement {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
-  items    CommissionStatementItem[]
-  payments StatementPayment[]
+  items       CommissionStatementItem[]
+  payments    StatementPayment[]
+  adjustments StatementAdjustment[]
+}
+
+/**
+ * Una línea de ajuste de la planilla, que resta (o suma) a lo que la agencia transfiere: la devolución de
+ * una comisión ya cobrada de una reserva cancelada, o el cargo fijo de la agencia por viaje.
+ */
+model StatementAdjustment {
+  id            String              @id @default(cuid())
+  statementId   String
+  statement     CommissionStatement @relation(fields: [statementId], references: [id], onDelete: Cascade)
+  kind          String // REFUND | AGENCY_FEE
+  amount        Decimal             @db.Decimal(12, 2) // negativo resta
+  description   String
+  bookingId     String?
+  bookingItemId String?
+  createdAt     DateTime            @default(now())
+
+  @@index([bookingItemId])
+  @@index([bookingId])
 }
 
 /// Un pago que hizo la agencia por una planilla (una transferencia): se reparte entre sus reservas.

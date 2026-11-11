@@ -24,6 +24,10 @@ export async function updateAgency(_: ActionState, formData: FormData): Promise<
       defaultCommissionRate: rate,
       paymentTermDays: termDays(formData),
       agentSharePercent: sharePct(formData),
+      feePerTrip: (() => {
+        const n = Number(String(formData.get("feePerTrip") ?? "").trim().replace(",", "."));
+        return String(formData.get("feePerTrip") ?? "").trim() && Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null;
+      })(),
       notes: str(formData, "notes"),
     },
   });

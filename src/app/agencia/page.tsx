@@ -33,12 +33,13 @@ export default async function AgencyDashboard({ searchParams }: { searchParams: 
     );
   }
 
-  const total = summarize(sales, user.agency.agentSharePercent);
+  const agentPct = Object.fromEntries(agents.filter((a) => a.agentSharePercent !== null).map((a) => [a.id, a.agentSharePercent]));
+  const total = summarize(sales, user.agency.agentSharePercent, agentPct);
   const byAgent = agents
-    .map((a) => ({ agent: a, ...summarize(sales.filter((s) => s.organizationId === a.id), user.agency.agentSharePercent) }))
+    .map((a) => ({ agent: a, ...summarize(sales.filter((s) => s.organizationId === a.id), user.agency.agentSharePercent, agentPct) }))
     .sort((a, b) => b.revenue - a.revenue);
   const byMonth = MONTHS.map((label, i) => {
-    const value = summarize(sales.filter((s) => s.saleDate!.getUTCMonth() === i), user.agency.agentSharePercent).revenue;
+    const value = summarize(sales.filter((s) => s.saleDate!.getUTCMonth() === i), user.agency.agentSharePercent, agentPct).revenue;
     return { label, value, display: money(value, currency) };
   });
   const destinations = new Map<string, number>();

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import clsx from "clsx";
 import type { ReactNode } from "react";
-import { Paperclip, AlertTriangle, BedDouble, CalendarDays, Car, CheckCircle2, FileText, Hash, Building2, Plane, Plus, Package, PartyPopper, Ship, Shield, Ticket, Trash2, Users, Utensils, Bus, Sparkles, Ban, Wallet } from "lucide-react";
+import { Paperclip, AlertTriangle, BedDouble, CalendarDays, Car, CheckCircle2, Hash, Building2, Plane, Plus, Package, PartyPopper, Ship, Shield, Ticket, Trash2, Users, Utensils, Bus, Sparkles, Ban, Wallet } from "lucide-react";
 import { ConfirmButton } from "@/components/form-controls";
 import { Badge, Card, CardHeader, buttonClass } from "@/components/ui";
 import { COMMISSION_STATUS_LABEL, ITEM_TYPE_BASE, ITEM_TYPE_LABEL, reservationStage } from "@/lib/labels";
@@ -10,7 +10,7 @@ import { storageMode } from "@/lib/storage";
 import type { ItemType } from "@/generated/prisma/enums";
 import { addBookingItem, deleteBookingItem, payReservationDeposit, quickItemAction, updateBookingItem } from "../actions";
 import { ReservationForm } from "./reservation-form";
-import { agentShareOf } from "@/lib/trips";
+import { myCommissionOf, orgSharePercent } from "@/lib/trips";
 import { isPlatformAgency } from "@/lib/agencies";
 import { AttachmentChips } from "@/components/attachment-chips";
 import { ReservationPayments } from "./payments";
@@ -129,7 +129,7 @@ export function Items({
               travelers={travelerOptions}
               selectedTravelers={tripTravelers}
               directUpload={directUpload}
-              agencyShare={{ percent: b.organization.agency?.agentSharePercent ? Number(b.organization.agency.agentSharePercent) : null, editable: !isPlatformAgency(b.organization.agency) }}
+              agencyShare={{ percent: orgSharePercent(b.organization) ?? null, editable: !isPlatformAgency(b.organization.agency) }}
               submitLabel="Agregar reserva"
             />
           </div>
@@ -211,7 +211,7 @@ function ItemCard({
         <details className="group ml-auto text-right open:basis-full open:text-left">
           <summary className="cursor-pointer list-none text-xs text-slate-500 hover:text-slate-800">
             {(() => {
-              const mine = agentShareOf(item, b.organization.agency?.agentSharePercent);
+              const mine = myCommissionOf(item, orgSharePercent(b.organization));
               const provider = Number(item.commissionAmount);
               return (
                 <>
@@ -243,7 +243,7 @@ function ItemCard({
               travelers={travelerOptions}
               selectedTravelers={item.travelers.map((t) => t.travelerId)}
               directUpload={directUpload}
-              agencyShare={{ percent: b.organization.agency?.agentSharePercent ? Number(b.organization.agency.agentSharePercent) : null, editable: !isPlatformAgency(b.organization.agency) }}
+              agencyShare={{ percent: orgSharePercent(b.organization) ?? null, editable: !isPlatformAgency(b.organization.agency) }}
               documents={item.documents}
               submitLabel="Guardar reserva"
             />

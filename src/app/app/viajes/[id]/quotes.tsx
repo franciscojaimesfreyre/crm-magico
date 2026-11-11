@@ -22,7 +22,7 @@ import {
 import { ItemFields } from "./item-fields";
 import { QuoteMessageEditor } from "./quote-message";
 import type { LoadedBooking } from "./data";
-import { commissionFor, sharePercentOf } from "@/lib/trips";
+import { commissionFor, sharePercentOf, orgSharePercent } from "@/lib/trips";
 import { DateInput } from "@/components/date-input";
 import { MultiFileUpload } from "@/components/file-upload";
 import { AttachmentChips } from "@/components/attachment-chips";
@@ -256,7 +256,8 @@ function OptionBlock({
   const total = o.items.reduce((s, i) => s + toNumber(i.price), 0);
   // Tu parte de la comisión (si la agencia host retiene un %); la del proveedor, chica.
   const providerCommission = o.items.reduce((s, i) => s + commissionFor(i, defaultRate), 0);
-  const commission = Math.round(providerCommission * sharePercentOf({}, b.organization.agency?.agentSharePercent)) / 100;
+  // Redondeado por servicio, igual que las reservas que salen al aceptar.
+  const commission = o.items.reduce((s, i) => s + Math.round(commissionFor(i, defaultRate) * sharePercentOf({}, orgSharePercent(b.organization))) / 100, 0);
   const accepted = q.acceptedOptionId === o.id;
   const dimmed = q.status === "ACCEPTED" && !accepted;
   const single = q.options.length === 1;

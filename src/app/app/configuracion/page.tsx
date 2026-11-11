@@ -1,4 +1,6 @@
 import { AgentShareField } from "./share-field";
+import { commissionOverview } from "@/lib/commissions";
+import { orgSharePercent } from "@/lib/trips";
 import { Building2 } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { ActionForm, ConfirmButton, SubmitButton } from "@/components/form-controls";
@@ -34,6 +36,20 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     { key: "cuenta", label: "Mi cuenta" },
   ];
 
+  // Vista previa del reparto: lo que no está en una planilla ni cobrado (y sin % propio) toma el % nuevo.
+  const sharePreview =
+    tab === "agencia"
+      ? await (async () => {
+          const { rows } = await commissionOverview(user.organizationId);
+          const cur = org.defaultCurrency;
+          const mine = rows.filter((r) => r.currency === cur);
+          const open = mine.filter((r) => (r.stage === "ready" || r.stage === "upcoming") && r.item.agentSharePercent === null);
+          const current = mine.reduce((t, r) => t + r.owed, 0);
+          const basis = open.reduce((t, r) => t + r.provider, 0);
+          const fixed = current - open.reduce((t, r) => t + r.owed, 0);
+          return { fixed, basis, current, currency: cur === "USD" ? "US$" : cur };
+        })()
+      : undefined;
   return (
     <div className="max-w-4xl">
       <PageHeader title="Configuración" />
@@ -109,7 +125,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
               <div>
                 <dt className="text-xs text-slate-500">Tu parte de la comisión</dt>
                 <dd className="text-slate-800">
-                  {agency!.agentSharePercent !== null ? `${percent(agency!.agentSharePercent)} (la agencia retiene ${100 - Number(agency!.agentSharePercent)} %)` : "100 % (no retiene nada)"}
+                  {orgSharePercent(org) !== null ? `${percent(orgSharePercent(org)!)} (la agencia retiene ${100 - orgSharePercent(org)!} %)` : "100 % (no retiene nada)"}
                   <span className="block text-xs text-slate-500">Definido por tu agencia</span>
                 </dd>
               </div>
@@ -138,7 +154,10 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                 <Field label="Nombre">
                   <Input name="name" defaultValue={agency?.name} placeholder="Ej: Agencia Madre Travel" required />
                 </Field>
-                <AgentShareField defaultValue={agency?.agentSharePercent?.toString() ?? ""} providerRate={Number(agency?.defaultCommissionRate ?? org.defaultCommissionRate)} />
+                <AgentShareField defaultValue={agency?.agentSharePercent?.toString() ?? ""} providerRate={Number(agency?.defaultCommissionRate ?? org.defaultCommissionRate)} preview={sharePreview} />
+                <Field label="Cargo fijo por viaje" hint="Si la agencia descuenta un monto por cada viaje (gestión, seguro). Se resta una sola vez por viaje en la planilla. Vacío = sin cargo.">
+                  <Input name="feePerTrip" type="number" step="0.01" min={0} defaultValue={agency?.feePerTrip?.toString() ?? ""} />
+                </Field>
                 <Field label="Plazo de pago (días)" hint="Cuántos días suele tardar en pagar una planilla. Vacío = 30.">
                   <Input name="paymentTermDays" type="number" min={1} max={365} defaultValue={agency?.paymentTermDays ?? ""} />
                 </Field>

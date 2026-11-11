@@ -1,4 +1,4 @@
-import { agentShareOf } from "@/lib/trips";
+import { myCommissionOf } from "@/lib/trips";
 import "server-only";
 import { db } from "@/lib/db";
 import { toNumber } from "@/lib/format";
@@ -23,6 +23,7 @@ const SALE_SELECT = {
   commissionStatus: true,
   commissionPaidAt: true,
   commissionPaidAmount: true,
+  statementItems: { where: { cancelledAt: null }, select: { expectedAmount: true } },
   booking: {
     select: { id: true, organizationId: true, code: true, destination: true, status: true, startDate: true, endDate: true, currency: true },
   },
@@ -50,6 +51,7 @@ function toSale(r: SaleRow) {
     commissionStatus: r.commissionStatus,
     commissionPaidAt: r.commissionPaidAt,
     commissionPaidAmount: r.commissionPaidAmount,
+    statementItems: r.statementItems,
   };
 }
 
@@ -66,6 +68,7 @@ export async function agencyAgents(agencyId: string) {
       name: true,
       contactEmail: true,
       agencyJoinedAt: true,
+      agentSharePercent: true,
       users: { select: { name: true }, orderBy: { createdAt: "asc" }, take: 1 },
     },
     orderBy: { name: "asc" },
@@ -76,7 +79,7 @@ export async function agencyAgents(agencyId: string) {
 export async function agencyAgent(agencyId: string, organizationId: string) {
   return db.organization.findFirst({
     where: { id: organizationId, agencyId },
-    select: { id: true, name: true, contactEmail: true, contactPhone: true, agencyJoinedAt: true, users: { select: { name: true }, take: 1 } },
+    select: { id: true, name: true, contactEmail: true, contactPhone: true, agencyJoinedAt: true, agentSharePercent: true, users: { select: { name: true }, take: 1 } },
   });
 }
 
@@ -113,7 +116,7 @@ export async function agencyCurrencies(agencyId: string) {
  * Totales de la agencia: comisión de los proveedores, lo que retiene la agencia, lo que le toca a los agentes,
  * lo ya transferido y lo que falta transferir (según el % de reparto de la agencia o de cada reserva).
  */
-export function summarize(sales: AgencySale[], agentSharePercent?: unknown) {
+export function summarize(sales: AgencySale[], agentSharePercent?: unknown, byAgent: Record<string, unknown> = {}) {
   let revenue = 0;
   let commission = 0;
   let toAgents = 0;
@@ -121,7 +124,9 @@ export function summarize(sales: AgencySale[], agentSharePercent?: unknown) {
   for (const s of sales) {
     revenue += toNumber(s.totalPrice);
     commission += toNumber(s.commissionAmount);
-    const share = agentShareOf(s, agentSharePercent as never);
+    // El % de ese agente (si la agencia le definió uno) o el general; lo cobrado o congelado, si lo hay.
+    const pct = (byAgent[s.organizationId] ?? agentSharePercent) as never;
+    const share = myCommissionOf(s, pct);
     toAgents += share;
     paid += s.commissionPaidAmount !== null ? toNumber(s.commissionPaidAmount) : s.commissionStatus === "PAID" ? share : 0;
   }
